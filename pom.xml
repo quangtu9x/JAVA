@@ -46,11 +46,16 @@
         
         <!-- Security -->
         <spring.security.version>6.2.0</spring.security.version>
-        <jwt.version>4.4.0</jwt.version>
         
         <!-- Utilities -->
         <lombok.version>1.18.30</lombok.version>
         <apache.commons.lang3.version>3.13.0</apache.commons.lang3.version>
+        
+        <!-- File Storage -->
+        <minio.version>8.5.7</minio.version>
+        
+        <!-- Search -->
+        <elasticsearch.version>8.11.3</elasticsearch.version>
         
         <!-- Plugins -->
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
@@ -150,11 +155,11 @@
                 <version>${archunit.version}</version>
             </dependency>
 
-            <!-- Security -->
+            <!-- Security - OAuth2 Resource Server -->
             <dependency>
-                <groupId>com.auth0</groupId>
-                <artifactId>java-jwt</artifactId>
-                <version>${jwt.version}</version>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+                <version>${spring.boot.version}</version>
             </dependency>
 
             <!-- Utilities -->
@@ -167,6 +172,24 @@
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-lang3</artifactId>
                 <version>${apache.commons.lang3.version}</version>
+            </dependency>
+
+            <!-- File Storage -->
+            <dependency>
+                <groupId>io.minio</groupId>
+                <artifactId>minio</artifactId>
+                <version>${minio.version}</version>
+            </dependency>
+
+            <!-- Search -->
+            <dependency>
+                <groupId>org.springframework.data</groupId>
+                <artifactId>spring-data-elasticsearch</artifactId>
+            </dependency>
+            <dependency>
+                <groupId>co.elastic.clients</groupId>
+                <artifactId>elasticsearch-java</artifactId>
+                <version>${elasticsearch.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

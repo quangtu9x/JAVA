@@ -1,0 +1,202 @@
+{
+  "realm": "td-webapi-realm",
+  "enabled": true,
+  "displayName": "TD WebAPI Realm",
+  "displayNameHtml": "<div class=\"kc-logo-text\"><span>TD WebAPI</span></div>",
+  "accessTokenLifespan": 3600,
+  "accessTokenLifespanForImplicitFlow": 900,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "registrationAllowed": false,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "USER",
+        "description": "Basic user role for accessing products and brands"
+      },
+      {
+        "name": "ADMIN",
+        "description": "Administrator role with full system access"
+      },
+      {
+        "name": "PRODUCT_MANAGER",
+        "description": "Role for managing products"
+      },
+      {
+        "name": "BRAND_MANAGER",
+        "description": "Role for managing brands"
+      }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@td-webapi.com",
+      "firstName": "System",
+      "lastName": "Administrator",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["ADMIN", "USER"],
+      "attributes": {}
+    },
+    {
+      "username": "user",
+      "email": "user@td-webapi.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "user123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["USER"],
+      "attributes": {}
+    },
+    {
+      "username": "product_manager",
+      "email": "product.manager@td-webapi.com",
+      "firstName": "Product",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "pm123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["PRODUCT_MANAGER", "USER"],
+      "attributes": {}
+    },
+    {
+      "username": "brand_manager",
+      "email": "brand.manager@td-webapi.com",
+      "firstName": "Brand",
+      "lastName": "Manager",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "bm123",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["BRAND_MANAGER", "USER"],
+      "attributes": {}
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "td-webapi-client",
+      "name": "TD WebAPI Client",
+      "description": "Client for TD WebAPI backend service",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "td-webapi-secret-2024",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "http://localhost:8080/*",
+        "https://localhost:8080/*",
+        "http://localhost:3000/*",
+        "https://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:8080",
+        "https://localhost:8080",
+        "http://localhost:3000",
+        "https://localhost:3000"
+      ],
+      "attributes": {
+        "access.token.lifespan": "3600",
+        "client.secret.creation.time": "1699545600"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "td-api",
+      "description": "TD WebAPI access scope",
+      "protocol": "openid-connect",
+      "attributes": {
+        "consent.screen.text": "Access to TD WebAPI",
+        "display.on.consent.screen": "true"
+      }
+    }
+  ],
+  "defaultDefaultClientScopes": [
+    "role_list",
+    "profile",
+    "email",
+    "td-api"
+  ]
+}

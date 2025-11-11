@@ -1,0 +1,207 @@
+version: '3.8'
+
+services:
+  # Keycloak Identity Provider
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0.5
+    container_name: td-keycloak
+    ports:
+      - "8180:8080"
+    environment:
+      # Admin user for Keycloak management console
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      
+      # Database configuration for Keycloak
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      
+      # Development mode settings
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+    command: 
+      - start-dev
+      - --import-realm
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json:ro
+    depends_on:
+      - keycloak-db
+    networks:
+      - td-network
+
+  # PostgreSQL for Keycloak
+  keycloak-db:
+    image: postgres:15-alpine
+    container_name: td-keycloak-db
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - keycloak_postgres_data:/var/lib/postgresql/data
+    networks:
+      - td-network
+
+  # PostgreSQL for Application
+  app-postgres:
+    image: postgres:15-alpine
+    container_name: td-app-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: tdwebapi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - app_postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - td-network
+
+  # MongoDB for Logging
+  mongodb:
+    image: mongo:7-jammy
+    container_name: td-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: tdwebapi_logs
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - td-network
+
+  # MinIO Object Storage
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-01-01T16-36-33Z
+    container_name: td-minio
+    ports:
+      - "9000:9000"    # API port
+      - "9001:9001"    # Console port
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio_data:/data
+      - ./minio/policies:/etc/minio/policies
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - td-network
+
+  # Elasticsearch for Search
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: td-elasticsearch
+    ports:
+      - "9200:9200"    # HTTP API port
+      - "9300:9300"    # Transport port
+    environment:
+      # Single node cluster configuration
+      - discovery.type=single-node
+      - cluster.name=td-cluster
+      - node.name=td-node-1
+      
+      # Memory settings
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      
+      # Security settings (disable for development)
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - xpack.security.transport.ssl.enabled=false
+      
+      # Performance settings
+      - bootstrap.memory_lock=true
+      - thread_pool.write.queue_size=1000
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - td-network
+
+  # Kibana for Elasticsearch Management (Optional)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.3
+    container_name: td-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=
+      - xpack.security.enabled=false
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - td-network
+    profiles:
+      - analytics
+
+  # Redis for Caching (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: td-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - td-network
+
+  # Nginx for reverse proxy (Optional - for production setup)
+  nginx:
+    image: nginx:alpine
+    container_name: td-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - keycloak
+    networks:
+      - td-network
+    profiles:
+      - production
+
+volumes:
+  keycloak_postgres_data:
+    driver: local
+  app_postgres_data:
+    driver: local
+  mongodb_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  td-network:
+    driver: bridge

@@ -12,7 +12,8 @@
 ### Công Nghệ Chính
 - **Java 17**, **Spring Boot 3.2.0**, **Spring Security 6.2.0**
 - **Database**: PostgreSQL (chính) + MongoDB (logging)
-- **Security**: JWT Authentication với Auth0 java-jwt
+- **File Storage**: MinIO Object Storage
+- **Security**: Keycloak OAuth2/OIDC Integration
 - **Migration**: Flyway
 - **Tools**: MapStruct, Lombok, SpringDoc OpenAPI
 
@@ -84,10 +85,26 @@ $env:MONGODB_PASSWORD = ""
 $env:MONGODB_AUTH_DB = "admin"
 ```
 
-### JWT Security
+### Keycloak Security
 ```powershell
-# ⚠️ QUAN TRỌNG: Thay đổi secret trên production
-$env:JWT_SECRET = "your-very-secure-secret-key-minimum-256-bits"
+# Keycloak Server Configuration
+$env:KEYCLOAK_SERVER_URL = "http://localhost:8180"
+$env:KEYCLOAK_REALM = "td-webapi-realm"
+$env:KEYCLOAK_CLIENT_ID = "td-webapi-client"
+$env:KEYCLOAK_CLIENT_SECRET = "your-keycloak-client-secret"
+
+# Optional: Custom Keycloak Admin (for user management)
+$env:KEYCLOAK_ADMIN_USERNAME = "admin"
+$env:KEYCLOAK_ADMIN_PASSWORD = "admin-password"
+```
+
+### MinIO File Storage
+```powershell
+# MinIO Configuration
+$env:MINIO_URL = "http://localhost:9000"
+$env:MINIO_ACCESS_KEY = "minioadmin"
+$env:MINIO_SECRET_KEY = "minioadmin"
+$env:MINIO_BUCKET_NAME = "td-webapi-files"
 ```
 
 ### Spring Profiles
@@ -101,9 +118,68 @@ $env:SPRING_PROFILES_ACTIVE = "dev"  # dev, staging, prod
 mvn -pl td-web -am spring-boot:run
 ```
 
+### Quick Setup với Docker Compose
+```yaml
+# docker-compose.yml (example)
+version: '3.8'
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0.1
+    ports:
+      - "8180:8080"
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    command: start-dev
+    
+  postgres:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: tdwebapi
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: tdwebapi_logs
+```
+
+```powershell
+# Start tất cả services
+docker-compose up -d
+
+# Chạy application
+mvn -pl td-web -am spring-boot:run
+```
+
 ---
 
-## 🗃️ Cấu Hình Database
+## 🗃️ Cấu Hình Database & Keycloak
+
+### Keycloak Setup
+1. **Cài đặt Keycloak 22+**
+   ```powershell
+   # Download và chạy Keycloak
+   docker run -p 8180:8080 -e KEYCLOAK_ADMIN=admin -e KEYCLOAK_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:22.0.1 start-dev
+   ```
+
+2. **Cấu hình Realm và Client**:
+   - Tạo realm: `td-webapi-realm`
+   - Tạo client: `td-webapi-client`
+   - Client Type: `confidential`
+   - Authentication flow: `Standard Flow + Direct Access Grants`
+   - Valid redirect URIs: `http://localhost:8080/*`
+
+3. **Tạo Roles**:
+   - `USER` - Basic user access
+   - `ADMIN` - Admin access
+   - `BRAND_MANAGER` - Brand management
+   - `PRODUCT_MANAGER` - Product management
 
 ### PostgreSQL Setup
 1. **Cài đặt PostgreSQL 12+**
@@ -125,32 +201,46 @@ mvn -pl td-web -am spring-boot:run
 
 ---
 
-## 🔐 Cấu Hình Security
+## 🔐 Cấu Hình Security với Keycloak
 
-### JWT Configuration
-- **Access Token**: 1 giờ (mặc định)
-- **Refresh Token**: 24 giờ (mặc định)
-- **Algorithm**: HMAC256
-- **Issuer**: TD.WebAPI
+### Keycloak OAuth2/OIDC Configuration
+- **Authorization Server**: Keycloak (port 8180)
+- **Token Type**: JWT (RS256 - RSA signature)
+- **Token Validation**: JWK Set từ Keycloak
+- **Scopes**: `openid`, `profile`, `email`, `roles`
 
 ### API Endpoints Security
 ```yaml
 Public Endpoints:
-  - /api/v1/auth/**
   - /api/health/**
   - /swagger-ui/**, /v3/api-docs/**
+  - /login/oauth2/**, /oauth2/**
 
-Protected Endpoints (USER/ADMIN):
-  - /api/v1/products/**
-  - /api/v1/brands/**
+Protected Endpoints:
+  - /api/v1/products/** (Roles: USER, ADMIN, PRODUCT_MANAGER)
+  - /api/v1/brands/** (Roles: USER, ADMIN, BRAND_MANAGER)
+  - /api/v1/admin/** (Roles: ADMIN)
 
-Admin Only:
-  - /api/v1/admin/**
+Authentication Flow:
+  1. Frontend redirect to Keycloak login
+  2. User login tại Keycloak
+  3. Keycloak redirect về với authorization code
+  4. Backend exchange code → access token
+  5. API calls với Bearer token
+```
+
+### Keycloak Roles Mapping
+```yaml
+Keycloak Role → Spring Authority:
+  - USER → ROLE_USER
+  - ADMIN → ROLE_ADMIN  
+  - BRAND_MANAGER → ROLE_BRAND_MANAGER
+  - PRODUCT_MANAGER → ROLE_PRODUCT_MANAGER
 ```
 
 ### CORS Configuration
-- **Development**: Cho phép tất cả origins
-- **Production**: ⚠️ Cần tighten origins
+- **Development**: Cho phép Keycloak + localhost
+- **Production**: Specific domains only
 
 ---
 
@@ -170,12 +260,13 @@ td-infrastructure/src/main/java/com/td/infrastructure/
 ├── config/
 │   ├── MongoConfig.java           # MongoDB config (app.mongodb.*)
 │   ├── MongoClientConfig.java     # MongoDB client setup
-│   └── DatabaseConfig.java       # PostgreSQL config (app.database.*)
+│   ├── DatabaseConfig.java       # PostgreSQL config (app.database.*)
+│   └── KeycloakConfig.java        # Keycloak OAuth2 config
 └── security/
-    ├── SecurityConfig.java        # Security rules & CORS
-    ├── JwtProperties.java         # JWT settings (app.security.jwt.*)
-    ├── JwtService.java            # JWT token operations
-    └── JwtAuthenticationFilter.java # JWT request filter
+    ├── SecurityConfig.java        # Security rules & OAuth2 setup
+    ├── KeycloakProperties.java    # Keycloak settings (app.keycloak.*)
+    ├── KeycloakJwtConverter.java  # JWT to Spring authorities converter
+    └── KeycloakRoleMapper.java    # Keycloak roles → Spring roles mapping
 ```
 
 ---
@@ -191,15 +282,19 @@ td-infrastructure/src/main/java/com/td/infrastructure/
 - **Option A**: Sử dụng Spring Boot auto-config (recommend)
 - **Option B**: Thêm `app.database.*` và `app.mongodb.*` vào `application.yml`
 
-### 2. JWT Secret Security
+### 2. Keycloak Client Secret Security
 **⚠️ CRITICAL**: 
-- Mặc định có secret trong `application.yml`
-- **KHÔNG BAO GIỜ** sử dụng secret mặc định trên production
+- Client secret cần được bảo mật
+- **KHÔNG BAO GIỜ** commit client secret vào code
 - Sử dụng Azure Key Vault, AWS Secrets Manager, hoặc secure env vars
+- Rotate client secret định kỳ
 
-### 3. JWT Roles Mapping
-**Vấn đề**: Spring Security `hasAnyRole("USER")` tìm `ROLE_USER`, nhưng filter map roles as-is.
-**Giải pháp**: Đảm bảo roles trong JWT token có format đúng hoặc adjust mapping logic.
+### 3. Keycloak Roles Mapping
+**Cấu hình**: Keycloak roles được map từ JWT claims sang Spring authorities
+**Lưu ý**: 
+- Keycloak roles nằm trong `realm_access.roles` hoặc `resource_access.{client}.roles`
+- Spring Security cần prefix `ROLE_` cho authorities
+- Custom converter sẽ handle mapping: `USER` → `ROLE_USER`
 
 ### 4. Database Migration
 - **Flyway enabled**: Migrations chạy tự động
@@ -228,25 +323,44 @@ http://localhost:8080/v3/api-docs
 ### Main Endpoints
 ```
 Products:
-  POST /api/v1/products/search
-  GET  /api/v1/products/{id}
-  POST /api/v1/products
-  PUT  /api/v1/products/{id}
-  DELETE /api/v1/products/{id}
-  POST /api/v1/products/export
+  POST /api/v1/products/search     (Roles: USER, ADMIN, PRODUCT_MANAGER)
+  GET  /api/v1/products/{id}       (Roles: USER, ADMIN, PRODUCT_MANAGER)
+  POST /api/v1/products            (Roles: ADMIN, PRODUCT_MANAGER)
+  PUT  /api/v1/products/{id}       (Roles: ADMIN, PRODUCT_MANAGER)
+  DELETE /api/v1/products/{id}     (Roles: ADMIN)
+  POST /api/v1/products/export     (Roles: ADMIN, PRODUCT_MANAGER)
 
 Brands:
-  POST /api/v1/brands/search
-  GET  /api/v1/brands/{id}
-  POST /api/v1/brands
-  PUT  /api/v1/brands/{id}
-  DELETE /api/v1/brands/{id}
+  POST /api/v1/brands/search       (Roles: USER, ADMIN, BRAND_MANAGER)
+  GET  /api/v1/brands/{id}         (Roles: USER, ADMIN, BRAND_MANAGER)
+  POST /api/v1/brands              (Roles: ADMIN, BRAND_MANAGER)
+  PUT  /api/v1/brands/{id}         (Roles: ADMIN, BRAND_MANAGER)
+  DELETE /api/v1/brands/{id}       (Roles: ADMIN)
 
 Audit Logs:
-  POST /api/v1/audit-logs/search (Admin only)
+  POST /api/v1/audit-logs/search   (Roles: ADMIN)
 
 Health:
-  GET /api/health
+  GET /api/health                  (Public)
+```
+
+### Testing với Keycloak Token
+```powershell
+# 1. Get access token từ Keycloak
+$response = Invoke-RestMethod -Uri "http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token" `
+  -Method POST `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "client_id=td-webapi-client&client_secret=YOUR_CLIENT_SECRET&grant_type=password&username=testuser&password=testpass"
+
+$token = $response.access_token
+
+# 2. Call API với Bearer token
+$headers = @{ "Authorization" = "Bearer $token" }
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/products/search" `
+  -Method POST `
+  -Headers $headers `
+  -ContentType "application/json" `
+  -Body '{"pageIndex": 0, "pageSize": 10}'
 ```
 
 ---
@@ -295,10 +409,19 @@ mongosh --eval "db.adminCommand('ping')"
 mvn flyway:repair -Dflyway.url=$env:DATABASE_URL
 ```
 
-#### 4. JWT Token Invalid
-- Kiểm tra JWT secret đúng
-- Kiểm tra token chưa expired
-- Kiểm tra roles format trong token
+#### 4. Keycloak Authentication Failed
+```powershell
+# Kiểm tra Keycloak server đang chạy:
+curl http://localhost:8180/realms/td-webapi-realm/.well-known/openid_configuration
+
+# Kiểm tra token validity:
+curl -X POST http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token-introspect \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=td-webapi-client&client_secret=YOUR_SECRET&token=YOUR_TOKEN"
+```
+- Kiểm tra Keycloak realm và client config
+- Kiểm tra redirect URIs đúng
+- Kiểm tra client secret không expired
 
 #### 5. Lombok/MapStruct Not Working
 - Bật annotation processing trong IDE
@@ -311,21 +434,21 @@ mvn flyway:repair -Dflyway.url=$env:DATABASE_URL
 
 ### Ưu Tiên Cao
 1. **Thống nhất cấu hình**: Chọn `spring.*` OR `app.*` prefixes
-2. **Bảo mật JWT**: Sử dụng secure secret management
-3. **Docker Compose**: Thêm PostgreSQL + MongoDB setup
-4. **Environment Template**: Tạo `.env.example`
+2. **Keycloak Production Setup**: Multi-node, SSL, custom themes
+3. **Docker Compose**: Thêm Keycloak + PostgreSQL + MongoDB setup
+4. **Environment Template**: Tạo `.env.example` với Keycloak vars
 
 ### Ưu Tiên Trung Bình
-5. **Integration Tests**: Thêm Testcontainers tests
-6. **CI/CD Pipeline**: GitHub Actions hoặc Azure DevOps
-7. **Health Checks**: Cải thiện monitoring endpoints
-8. **Logging**: Cấu hình structured logging
+5. **Integration Tests**: Thêm Testcontainers với Keycloak
+6. **CI/CD Pipeline**: GitHub Actions với Keycloak testing
+7. **Health Checks**: Monitor Keycloak connectivity
+8. **Keycloak Themes**: Custom login/registration UI
 
 ### Ưu Tiên Thấp
-9. **API Versioning**: Strategy cho breaking changes
-10. **Caching**: Redis cho performance
-11. **Documentation**: OpenAPI examples và descriptions
-12. **Metrics**: Prometheus/Micrometer integration
+9. **Keycloak Extensions**: Custom authenticators, protocols
+10. **Social Login**: Google, Facebook, GitHub integration
+11. **Advanced RBAC**: Fine-grained permissions với Keycloak
+12. **SSO Integration**: SAML, LDAP, Active Directory
 
 ---
 
@@ -348,7 +471,9 @@ mvn test -Dtest=BrandServiceTest
 
 ### Configuration References
 - [Spring Boot Configuration Properties](https://docs.spring.io/spring-boot/docs/current/reference/html/application-properties.html)
-- [Spring Security JWT](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/jwt.html)
+- [Spring Security OAuth2 Resource Server](https://docs.spring.io/spring-security/reference/servlet/oauth2/resource-server/index.html)
+- [Keycloak Documentation](https://www.keycloak.org/documentation)
+- [Keycloak Spring Security Adapter](https://www.keycloak.org/docs/latest/securing_apps/#_spring_security_adapter)
 - [Flyway Documentation](https://flywaydb.org/documentation/)
 
 ### Project Structure References
@@ -361,24 +486,25 @@ mvn test -Dtest=BrandServiceTest
 
 ### Version 1.0.0-SNAPSHOT
 - Initial Clean Architecture setup
-- JWT Authentication implementation  
+- Keycloak OAuth2/OIDC Integration
 - PostgreSQL + MongoDB integration
 - Flyway migrations
 - Basic CRUD for Products and Brands
-- OpenAPI documentation
+- OpenAPI documentation với OAuth2 security
 
 ### Known Issues
 - Configuration prefix inconsistency (DatabaseConfig/MongoConfig vs application.yml)
-- JWT roles mapping needs standardization
-- CORS policy too permissive for production
+- Keycloak roles mapping cần custom converter
+- CORS policy cần cấu hình cho Keycloak origins
+- Production Keycloak setup chưa có SSL
 
 ### TODO
-- [ ] Add Testcontainers integration tests
-- [ ] Implement user authentication endpoints
-- [ ] Add API rate limiting
-- [ ] Implement audit logging for all operations
-- [ ] Add Docker containerization
-- [ ] Production-ready configuration profiles
+- [ ] Add Testcontainers với Keycloak testing
+- [ ] Implement Keycloak user management endpoints
+- [ ] Add API rate limiting với Keycloak integration
+- [ ] Implement audit logging với user context từ Keycloak
+- [ ] Add Docker Compose với Keycloak
+- [ ] Production-ready Keycloak configuration
 
 ---
 
