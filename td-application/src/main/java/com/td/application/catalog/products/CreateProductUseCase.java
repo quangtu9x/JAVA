@@ -10,6 +10,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+/**
+ * Use Case - Tạo sản phẩm mới trong hệ thống
+ * 
+ * Nghiệp vụ:
+ * 1. Validate thương hiệu có tồn tại không
+ * 2. Tạo entity Product mới với thông tin từ request
+ * 3. Lưu vào database
+ * 4. Trả về ID của sản phẩm vừa tạo
+ * 
+ * Sử dụng:
+ * - Input: CreateProductRequest (name, description, rate, brandId, imagePath)
+ * - Output: Result<UUID> (success với productId hoặc failure với error message)
+ * 
+ * @Transactional: Đảm bảo toàn bộ thao tác trong 1 transaction
+ */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -18,15 +33,21 @@ public class CreateProductUseCase {
     private final IRepository<Product> productRepository;
     private final IRepository<Brand> brandRepository;
 
+    /**
+     * Thực thi use case - Tạo sản phẩm mới
+     * 
+     * @param request Request chứa thông tin sản phẩm cần tạo
+     * @return Result<UUID> - Success với ID sản phẩm hoặc Failure với lỗi
+     */
     public Result<UUID> execute(CreateProductRequest request) {
         try {
-            // Validate brand exists
+            // Bước 1: Validate brand exists - Kiểm tra thương hiệu có tồn tại không
             var brand = brandRepository.findById(request.getBrandId());
             if (brand.isEmpty()) {
                 return Result.failure("Brand not found with ID: " + request.getBrandId());
             }
 
-            // Create product
+            // Bước 2: Create product - Tạo entity sản phẩm mới
             var product = new Product(
                 request.getName(),
                 request.getDescription(), 
@@ -35,9 +56,10 @@ public class CreateProductUseCase {
                 request.getImagePath()
             );
 
-            // Save product
+            // Bước 3: Save product - Lưu vào database
             var savedProduct = productRepository.save(product);
             
+            // Bước 4: Return product ID - Trả về ID sản phẩm vừa tạo
             return Result.success(savedProduct.getId());
             
         } catch (Exception ex) {

@@ -1,191 +1,244 @@
 # TD WebAPI - Java Spring Boot
 
-Đây là phiên bản Java Spring Boot của TD WebAPI, được phát triển dựa trên phiên bản .NET gốc với kiến trúc Clean Architecture.
+> Migration từ .NET TD WebAPI sang Java Spring Boot với Clean Architecture
 
-## Kiến trúc dự án
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://www.oracle.com/java/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.0-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Dự án được tổ chức theo Clean Architecture với các module sau:
+## 📚 Tài liệu
 
-- **td-domain**: Chứa các entity, aggregate root, domain events và business logic
-- **td-application**: Chứa use cases, DTOs, interfaces và application services  
-- **td-infrastructure**: Chứa implementations cho database, security, caching, file storage
-- **td-web**: Chứa controllers, main application và configuration
+- **[HUONG_DAN_SU_DUNG.md](./HUONG_DAN_SU_DUNG.md)** - Hướng dẫn sử dụng chi tiết bằng tiếng Việt (ƯU TIÊN ĐỌC FILE NÀY TRƯỚC)
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Kiến trúc hệ thống chi tiết
+- **[docs/QUICK_START.md](./docs/QUICK_START.md)** - Cài đặt nhanh
+- **[docs/EXTERNAL_SERVICES.md](./docs/EXTERNAL_SERVICES.md)** - Cấu hình services bên ngoài
 
-## Công nghệ sử dụng
+## 🎯 Tổng quan
 
-- **Java 17**
-- **Spring Boot 3.2.0**
-- **Spring Security 6.2.0** - OAuth2 Resource Server với Keycloak
-- **Spring Data JPA** - ORM và Repository pattern cho PostgreSQL
-- **Spring Data MongoDB** - NoSQL database cho logging
-- **PostgreSQL** - Primary relational database
-- **MongoDB** - Document database cho audit logs và API logs
-- **MinIO** - Object storage cho file management
-- **Keycloak** - Identity Provider và Authentication/Authorization
-- **Flyway** - Database migration
-- **MapStruct** - Object mapping
-- **Lombok** - Code generation
-- **SpringDoc OpenAPI** - API documentation
-- **Maven** - Build tool
-- **Docker Compose** - Infrastructure orchestration
+TD WebAPI là hệ thống quản lý sản phẩm và thương hiệu được xây dựng bằng **Java Spring Boot** với:
 
-## Cài đặt và chạy
+### ✨ Tính năng chính
+- 🛒 **Quản lý Sản phẩm & Thương hiệu**: CRUD, tìm kiếm, export Excel
+- 🔍 **Tìm kiếm nâng cao**: Elasticsearch full-text search với fuzzy matching
+- 📁 **Quản lý File**: Upload/download với MinIO object storage
+- 📊 **Audit Logging**: Tự động tracking mọi thay đổi data vào MongoDB
+- 🔐 **Authentication**: Keycloak OAuth2/OIDC với JWT
+- 📄 **API Documentation**: Swagger/OpenAPI interactive docs
 
-### Yêu cầu hệ thống
+### 🏗️ Kiến trúc
 
-- Java 17 hoặc cao hơn
-- Maven 3.8+
-- Docker & Docker Compose (khuyến nghị)
+```
+┌─────────────────────────────────────────────┐
+│           Web Layer (td-web)                │  ← REST API Controllers
+├─────────────────────────────────────────────┤
+│    Infrastructure (td-infrastructure)       │  ← Repositories, Security, External Services
+├─────────────────────────────────────────────┤
+│    Application (td-application)             │  ← Use Cases, DTOs, Business Workflows
+├─────────────────────────────────────────────┤
+│       Domain (td-domain)                    │  ← Entities, Business Logic (Pure Java)
+└─────────────────────────────────────────────┘
+```
 
-**Hoặc cài đặt thủ công:**
-- PostgreSQL 12+ 
-- MongoDB 5.0+
-- MinIO Server
-- Keycloak 22+
+**Clean Architecture Principles:**
+- Domain không phụ thuộc vào framework nào
+- Application chỉ biết về Domain
+- Infrastructure implement interfaces từ Application
+- Web layer điều phối tất cả
 
-### Setup với Docker Compose (Khuyến nghị)
+### 🗄️ Hybrid Database Strategy
 
-#### Quick Start
-```powershell
-# 1. Start tất cả services
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  PostgreSQL  │  │   MongoDB    │  │Elasticsearch │  │    MinIO     │
+│  (Primary)   │  │  (Logging)   │  │   (Search)   │  │   (Files)    │
+└──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+     Products          AuditLogs        Full-text        Images/Docs
+     Brands            ApiLogs          Suggestions      Metadata
+```
+
+## 🚀 Quick Start
+
+### 📦 Với Docker Compose (Khuyến nghị)
+
+```bash
+# 1. Clone repository
+git clone <repo-url>
+cd td-webapi-java
+
+# 2. Start tất cả infrastructure services
 docker-compose up -d
 
-# 2. Chạy setup script
-.\setup-dev.ps1
+# 3. Đợi services khởi động (~30-60 giây)
+docker-compose logs -f
 
-# 3. Build và chạy application
-mvn clean install
-mvn -pl td-web -am spring-boot:run
-```
-
-#### Services được khởi động:
-- **PostgreSQL** - Database chính (port 5432)
-- **MongoDB** - Logging database (port 27017)
-- **MinIO** - File storage (API: 9000, Console: 9001)
-- **Keycloak** - Identity provider (port 8180)
-- **Redis** - Caching (port 6379)
-
-### Setup thủ công (không dùng Docker)
-
-#### PostgreSQL (Primary Database)
-1. Cài đặt PostgreSQL 12+
-2. Tạo database tên `tdwebapi`
-3. Set environment variables:
-
-```powershell
-$env:DATABASE_URL = "jdbc:postgresql://localhost:5432/tdwebapi"
-$env:DATABASE_USERNAME = "postgres"
-$env:DATABASE_PASSWORD = "postgres"
-```
-
-#### MongoDB (Logging Database)
-1. Cài đặt MongoDB 5.0+
-2. Set environment variables:
-
-```powershell
-$env:MONGODB_HOST = "localhost"
-$env:MONGODB_PORT = "27017"
-$env:MONGODB_DATABASE = "tdwebapi_logs"
-```
-
-#### Keycloak (Identity Provider)
-1. Cài đặt Keycloak 22+
-2. Import realm từ `keycloak/realm-export.json`
-3. Set environment variables:
-
-```powershell
-$env:KEYCLOAK_SERVER_URL = "http://localhost:8180"
-$env:KEYCLOAK_REALM = "td-webapi-realm"
-$env:KEYCLOAK_CLIENT_ID = "td-webapi-client"
-$env:KEYCLOAK_CLIENT_SECRET = "td-webapi-secret-2024"
-```
-
-#### MinIO (File Storage)
-1. Cài đặt MinIO Server
-2. Set environment variables:
-
-```powershell
-$env:MINIO_URL = "http://localhost:9000"
-$env:MINIO_ACCESS_KEY = "minioadmin"
-$env:MINIO_SECRET_KEY = "minioadmin"
-$env:MINIO_BUCKET_NAME = "td-webapi-files"
-```
-
-### Build và chạy ứng dụng
-
-#### Option 1: Automatic Setup (Khuyến nghị)
-```powershell
-# Setup toàn bộ môi trường development
-.\setup-dev.ps1
-
-# Build và chạy
-mvn -pl td-web -am spring-boot:run
-```
-
-#### Option 2: Manual Build
-```powershell
-# Build tất cả modules
+# 4. Build application
 mvn clean install
 
-# Chạy ứng dụng với environment variables
-mvn -pl td-web -am spring-boot:run
+# 5. Run application
+cd td-web
+mvn spring-boot:run
+
+# 6. Truy cập Swagger UI
+# http://localhost:8080/swagger-ui.html
 ```
 
-#### Option 3: Chạy từ IDE
-1. Import project vào IDE (IntelliJ IDEA, Eclipse, VS Code)
-2. Set environment variables trong IDE run configuration
-3. Chạy class `TdWebApiApplication` trong module `td-web`
+### 🛠️ Setup thủ công (Không Docker)
 
-## Service URLs
+Chi tiết xem: **[docs/QUICK_START.md](./docs/QUICK_START.md)**
 
-Sau khi setup hoàn tất:
+## 🔗 Service URLs
 
-- **Application**: http://localhost:8080
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
-- **OpenAPI JSON**: http://localhost:8080/v3/api-docs
-- **Keycloak Admin**: http://localhost:8180 (admin/admin)
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
-- **Health Check**: http://localhost:8080/api/health
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| 🌐 Application | http://localhost:8080 | - |
+| 📖 Swagger UI | http://localhost:8080/swagger-ui.html | - |
+| 🔐 Keycloak Admin | http://localhost:8180 | admin / admin |
+| 📦 MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
+| 🔍 Elasticsearch | http://localhost:9200 | elastic / changeme |
 
-## API Endpoints
+## 📡 API Endpoints
 
-### Products (Requires Authentication)
+### Authentication - Lấy Access Token
 
-- `POST /api/v1/products/search` - Tìm kiếm products (USER, ADMIN, PRODUCT_MANAGER)
-- `GET /api/v1/products/{id}` - Lấy thông tin product (USER, ADMIN, PRODUCT_MANAGER)
-- `POST /api/v1/products` - Tạo product mới (ADMIN, PRODUCT_MANAGER)
-- `PUT /api/v1/products/{id}` - Cập nhật product (ADMIN, PRODUCT_MANAGER)
-- `DELETE /api/v1/products/{id}` - Xóa product (ADMIN)
-- `POST /api/v1/products/export` - Export products (ADMIN, PRODUCT_MANAGER)
+```bash
+curl -X POST "http://localhost:8180/realms/td-realm/protocol/openid-connect/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password" \
+  -d "client_id=td-client" \
+  -d "username=admin" \
+  -d "password=admin"
+```
 
-### Brands (Requires Authentication)
+### Products API
 
-- `POST /api/v1/brands/search` - Tìm kiếm brands (USER, ADMIN, BRAND_MANAGER)
-- `GET /api/v1/brands/{id}` - Lấy thông tin brand (USER, ADMIN, BRAND_MANAGER)
-- `POST /api/v1/brands` - Tạo brand mới (ADMIN, BRAND_MANAGER)
-- `PUT /api/v1/brands/{id}` - Cập nhật brand (ADMIN, BRAND_MANAGER)
-- `DELETE /api/v1/brands/{id}` - Xóa brand (ADMIN)
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| `POST` | `/api/v1/products/search` | Tìm kiếm sản phẩm | USER |
+| `GET` | `/api/v1/products/{id}` | Chi tiết sản phẩm | USER |
+| `POST` | `/api/v1/products` | Tạo sản phẩm | USER |
+| `PUT` | `/api/v1/products/{id}` | Cập nhật sản phẩm | USER |
+| `DELETE` | `/api/v1/products/{id}` | Xóa sản phẩm | USER |
+| `POST` | `/api/v1/products/export` | Export Excel | USER |
 
-### File Management (Requires Authentication)
+### Brands API
 
-- `POST /api/v1/files/upload` - Upload file (USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER)
-- `GET /api/v1/files/download/{id}` - Download file (USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER)
-- `DELETE /api/v1/files/{id}` - Delete file (ADMIN or file owner)
-- `GET /api/v1/files/info/{id}` - Get file information (USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER)
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| `POST` | `/api/v1/brands/search` | Tìm kiếm thương hiệu | USER |
+| `GET` | `/api/v1/brands/{id}` | Chi tiết thương hiệu | USER |
+| `POST` | `/api/v1/brands` | Tạo thương hiệu | USER |
+| `PUT` | `/api/v1/brands/{id}` | Cập nhật thương hiệu | USER |
+| `DELETE` | `/api/v1/brands/{id}` | Xóa thương hiệu | USER |
 
-### Audit Logs (Admin Only)
+### Search API (Elasticsearch)
 
-- `POST /api/v1/audit-logs/search` - Tìm kiếm audit logs (ADMIN)
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| `POST` | `/api/v1/search/products/advanced` | Tìm kiếm nâng cao | USER |
+| `GET` | `/api/v1/search/suggestions?q={query}` | Gợi ý tìm kiếm | USER |
+| `POST` | `/api/v1/search/admin/reindex` | Reindex Elasticsearch | ADMIN |
 
-### Health Check (Public)
+### Files API (MinIO)
 
-- `GET /api/health` - Health check endpoint
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| `POST` | `/api/v1/files/upload` | Upload file | USER |
+| `GET` | `/api/v1/files/{id}/download` | Download file | USER |
+| `DELETE` | `/api/v1/files/{id}` | Xóa file | USER |
 
-## Authentication & Authorization
+### Audit Logs API
 
-Ứng dụng sử dụng **Keycloak** cho identity management và **OAuth2/OIDC** cho authentication.
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| `POST` | `/api/v1/audit-logs/search` | Tìm audit logs | ADMIN |
 
-### Test Users (có sẵn trong Keycloak)
+**Chi tiết sử dụng API:** Xem [HUONG_DAN_SU_DUNG.md](./HUONG_DAN_SU_DUNG.md)
+
+## 🔐 Authentication & Authorization
+
+### Keycloak OAuth2/OIDC Flow
+
+1. **Login** → Lấy access token từ Keycloak
+2. **API Request** → Gửi token trong header `Authorization: Bearer {token}`
+3. **Validation** → Spring Security verify token với Keycloak
+4. **Authorization** → Check roles với `@PreAuthorize("hasRole('USER')")`
+
+### Test Users (trong Keycloak)
+
+| Username | Password | Roles | Quyền |
+|----------|----------|-------|-------|
+| admin | admin | ADMIN, USER | Tất cả API |
+| user | user | USER | Read Products/Brands |
+
+## 🏗️ Cấu trúc Project
+
+```
+td-webapi-java/
+├── td-domain/                  # Domain Layer (Pure Java)
+│   ├── catalog/                # Product, Brand entities
+│   ├── logs/                   # AuditLog, ApiLog (MongoDB documents)
+│   ├── search/                 # ProductDocument (Elasticsearch)
+│   ├── storage/                # FileMetadata
+│   └── common/                 # Base entities, interfaces
+│
+├── td-application/             # Application Layer (Use Cases)
+│   ├── catalog/products/       # CreateProduct, SearchProducts, etc.
+│   ├── catalog/brands/         # CreateBrand, SearchBrands, etc.
+│   ├── search/                 # AdvancedSearch, Suggestions
+│   ├── storage/                # UploadFile, DownloadFile
+│   ├── logs/                   # GetAuditLogs
+│   └── common/                 # Result, PaginationResponse
+│
+├── td-infrastructure/          # Infrastructure Layer (Technical)
+│   ├── config/                 # Database, Security, Elasticsearch configs
+│   ├── persistence/            # JPA & MongoDB repositories
+│   ├── search/                 # Elasticsearch repositories
+│   ├── storage/                # MinIO service
+│   └── security/               # Keycloak JWT converter
+│
+├── td-web/                     # Web Layer (REST API)
+│   ├── controllers/v1/         # ProductsController, BrandsController, etc.
+│   ├── config/                 # OpenAPI/Swagger config
+│   └── resources/
+│       ├── application.yml     # Main configuration
+│       └── db/migration/       # Flyway SQL scripts
+│
+├── docs/                       # Documentation
+│   ├── QUICK_START.md
+│   ├── EXTERNAL_SERVICES.md
+│   └── ...
+│
+├── ARCHITECTURE.md             # Kiến trúc chi tiết (tiếng Việt)
+├── HUONG_DAN_SU_DUNG.md       # Hướng dẫn sử dụng (tiếng Việt) ⭐
+├── docker-compose.yml          # Docker services
+└── pom.xml                     # Maven parent POM
+```
+
+## 🛠️ Tech Stack
+
+| Category | Technology | Purpose |
+|----------|-----------|---------|
+| **Language** | Java 17 | Primary language |
+| **Framework** | Spring Boot 3.2.0 | Application framework |
+| **Security** | Spring Security 6.2.0 + Keycloak | OAuth2/OIDC authentication |
+| **Database (SQL)** | PostgreSQL 12+ | Primary transactional data |
+| **Database (NoSQL)** | MongoDB 5.0+ | Audit logs, API logs |
+| **Search** | Elasticsearch 8+ | Full-text search |
+| **Storage** | MinIO | S3-compatible object storage |
+| **Migration** | Flyway | Database version control |
+| **ORM** | Spring Data JPA | PostgreSQL ORM |
+| **Mapping** | MapStruct | DTO ↔ Entity mapping |
+| **Validation** | Hibernate Validator | Bean validation |
+| **Documentation** | SpringDoc OpenAPI | Swagger UI |
+| **Build** | Maven 3.8+ | Build automation |
+
+## 📊 Database Schema
+
+### PostgreSQL Tables
+
+- `products` - Sản phẩm (id, name, description, rate, brand_id, image_path, audit fields)
+- `brands` - Thương hiệu (id, name, description, audit fields)
+- `file_metadata` - Metadata files (id, file_name, content_type, file_size, storage_path)
 
 | Username | Password | Roles |
 |----------|----------|-------|

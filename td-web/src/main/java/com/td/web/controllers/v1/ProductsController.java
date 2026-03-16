@@ -15,6 +15,25 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.UUID;
 
+/**
+ * REST API Controller - Quản lý sản phẩm
+ * 
+ * Base URL: /api/v1/products
+ * 
+ * Các endpoint:
+ * - POST   /search      : Tìm kiếm sản phẩm với filters (name, brandId, price range, etc.)
+ * - GET    /{id}        : Lấy chi tiết sản phẩm theo ID
+ * - POST   /            : Tạo sản phẩm mới
+ * - PUT    /{id}        : Cập nhật thông tin sản phẩm
+ * - DELETE /{id}        : Xóa sản phẩm (soft delete)
+ * - POST   /export      : Export danh sách sản phẩm ra Excel
+ * 
+ * Bảo mật:
+ * - Tất cả endpoint yêu cầu role USER (được cấp từ Keycloak)
+ * - Token JWT từ Keycloak trong header: Authorization: Bearer {token}
+ * 
+ * Swagger UI: http://localhost:8080/swagger-ui.html
+ */
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
@@ -29,6 +48,31 @@ public class ProductsController extends BaseController {
     private final SearchProductsUseCase searchProductsUseCase;
     private final ExportProductsUseCase exportProductsUseCase;
 
+    /**
+     * API - Tìm kiếm sản phẩm với filters
+     * 
+     * @param request Request chứa điều kiện tìm kiếm:
+     *                - name: Tìm theo tên (LIKE search)
+     *                - description: Tìm theo mô tả
+     *                - brandId: Lọc theo thương hiệu
+     *                - brandName: Tìm theo tên thương hiệu
+     *                - minRate, maxRate: Lọc theo khoảng giá
+     *                - pageNumber, pageSize: Phân trang (mặc định 0, 10)
+     *                - sortBy, sortDirection: Sắp xếp (mặc định createdOn, desc)
+     * @return PaginationResponse với danh sách ProductDto
+     * 
+     * Ví dụ request body:
+     * {
+     *   "name": "iPhone",
+     *   "minRate": 1000,
+     *   "maxRate": 5000,
+     *   "brandId": "uuid-here",
+     *   "pageNumber": 0,
+     *   "pageSize": 10,
+     *   "sortBy": "rate",
+     *   "sortDirection": "desc"
+     * }
+     */
     @PostMapping("/search")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Search products using available filters")
@@ -38,6 +82,14 @@ public class ProductsController extends BaseController {
         return ok(response);
     }
 
+    /**
+     * API - Lấy chi tiết sản phẩm theo ID
+     * 
+     * @param id UUID của sản phẩm
+     * @return Result<ProductDetailsDto> với thông tin chi tiết sản phẩm
+     * 
+     * Ví dụ: GET /api/v1/products/123e4567-e89b-12d3-a456-426614174000
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Get product details")
@@ -46,6 +98,26 @@ public class ProductsController extends BaseController {
         return ok(result);
     }
 
+    /**
+     * API - Tạo sản phẩm mới
+     * 
+     * @param request Request chứa thông tin sản phẩm:
+     *                - name: Tên sản phẩm (bắt buộc, max 200 ký tự)
+     *                - description: Mô tả
+     *                - rate: Giá (bắt buộc, > 0)
+     *                - brandId: ID thương hiệu (bắt buộc)
+     *                - imagePath: Đường dẫn ảnh
+     * @return Result<UUID> với ID của sản phẩm vừa tạo
+     * 
+     * Ví dụ request body:
+     * {
+     *   "name": "iPhone 15 Pro",
+     *   "description": "Flagship phone",
+     *   "rate": 29990000,
+     *   "brandId": "uuid-of-apple-brand",
+     *   "imagePath": "/images/iphone15pro.jpg"
+     * }
+     */
     @PostMapping
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Create a new product")
@@ -54,6 +126,16 @@ public class ProductsController extends BaseController {
         return created(result);
     }
 
+    /**
+     * API - Cập nhật thông tin sản phẩm
+     * 
+     * @param id UUID của sản phẩm cần update
+     * @param request Request chứa thông tin mới (các field null sẽ không được update)
+     * @return Result<UUID> với ID của sản phẩm đã update
+     * 
+     * Ví dụ: PUT /api/v1/products/123e4567-e89b-12d3-a456-426614174000
+     * Body: { "name": "iPhone 15 Pro Max", "rate": 35990000 }
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Update a product")
@@ -67,6 +149,16 @@ public class ProductsController extends BaseController {
         return ok(result);
     }
 
+    /**
+     * API - Xóa sản phẩm (soft delete)
+     * 
+     * @param id UUID của sản phẩm cần xóa
+     * @return Result<UUID> với ID của sản phẩm đã xóa
+     * 
+     * Lưu ý: Đây là soft delete, sản phẩm vẫn còn trong DB nhưng có deletedOn != null
+     * 
+     * Ví dụ: DELETE /api/v1/products/123e4567-e89b-12d3-a456-426614174000
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Delete a product")
@@ -75,6 +167,19 @@ public class ProductsController extends BaseController {
         return ok(result);
     }
 
+    /**
+     * API - Export danh sách sản phẩm ra file Excel
+     * 
+     * @param request Request chứa điều kiện filter (giống SearchProductsRequest)
+     * @return byte[] - File Excel (.xlsx)
+     * 
+     * Response headers:
+     * - Content-Disposition: attachment; filename=ProductExports.xlsx
+     * - Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+     * 
+     * Ví dụ: POST /api/v1/products/export
+     * Body: { "brandId": "uuid-here", "minRate": 1000 }
+     */
     @PostMapping("/export")
     @PreAuthorize("hasRole('USER')")
     @Operation(summary = "Export products")
