@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TD WebAPI Swagger UI</title>
+  <link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
+  <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow-y: scroll;
+    }
+
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #1f2937;
+    }
+
+    .td-header {
+      background: linear-gradient(110deg, #0f172a, #1d4ed8);
+      color: #ffffff;
+      padding: 14px 18px;
+      border-bottom: 1px solid #0b3a8f;
+    }
+
+    .td-header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .td-header p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      opacity: 0.92;
+    }
+
+    .td-toolbar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+      padding: 12px 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #dbe2ef;
+    }
+
+    .td-card {
+      background: #ffffff;
+      border: 1px solid #dbe2ef;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .td-card h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .td-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .td-card label {
+      font-size: 12px;
+      color: #334155;
+      font-weight: 600;
+    }
+
+    .td-card input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .td-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .td-actions button {
+      border: 1px solid #1d4ed8;
+      background: #1d4ed8;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    .td-actions button.secondary {
+      background: #ffffff;
+      color: #1d4ed8;
+    }
+
+    .td-actions button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .td-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    .td-status {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #0f172a;
+      min-height: 18px;
+    }
+
+    .td-quick-list {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 12px;
+      color: #334155;
+      line-height: 1.45;
+    }
+
+    .td-quick-list li {
+      margin-bottom: 4px;
+    }
+
+    #swagger-ui {
+      background: #ffffff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="td-header">
+    <h1>TD WebAPI - Swagger UI (Updated APIs)</h1>
+    <p>Use Authorize to test secured endpoints. This page is prepared for full API testing flow.</p>
+  </div>
+
+  <div class="td-toolbar">
+    <div class="td-card">
+      <h2>Quick Token (Keycloak)</h2>
+
+      <div class="td-row">
+        <label for="token-endpoint">Token endpoint</label>
+        <input id="token-endpoint" value="http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token" />
+      </div>
+
+      <div class="td-row">
+        <label for="client-id">Client ID</label>
+        <input id="client-id" value="td-webapi-client" />
+      </div>
+
+      <div class="td-row">
+        <label for="client-secret">Client Secret</label>
+        <input id="client-secret" value="td-webapi-secret-2024" />
+      </div>
+
+      <div class="td-row">
+        <label for="username">Username</label>
+        <input id="username" value="admin" />
+      </div>
+
+      <div class="td-row">
+        <label for="password">Password</label>
+        <input id="password" type="password" value="admin123" />
+      </div>
+
+      <div class="td-actions">
+        <button id="btn-fetch-token" type="button">Fetch token</button>
+      </div>
+
+      <div class="td-row" style="margin-top: 8px;">
+        <label for="bearer-token">Bearer token</label>
+        <input id="bearer-token" placeholder="Paste JWT token here" />
+      </div>
+
+      <div class="td-actions">
+        <button id="btn-apply-token" type="button">Apply token</button>
+        <button id="btn-clear-token" class="secondary" type="button">Clear token</button>
+      </div>
+
+      <div id="token-status" class="td-status"></div>
+      <div class="td-note">The token is saved in localStorage key td.swagger.token for reuse.</div>
+    </div>
+
+    <div class="td-card">
+      <h2>Recommended Test Flow</h2>
+      <ol class="td-quick-list">
+        <li>POST /api/v1/documents</li>
+        <li>GET /api/v1/documents</li>
+        <li>GET /api/v1/documents/{id}</li>
+        <li>PUT /api/v1/documents/{id}</li>
+        <li>POST /api/v1/documents/search</li>
+        <li>DELETE /api/v1/documents/{id}</li>
+        <li>POST /api/v1/audit-logs/search (ADMIN)</li>
+      </ol>
+      <div class="td-note">
+        After soft delete, GET detail currently returns business failure in response body (success=false) instead of HTTP 404.
+      </div>
+    </div>
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <script src="./swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    (function () {
+      function basePath() {
+        var path = window.location.pathname || "";
+        var marker = "/swagger-ui";
+        var index = path.indexOf(marker);
+        return index >= 0 ? path.substring(0, index) : "";
+      }
+
+      var appBasePath = basePath();
+      var swaggerConfigUrl = appBasePath + "/v3/api-docs/swagger-config";
+
+      var ui = SwaggerUIBundle({
+        configUrl: swaggerConfigUrl,
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        displayOperationId: true,
+        filter: true,
+        persistAuthorization: true,
+        tryItOutEnabled: true,
+        tagsSorter: "alpha",
+        operationsSorter: "alpha",
+        supportedSubmitMethods: ["get", "post", "put", "delete", "patch"],
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
+      });
+
+      window.ui = ui;
+
+      var tokenInput = document.getElementById("bearer-token");
+      var statusEl = document.getElementById("token-status");
+      var tokenStorageKey = "td.swagger.token";
+
+      function setStatus(message, isError) {
+        statusEl.textContent = message || "";
+        statusEl.style.color = isError ? "#b91c1c" : "#0f172a";
+      }
+
+      function applyToken(token) {
+        var value = (token || tokenInput.value || "").trim();
+        if (!value) {
+          setStatus("Token is empty.", true);
+          return;
+        }
+
+        try {
+          tokenInput.value = value;
+          localStorage.setItem(tokenStorageKey, value);
+          ui.preauthorizeApiKey("bearer-jwt", value);
+          setStatus("Token applied. You can now call secured APIs.", false);
+        } catch (error) {
+          setStatus("Cannot apply token: " + error.message, true);
+        }
+      }
+
+      function clearToken() {
+        tokenInput.value = "";
+        localStorage.removeItem(tokenStorageKey);
+        setStatus("Token cleared.", false);
+      }
+
+      async function fetchToken() {
+        var button = document.getElementById("btn-fetch-token");
+        button.disabled = true;
+
+        try {
+          setStatus("Fetching token...", false);
+
+          var form = new URLSearchParams();
+          form.set("client_id", document.getElementById("client-id").value.trim());
+          form.set("client_secret", document.getElementById("client-secret").value.trim());
+          form.set("grant_type", "password");
+          form.set("username", document.getElementById("username").value.trim());
+          form.set("password", document.getElementById("password").value);
+
+          var response = await fetch(document.getElementById("token-endpoint").value.trim(), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: form.toString()
+          });
+
+          if (!response.ok) {
+            var text = await response.text();
+            throw new Error("Token endpoint returned " + response.status + ". " + text);
+          }
+
+          var data = await response.json();
+          if (!data.access_token) {
+            throw new Error("No access_token in response.");
+          }
+
+          applyToken(data.access_token);
+        } catch (error) {
+          setStatus("Fetch token failed: " + error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      document.getElementById("btn-apply-token").addEventListener("click", function () {
+        applyToken();
+      });
+
+      document.getElementById("btn-clear-token").addEventListener("click", function () {
+        clearToken();
+      });
+
+      document.getElementById("btn-fetch-token").addEventListener("click", function () {
+        fetchToken();
+      });
+
+      var savedToken = localStorage.getItem(tokenStorageKey);
+      if (savedToken) {
+        applyToken(savedToken);
+      }
+    })();
+  </script>
+</body>
+</html>

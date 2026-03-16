@@ -44,23 +44,23 @@ public class SearchDocumentsUseCase {
                 0,
                 true,
                 true
-        );
+            );
+        }
     }
 
-    private DocumentDto mapToDto(BusinessDocument document) {
-        var dto = new DocumentDto();
-        dto.setId(document.getId());
-        dto.setTitle(document.getTitle());
-        dto.setDocumentType(document.getDocumentType());
-        dto.setStatus(document.getStatus());
-        dto.setContent(document.getContent());
-        dto.setTags(DocumentJsonMapper.toStringList(document.getTagsJson()));
-        dto.setAttributes(DocumentJsonMapper.toMap(document.getAttributesJson()));
-        dto.setMetadata(DocumentJsonMapper.toMap(document.getMetadataJson()));
-        dto.setVersionNo(document.getVersionNo());
-        dto.setCreatedOn(document.getCreatedOn());
-        dto.setLastModifiedOn(document.getLastModifiedOn());
-        dto.setDeleted(document.isDeleted());
-        return dto;
+    private Pageable buildPageable(SearchDocumentsRequest request) {
+        String sortBy = (request.getSortBy() == null || request.getSortBy().isBlank())
+            ? "lastModifiedOn"
+            : request.getSortBy();
+
+        Sort.Direction direction = "asc".equalsIgnoreCase(request.getSortDirection())
+            ? Sort.Direction.ASC
+            : Sort.Direction.DESC;
+
+        return PageRequest.of(
+            Math.max(0, request.getPageNumber()),
+            Math.min(Math.max(1, request.getPageSize()), 100),
+            Sort.by(direction, sortBy)
+        );
     }
 }

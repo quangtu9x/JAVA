@@ -23,7 +23,7 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
-      auto-commit: true
+      auto-commit: ${DATABASE_AUTO_COMMIT:false}
   
   # JPA Configuration
   jpa:

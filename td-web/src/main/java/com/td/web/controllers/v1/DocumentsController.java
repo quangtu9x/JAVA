@@ -49,13 +49,13 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "List documents")
     public ResponseEntity<PaginationResponse<DocumentDto>> listDocuments(
-            @RequestParam(defaultValue = "0") int pageNumber,
-            @RequestParam(defaultValue = "10") int pageSize,
-            @RequestParam(defaultValue = "lastModifiedOn") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDirection,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String documentType,
-            @RequestParam(required = false) String status) {
+            @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+            @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
+            @RequestParam(name = "sortBy", defaultValue = "lastModifiedOn") String sortBy,
+            @RequestParam(name = "sortDirection", defaultValue = "desc") String sortDirection,
+            @RequestParam(name = "keyword", required = false) String keyword,
+            @RequestParam(name = "documentType", required = false) String documentType,
+            @RequestParam(name = "status", required = false) String status) {
         var request = new SearchDocumentsRequest();
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
@@ -72,7 +72,7 @@ public class DocumentsController extends BaseController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Get document details")
-    public ResponseEntity<Result<DocumentDto>> getDocument(@PathVariable UUID id) {
+    public ResponseEntity<Result<DocumentDto>> getDocument(@PathVariable("id") UUID id) {
         var result = getDocumentUseCase.execute(new GetDocumentRequest(id));
         return ok(result);
     }
@@ -98,7 +98,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Update an existing document")
     public ResponseEntity<Result<UUID>> updateDocument(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateDocumentRequest request) {
         if (!id.equals(request.getId())) {
             return badRequest(Result.<UUID>failure("Document ID mismatch"));
@@ -111,7 +111,7 @@ public class DocumentsController extends BaseController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Delete a document (soft delete)")
-    public ResponseEntity<Result<UUID>> deleteDocument(@PathVariable UUID id) {
+    public ResponseEntity<Result<UUID>> deleteDocument(@PathVariable("id") UUID id) {
         var result = deleteDocumentUseCase.execute(id);
         return ok(result);
     }

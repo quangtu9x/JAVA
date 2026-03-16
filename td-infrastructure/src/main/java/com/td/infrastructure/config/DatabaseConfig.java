@@ -30,6 +30,6 @@ public class DatabaseConfig {
         private long connectionTimeout = 30000;
         private long idleTimeout = 600000;
         private long maxLifetime = 1800000;
-        private boolean autoCommit = true;
+        private boolean autoCommit = false;
     }
 }
