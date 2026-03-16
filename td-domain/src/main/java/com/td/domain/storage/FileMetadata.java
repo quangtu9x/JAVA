@@ -1,6 +1,6 @@
 package com.td.domain.storage;
 
-import com.td.domain.common.BaseEntity;
+import com.td.domain.common.contracts.BaseEntity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -81,7 +81,6 @@ public class FileMetadata extends BaseEntity {
 
     @PrePersist
     protected void onCreate() {
-        super.onCreate();
         if (id == null) {
             id = UUID.randomUUID();
         }

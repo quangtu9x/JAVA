@@ -5,13 +5,13 @@ import java.util.UUID;
 /**
  * Default AuditableEntity with UUID as the ID type
  */
-public abstract class AuditableEntity extends AuditableEntity<UUID> {
+public abstract class DefaultAuditableEntity extends AuditableEntity<UUID> {
     
-    protected AuditableEntity() {
+    protected DefaultAuditableEntity() {
         super();
     }
     
-    protected AuditableEntity(UUID id) {
+    protected DefaultAuditableEntity(UUID id) {
         super(id);
     }
 }

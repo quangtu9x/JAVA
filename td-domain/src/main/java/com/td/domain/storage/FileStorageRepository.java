@@ -14,6 +14,12 @@ import java.util.UUID;
  */
 public interface FileStorageRepository extends Repository<FileMetadata, UUID> {
 
+    Optional<FileMetadata> findById(UUID id);
+
+    FileMetadata save(FileMetadata entity);
+
+    void delete(FileMetadata entity);
+
     /**
      * Find file by stored filename
      */

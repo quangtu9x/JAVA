@@ -14,6 +14,10 @@ public abstract class BaseController {
         return ResponseEntity.ok(result);
     }
 
+    protected <T> ResponseEntity<T> ok(T body) {
+        return ResponseEntity.ok(body);
+    }
+
     protected <T> ResponseEntity<Result<T>> created(Result<T> result) {
         return ResponseEntity.status(201).body(result);
     }

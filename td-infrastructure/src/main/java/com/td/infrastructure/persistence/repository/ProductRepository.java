@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface ProductRepository extends BaseRepository<Product> {
+public interface ProductRepository extends BaseRepository<Product>, com.td.application.catalog.products.ProductRepository {
     
     List<Product> findByBrandId(UUID brandId);
     

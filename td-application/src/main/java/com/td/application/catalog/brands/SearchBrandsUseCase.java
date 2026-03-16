@@ -2,7 +2,6 @@ package com.td.application.catalog.brands;
 
 import com.td.application.common.models.PaginationResponse;
 import com.td.domain.catalog.Brand;
-import com.td.infrastructure.persistence.repository.BrandRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -44,7 +43,7 @@ public class SearchBrandsUseCase {
             Pageable pageable = PageRequest.of(request.getPageNumber(), request.getPageSize(), sort);
             
             // Execute query
-            var page = brandRepository.findAll(spec, pageable, false);
+            var page = brandRepository.findAll(spec, pageable);
             
             // Map to DTOs
             List<BrandDto> brandDtos = page.getContent().stream()

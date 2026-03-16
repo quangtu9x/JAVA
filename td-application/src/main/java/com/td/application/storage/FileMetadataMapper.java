@@ -11,9 +11,9 @@ public interface FileMetadataMapper {
     FileMetadataMapper INSTANCE = Mappers.getMapper(FileMetadataMapper.class);
     
     @Mapping(target = "humanReadableSize", expression = "java(entity.getHumanReadableSize())")
-    @Mapping(target = "isImage", expression = "java(entity.isImage())")
-    @Mapping(target = "isPdf", expression = "java(entity.isPdf())")
-    @Mapping(target = "isDocument", expression = "java(entity.isDocument())")
+    @Mapping(target = "image", expression = "java(entity.isImage())")
+    @Mapping(target = "pdf", expression = "java(entity.isPdf())")
+    @Mapping(target = "document", expression = "java(entity.isDocument())")
     @Mapping(target = "downloadUrl", ignore = true) // Set separately
     FileMetadataDto toDto(FileMetadata entity);
     

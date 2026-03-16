@@ -48,7 +48,7 @@
         <spring.security.version>6.2.0</spring.security.version>
         
         <!-- Utilities -->
-        <lombok.version>1.18.30</lombok.version>
+        <lombok.version>1.18.38</lombok.version>
         <apache.commons.lang3.version>3.13.0</apache.commons.lang3.version>
         
         <!-- File Storage -->

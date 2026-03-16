@@ -3,7 +3,6 @@ package com.td.application.storage;
 import com.td.application.common.cqrs.UseCase;
 import com.td.domain.storage.FileMetadata;
 import com.td.domain.storage.FileStorageRepository;
-import com.td.infrastructure.storage.MinIOService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

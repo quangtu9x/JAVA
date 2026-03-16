@@ -6,11 +6,13 @@ import com.td.infrastructure.config.MinIOProperties;
 import io.minio.*;
 import io.minio.errors.MinioException;
 import io.minio.http.Method;
+import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.io.InputStream;
 import java.time.Instant;
 import java.util.List;
@@ -20,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MinIOService {
+public class MinIOService implements com.td.application.storage.MinIOService {
 
     private final MinioClient minioClient;
     private final MinIOProperties minIOProperties;
@@ -181,7 +183,7 @@ public class MinIOService {
     /**
      * Get file information from MinIO
      */
-    public ObjectStat getFileInfo(String filePath) {
+    public StatObjectResponse getFileInfo(String filePath) {
         try {
             StatObjectArgs args = StatObjectArgs.builder()
                     .bucket(minIOProperties.getBucketName())
@@ -208,7 +210,11 @@ public class MinIOService {
                     .build();
                     
             Iterable<Result<Item>> results = minioClient.listObjects(args);
-            return (List<Result<Item>>) results;
+            List<Result<Item>> files = new ArrayList<>();
+            for (Result<Item> result : results) {
+                files.add(result);
+            }
+            return files;
             
         } catch (Exception e) {
             log.error("Failed to list files with prefix: {}", prefix, e);

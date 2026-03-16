@@ -4,6 +4,7 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\BaseEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\logs\ApiLog.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DefaultAuditableEntity.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Repository.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\logs\AuditLog.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\storage\FileCategory.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\catalog\Product.java
@@ -17,5 +18,6 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Entity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\IAuditableEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityUpdatedEvent.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\IAggregateRoot.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityCreatedEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\catalog\Brand.java

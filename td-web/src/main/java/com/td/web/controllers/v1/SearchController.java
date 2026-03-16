@@ -3,7 +3,6 @@ package com.td.web.controllers.v1;
 import com.td.application.search.*;
 import com.td.domain.search.BrandDocument;
 import com.td.domain.search.ProductDocument;
-import com.td.infrastructure.search.service.SearchService;
 import com.td.web.controllers.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

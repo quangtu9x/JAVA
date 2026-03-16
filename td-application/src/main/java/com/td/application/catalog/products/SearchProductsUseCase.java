@@ -1,9 +1,7 @@
 package com.td.application.catalog.products;
 
-import com.td.application.common.interfaces.IRepository;
 import com.td.application.common.models.PaginationResponse;
 import com.td.domain.catalog.Product;
-import com.td.infrastructure.persistence.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -57,7 +55,7 @@ public class SearchProductsUseCase {
             Pageable pageable = PageRequest.of(request.getPageNumber(), request.getPageSize(), sort);
             
             // Execute query
-            var page = productRepository.findAll(spec, pageable, false);
+            var page = productRepository.findAll(spec, pageable);
             
             // Map to DTOs
             List<ProductDto> productDtos = page.getContent().stream()

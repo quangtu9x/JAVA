@@ -1,6 +1,5 @@
 package com.td.application.catalog.products;
 
-import com.td.infrastructure.persistence.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;

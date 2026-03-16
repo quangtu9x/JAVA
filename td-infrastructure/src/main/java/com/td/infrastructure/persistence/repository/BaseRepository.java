@@ -1,8 +1,7 @@
 package com.td.infrastructure.persistence.repository;
 
 import com.td.application.common.interfaces.IRepository;
-import com.td.domain.common.contracts.BaseEntity;
-import com.td.domain.common.contracts.ISoftDelete;
+import com.td.domain.common.contracts.AuditableEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -19,7 +18,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @NoRepositoryBean
-public interface BaseRepository<T extends BaseEntity<UUID>> 
+public interface BaseRepository<T extends AuditableEntity<UUID>>
     extends JpaRepository<T, UUID>, JpaSpecificationExecutor<T>, IRepository<T> {
 
     @Query("SELECT e FROM #{#entityName} e WHERE e.deletedOn IS NULL")

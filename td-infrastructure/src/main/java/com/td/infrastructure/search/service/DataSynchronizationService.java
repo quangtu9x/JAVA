@@ -13,8 +13,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Data Synchronization Service
@@ -212,13 +214,13 @@ public class DataSynchronizationService {
         doc.setId(brand.getId().toString());
         doc.setName(brand.getName());
         doc.setDescription(brand.getDescription());
-        doc.setSlug(brand.getSlug());
-        doc.setIsActive(brand.getIsActive());
-        doc.setCreatedAt(brand.getCreatedAt());
-        doc.setUpdatedAt(brand.getUpdatedAt());
-        doc.setCreatedBy(brand.getCreatedBy());
-        doc.setUpdatedBy(brand.getUpdatedBy());
-        
+        doc.setSlug(toSlug(brand.getName()));
+        doc.setIsActive(!brand.isDeleted());
+        doc.setCreatedAt(toInstant(brand.getCreatedOn()));
+        doc.setUpdatedAt(toInstant(brand.getLastModifiedOn()));
+        doc.setCreatedBy(brand.getCreatedBy() != null ? brand.getCreatedBy().toString() : null);
+        doc.setUpdatedBy(brand.getLastModifiedBy() != null ? brand.getLastModifiedBy().toString() : null);
+
         return doc;
     }
 
@@ -230,31 +232,31 @@ public class DataSynchronizationService {
         doc.setId(product.getId().toString());
         doc.setName(product.getName());
         doc.setDescription(product.getDescription());
-        doc.setSlug(product.getSlug());
-        doc.setPrice(product.getPrice());
-        doc.setIsActive(product.getIsActive());
-        doc.setCreatedAt(product.getCreatedAt());
-        doc.setUpdatedAt(product.getUpdatedAt());
-        doc.setCreatedBy(product.getCreatedBy());
-        doc.setUpdatedBy(product.getUpdatedBy());
-        
+        doc.setSlug(toSlug(product.getName()));
+        doc.setPrice(product.getRate());
+        doc.setIsActive(!product.isDeleted());
+        doc.setCreatedAt(toInstant(product.getCreatedOn()));
+        doc.setUpdatedAt(toInstant(product.getLastModifiedOn()));
+        doc.setCreatedBy(product.getCreatedBy() != null ? product.getCreatedBy().toString() : null);
+        doc.setUpdatedBy(product.getLastModifiedBy() != null ? product.getLastModifiedBy().toString() : null);
+
         // Brand information (denormalized)
         if (product.getBrand() != null) {
             doc.setBrandId(product.getBrand().getId().toString());
             doc.setBrandName(product.getBrand().getName());
-            doc.setBrandSlug(product.getBrand().getSlug());
+            doc.setBrandSlug(toSlug(product.getBrand().getName()));
         }
-        
+
         return doc;
     }
 
     /**
      * Lấy số lượng products của một brand
      */
-    private Long getProductCountForBrand(Long brandId) {
+    private Long getProductCountForBrand(UUID brandId) {
         try {
             TypedQuery<Long> query = entityManager.createQuery(
-                "SELECT COUNT(p) FROM Product p WHERE p.brand.id = :brandId AND p.isActive = true", Long.class);
+                "SELECT COUNT(p) FROM Product p WHERE p.brandId = :brandId AND p.deletedOn IS NULL", Long.class);
             query.setParameter("brandId", brandId);
             return query.getSingleResult();
         } catch (Exception e) {
@@ -270,7 +272,7 @@ public class DataSynchronizationService {
         try {
             TypedQuery<Long> query = entityManager.createQuery(
                 "SELECT COUNT(b) FROM Brand b WHERE b.id = :brandId", Long.class);
-            query.setParameter("brandId", Long.parseLong(brandId));
+            query.setParameter("brandId", UUID.fromString(brandId));
             return query.getSingleResult() > 0;
         } catch (Exception e) {
             return false;
@@ -284,7 +286,7 @@ public class DataSynchronizationService {
         try {
             TypedQuery<Long> query = entityManager.createQuery(
                 "SELECT COUNT(p) FROM Product p WHERE p.id = :productId", Long.class);
-            query.setParameter("productId", Long.parseLong(productId));
+            query.setParameter("productId", UUID.fromString(productId));
             return query.getSingleResult() > 0;
         } catch (Exception e) {
             return false;
@@ -332,5 +334,20 @@ public class DataSynchronizationService {
             logger.error("Error during batch product synchronization", e);
             throw new RuntimeException("Failed to sync products in batch", e);
         }
+    }
+
+    private Instant toInstant(java.time.LocalDateTime value) {
+        return value != null ? value.toInstant(ZoneOffset.UTC) : null;
+    }
+
+    private String toSlug(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.toLowerCase()
+            .trim()
+            .replaceAll("[^a-z0-9\\s-]", "")
+            .replaceAll("\\s+", "-")
+            .replaceAll("-+", "-");
     }
 }

@@ -1,5 +1,6 @@
 package com.td.domain.common.contracts;
 
+import jakarta.persistence.MappedSuperclass;
 import java.util.UUID;
 
 /**

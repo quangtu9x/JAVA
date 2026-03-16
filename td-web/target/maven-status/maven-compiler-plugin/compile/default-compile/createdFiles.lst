@@ -1,0 +1,9 @@
+com\td\web\controllers\v1\SearchAdminController.class
+com\td\web\controllers\v1\AuditLogsController.class
+com\td\web\config\OpenApiConfig.class
+com\td\web\controllers\v1\ProductsController.class
+com\td\web\controllers\v1\SearchController.class
+com\td\web\controllers\v1\FileController.class
+com\td\web\controllers\BaseController.class
+com\td\web\controllers\v1\BrandsController.class
+com\td\web\TdWebApiApplication.class

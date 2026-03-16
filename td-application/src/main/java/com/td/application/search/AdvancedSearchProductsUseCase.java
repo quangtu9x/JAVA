@@ -2,7 +2,6 @@ package com.td.application.search;
 
 import com.td.application.common.cqrs.UseCase;
 import com.td.domain.search.ProductDocument;
-import com.td.infrastructure.search.service.SearchService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;

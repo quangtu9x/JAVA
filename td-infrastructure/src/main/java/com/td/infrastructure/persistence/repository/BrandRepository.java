@@ -7,7 +7,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface BrandRepository extends BaseRepository<Brand> {
+public interface BrandRepository extends BaseRepository<Brand>, com.td.application.catalog.brands.BrandRepository {
     
     Optional<Brand> findByNameIgnoreCase(String name);
     

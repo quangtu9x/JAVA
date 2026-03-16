@@ -1,9 +1,7 @@
 package com.td.application.catalog.brands;
 
-import com.td.application.common.interfaces.IRepository;
 import com.td.application.common.models.Result;
 import com.td.domain.catalog.Brand;
-import com.td.infrastructure.persistence.repository.BrandRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

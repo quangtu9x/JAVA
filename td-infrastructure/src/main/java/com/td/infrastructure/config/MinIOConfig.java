@@ -28,9 +28,9 @@ public class MinIOConfig {
             
             // Set timeouts
             client.setTimeout(
-                    Duration.ofSeconds(minIOProperties.getConnectTimeout()),
-                    Duration.ofSeconds(minIOProperties.getWriteTimeout()),
-                    Duration.ofSeconds(minIOProperties.getReadTimeout())
+                    Duration.ofSeconds(minIOProperties.getConnectTimeout()).toMillis(),
+                    Duration.ofSeconds(minIOProperties.getWriteTimeout()).toMillis(),
+                    Duration.ofSeconds(minIOProperties.getReadTimeout()).toMillis()
             );
             
             log.info("MinIO client initialized successfully with endpoint: {}", minIOProperties.getUrl());
