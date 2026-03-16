@@ -20,6 +20,7 @@ com\td\domain\common\contracts\AuditableEntity.class
 com\td\domain\storage\FileStorageRepository.class
 com\td\domain\common\contracts\AuditableBaseEntity.class
 com\td\domain\common\contracts\IAggregateRoot.class
+com\td\domain\documents\BusinessDocument.class
 com\td\domain\common\contracts\DomainEvent.class
 com\td\domain\common\events\EntityCreatedEvent.class
 com\td\domain\search\ProductDocument$ProductAttributes$Dimensions.class

@@ -8,6 +8,7 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\logs\AuditLog.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\storage\FileCategory.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\catalog\Product.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\documents\BusinessDocument.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableBaseEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\storage\FileMetadata.java

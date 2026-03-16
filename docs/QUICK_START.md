@@ -235,6 +235,10 @@ $env:KEYCLOAK_REALM = "td-webapi-realm"
 $env:KEYCLOAK_CLIENT_ID = "td-webapi-client"
 $env:KEYCLOAK_CLIENT_SECRET = "<YOUR_CLIENT_SECRET>"
 
+# Database profile for documents
+# Default PostgreSQL: dev hoặc postgres
+$env:SPRING_PROFILES_ACTIVE = "postgres"
+
 Write-Host "Environment variables set successfully!" -ForegroundColor Green
 ```
 
@@ -258,7 +262,16 @@ mvn -pl td-web spring-boot:run
 # 2. Chạy application
 cd td-web
 mvn spring-boot:run
+
+# Hoặc chạy với DB profile khác cho documents
+mvn spring-boot:run -Dspring-boot.run.profiles=tidb
+mvn spring-boot:run -Dspring-boot.run.profiles=mariadb
 ```
+
+Lưu ý:
+- `tidb` dùng `jdbc:mysql://...` và native JSON prefilter cho module documents.
+- `mariadb` dùng `jdbc:mariadb://...` và native JSON prefilter cho module documents.
+- Hai profile này đang tắt Flyway mặc định; hãy chuẩn bị schema tương thích trước khi chạy.
 
 **Quan sát logs:**
 - ✅ Flyway migrations chạy thành công (tạo tables trong PostgreSQL)
@@ -299,6 +312,52 @@ Invoke-RestMethod `
   -Headers $headers `
   -ContentType "application/json" `
   -Body $body
+```
+
+### Test Documents APIs (CRUD + xem + tim kiem)
+```powershell
+$headers = @{ Authorization = "Bearer $token" }
+
+# Them moi
+$create = Invoke-RestMethod `
+   -Uri "http://localhost:8080/api/v1/documents" `
+   -Method POST `
+   -Headers $headers `
+   -ContentType "application/json" `
+   -Body '{
+      "title":"Thong bao noi bo",
+      "documentType":"NOTICE",
+      "status":"ACTIVE",
+      "content":"Noi dung",
+      "attributes":{"department":"HR"}
+   }'
+
+$docId = $create.data
+
+# Xem danh sach
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/documents?pageNumber=0&pageSize=10" -Method GET -Headers $headers
+
+# Xem chi tiet
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/documents/$docId" -Method GET -Headers $headers
+
+# Tim kiem
+Invoke-RestMethod `
+   -Uri "http://localhost:8080/api/v1/documents/search" `
+   -Method POST `
+   -Headers $headers `
+   -ContentType "application/json" `
+   -Body '{"keyword":"thong bao","pageNumber":0,"pageSize":10}'
+
+# Sua
+Invoke-RestMethod `
+   -Uri "http://localhost:8080/api/v1/documents/$docId" `
+   -Method PUT `
+   -Headers $headers `
+   -ContentType "application/json" `
+   -Body "{\"id\":\"$docId\",\"title\":\"Thong bao noi bo - cap nhat\"}"
+
+# Xoa mem
+Invoke-RestMethod -Uri "http://localhost:8080/api/v1/documents/$docId" -Method DELETE -Headers $headers
 ```
 
 ### Swagger UI

@@ -18,6 +18,7 @@
 TD WebAPI là hệ thống quản lý sản phẩm và thương hiệu được xây dựng bằng **Java Spring Boot** với:
 
 ### ✨ Tính năng chính
+- 📄 **Quản lý văn bản động**: thêm, sửa, xóa mềm, tìm kiếm theo metadata không cố định
 - 🛒 **Quản lý Sản phẩm & Thương hiệu**: CRUD, tìm kiếm, export Excel
 - 🔍 **Tìm kiếm nâng cao**: Elasticsearch full-text search với fuzzy matching
 - 📁 **Quản lý File**: Upload/download với MinIO object storage
@@ -145,6 +146,36 @@ curl -X POST "http://localhost:8180/realms/td-realm/protocol/openid-connect/toke
 | `POST` | `/api/v1/files/upload` | Upload file | USER |
 | `GET` | `/api/v1/files/{id}/download` | Download file | USER |
 | `DELETE` | `/api/v1/files/{id}` | Xóa file | USER |
+
+### Documents API
+
+| Method | Endpoint | Description | Role |
+|--------|----------|-------------|------|
+| `GET` | `/api/v1/documents` | Xem danh sách văn bản | USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER |
+| `GET` | `/api/v1/documents/{id}` | Xem chi tiết văn bản | USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER |
+| `POST` | `/api/v1/documents/search` | Tìm kiếm văn bản động | USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER |
+| `POST` | `/api/v1/documents` | Tạo văn bản | USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER |
+| `PUT` | `/api/v1/documents/{id}` | Cập nhật văn bản | USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER |
+| `DELETE` | `/api/v1/documents/{id}` | Xóa mềm văn bản | USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER |
+
+Ví dụ payload tìm kiếm văn bản:
+
+```json
+{
+  "keyword": "quy trinh",
+  "documentType": "POLICY",
+  "status": "ACTIVE",
+  "attributeFilters": {
+    "department": "Accounting",
+    "title": { "operator": "contains", "value": "process" },
+    "amount": { "operator": "range", "from": 10, "to": 100 }
+  },
+  "pageNumber": 0,
+  "pageSize": 10,
+  "sortBy": "lastModifiedOn",
+  "sortDirection": "desc"
+}
+```
 
 ### Audit Logs API
 
@@ -385,7 +416,10 @@ mvn verify
 
 ## Environment Profiles
 
-- **dev** (default): Development environment với Docker services
+- **dev** (default): Development environment, dùng PostgreSQL adapter cho documents
+- **postgres**: Tương tự `dev`, giữ datasource PostgreSQL/Flyway hiện tại
+- **tidb**: Bật TiDB datasource + native JSON prefilter cho documents, Flyway tắt mặc định
+- **mariadb**: Bật MariaDB datasource + native JSON prefilter cho documents, Flyway tắt mặc định
 - **staging**: Staging environment với external services  
 - **prod**: Production environment với secure configurations
 
@@ -394,9 +428,20 @@ Thay đổi profile:
 # PowerShell
 $env:SPRING_PROFILES_ACTIVE = "prod"
 
+# PostgreSQL mặc định cho documents
+$env:SPRING_PROFILES_ACTIVE = "postgres"
+
+# TiDB hoặc MariaDB cho documents
+$env:SPRING_PROFILES_ACTIVE = "tidb"
+$env:SPRING_PROFILES_ACTIVE = "mariadb"
+
 # Hoặc trong application startup
 mvn -pl td-web -am spring-boot:run -Dspring-boot.run.profiles=staging
 ```
+
+Lưu ý:
+- Chỉ bật một DB profile tại một thời điểm: `postgres`, `tidb`, hoặc `mariadb`.
+- `tidb` và `mariadb` hiện tắt Flyway mặc định; schema tương thích cần được provision sẵn ở DB đích.
 
 ## Troubleshooting
 
