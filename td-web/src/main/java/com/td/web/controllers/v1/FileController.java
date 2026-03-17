@@ -30,7 +30,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/files")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "File Management", description = "API for file upload, download, and management operations")
+@Tag(name = "File Management", description = "API tải lên, tải xuống và quản lý file")
 @SecurityRequirement(name = "bearer-jwt")
 public class FileController extends BaseController {
 
@@ -40,31 +40,31 @@ public class FileController extends BaseController {
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(
-        summary = "Upload a file",
-        description = "Upload a file to MinIO storage with metadata",
+        summary = "Tải file lên",
+        description = "Tải file lên lưu trữ MinIO kèm metadata",
         responses = {
-            @ApiResponse(responseCode = "200", description = "File uploaded successfully"),
-            @ApiResponse(responseCode = "400", description = "Invalid file or request"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "413", description = "File too large"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
+            @ApiResponse(responseCode = "200", description = "Đã tải lên thành công"),
+            @ApiResponse(responseCode = "400", description = "File hoặc yêu cầu không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "413", description = "File quá lớn"),
+            @ApiResponse(responseCode = "500", description = "Lỗi máy chủ")
         }
     )
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     public ResponseEntity<UploadFileResponse> uploadFile(
-            @Parameter(description = "File to upload", required = true)
+            @Parameter(description = "File cần tải lên", required = true)
             @RequestParam("file") MultipartFile file,
             
-            @Parameter(description = "File category", required = true)
+            @Parameter(description = "Danh mục file", required = true)
             @RequestParam("category") FileCategory category,
             
-            @Parameter(description = "File description")
+            @Parameter(description = "Mô tả file")
             @RequestParam(value = "description", required = false) String description,
             
-            @Parameter(description = "Tags (comma-separated)")
+            @Parameter(description = "Thẻ (phân cách bằng dấu phẩy)")
             @RequestParam(value = "tags", required = false) String tags,
             
-            @Parameter(description = "Make file publicly accessible")
+            @Parameter(description = "Cho phép truy cập công khai")
             @RequestParam(value = "isPublic", defaultValue = "false") Boolean isPublic,
             
             Authentication authentication) {
@@ -89,31 +89,31 @@ public class FileController extends BaseController {
             }
 
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid upload request: {}", e.getMessage());
+            log.warn("Yêu cầu tải lên không hợp lệ: {}", e.getMessage());
             return ResponseEntity.badRequest()
-                .body(UploadFileResponse.failure("Invalid request: " + e.getMessage()));
+                .body(UploadFileResponse.failure("Yêu cầu không hợp lệ: " + e.getMessage()));
         } catch (Exception e) {
-            log.error("Failed to upload file", e);
+            log.error("Tải file lên thất bại", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(UploadFileResponse.failure("Internal server error"));
+                .body(UploadFileResponse.failure("Lỗi máy chủ"));
         }
     }
 
     @GetMapping("/download/{fileId}")
     @Operation(
-        summary = "Download a file",
-        description = "Download a file by ID",
+        summary = "Tải file xuống",
+        description = "Tải file xuống theo ID",
         responses = {
-            @ApiResponse(responseCode = "200", description = "File downloaded successfully"),
-            @ApiResponse(responseCode = "404", description = "File not found"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "403", description = "Access denied"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
+            @ApiResponse(responseCode = "200", description = "Đã tải xuống thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy file"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền"),
+            @ApiResponse(responseCode = "500", description = "Lỗi máy chủ")
         }
     )
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     public ResponseEntity<InputStreamResource> downloadFile(
-            @Parameter(description = "File ID", required = true)
+            @Parameter(description = "ID file", required = true)
             @PathVariable UUID fileId,
             Authentication authentication) {
 
@@ -130,24 +130,24 @@ public class FileController extends BaseController {
                 .body(resource);
 
         } catch (IllegalArgumentException e) {
-            log.warn("File not found: {}", fileId);
+            log.warn("Không tìm thấy file: {}", fileId);
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            log.error("Failed to download file: {}", fileId, e);
+            log.error("Tải file xuống thất bại: {}", fileId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     @DeleteMapping("/{fileId}")
     @Operation(
-        summary = "Delete a file",
-        description = "Delete a file by ID (Admin or file owner only)",
+        summary = "Xóa file",
+        description = "Xóa file theo ID (chỉ Admin hoặc chủ sở hữu)",
         responses = {
-            @ApiResponse(responseCode = "200", description = "File deleted successfully"),
-            @ApiResponse(responseCode = "404", description = "File not found"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "403", description = "Access denied"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
+            @ApiResponse(responseCode = "200", description = "Đã xóa thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy file"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "403", description = "Không có quyền"),
+            @ApiResponse(responseCode = "500", description = "Lỗi máy chủ")
         }
     )
     @PreAuthorize("hasRole('ADMIN') or @fileSecurityService.canDeleteFile(#fileId, authentication.principal)")
@@ -160,54 +160,54 @@ public class FileController extends BaseController {
             boolean deleted = deleteFileUseCase.execute(fileId);
             
             if (deleted) {
-                return ResponseEntity.ok("File deleted successfully");
+                return ResponseEntity.ok("Đã xóa file thành công");
             } else {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to delete file");
+                    .body("Xóa file thất bại");
             }
 
         } catch (IllegalArgumentException e) {
-            log.warn("File not found: {}", fileId);
+            log.warn("Không tìm thấy file: {}", fileId);
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            log.error("Failed to delete file: {}", fileId, e);
+            log.error("Xóa file thất bại: {}", fileId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Internal server error");
+                .body("Lỗi máy chủ");
         }
     }
 
     @GetMapping("/info/{fileId}")
     @Operation(
-        summary = "Get file information",
-        description = "Get file metadata by ID",
+        summary = "Xem thông tin file",
+        description = "Lấy metadata của file theo ID",
         responses = {
-            @ApiResponse(responseCode = "200", description = "File information retrieved successfully"),
-            @ApiResponse(responseCode = "404", description = "File not found"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
+            @ApiResponse(responseCode = "200", description = "Đã lấy thông tin thành công"),
+            @ApiResponse(responseCode = "404", description = "Không tìm thấy file"),
+            @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+            @ApiResponse(responseCode = "500", description = "Lỗi máy chủ")
         }
     )
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     public ResponseEntity<FileMetadataDto> getFileInfo(
-            @Parameter(description = "File ID", required = true)
+            @Parameter(description = "ID file", required = true)
             @PathVariable UUID fileId) {
 
-        // This would require a GetFileInfoUseCase - simplified for now
+        // Đây là chức năng đơn giản hoá, cần triển khai GetFileInfoUseCase
         return ResponseEntity.ok().build();
     }
 
-    // Helper method to extract user ID from authentication
+    // Phương thức hỗ trợ lấy user ID từ authentication
     private UUID getCurrentUserId(Authentication authentication) {
         try {
             Object principal = authentication.getPrincipal();
             if (principal instanceof UUID) {
                 return (UUID) principal;
             }
-            // Handle other principal types as needed
-            return UUID.randomUUID(); // Fallback - should be improved
+            // Xử lý các loại principal khác nếu cần
+            return UUID.randomUUID(); // Fallback - cần cải thiện
         } catch (Exception e) {
-            log.warn("Failed to extract user ID from authentication", e);
-            return UUID.randomUUID(); // Fallback - should be improved
+            log.warn("Không thể lấy ID người dùng từ authentication", e);
+            return UUID.randomUUID(); // Fallback - cần cải thiện
         }
     }
 }

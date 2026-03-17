@@ -38,7 +38,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
 @Validated
-@Tag(name = "Products", description = "Product management endpoints")
+@Tag(name = "Products", description = "Quản lý sản phẩm")
 public class ProductsController extends BaseController {
 
     private final CreateProductUseCase createProductUseCase;
@@ -75,7 +75,7 @@ public class ProductsController extends BaseController {
      */
     @PostMapping("/search")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Search products using available filters")
+    @Operation(summary = "Tìm kiếm sản phẩm")
     public ResponseEntity<PaginationResponse<ProductDto>> searchProducts(
             @Valid @RequestBody SearchProductsRequest request) {
         var response = searchProductsUseCase.execute(request);
@@ -92,7 +92,7 @@ public class ProductsController extends BaseController {
      */
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Get product details")
+    @Operation(summary = "Xem chi tiết sản phẩm")
     public ResponseEntity<Result<ProductDetailsDto>> getProduct(@PathVariable UUID id) {
         var result = getProductUseCase.execute(new GetProductRequest(id));
         return ok(result);
@@ -120,7 +120,7 @@ public class ProductsController extends BaseController {
      */
     @PostMapping
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Create a new product")
+    @Operation(summary = "Tạo sản phẩm mới")
     public ResponseEntity<Result<UUID>> createProduct(@Valid @RequestBody CreateProductRequest request) {
         var result = createProductUseCase.execute(request);
         return created(result);
@@ -138,13 +138,12 @@ public class ProductsController extends BaseController {
      */
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Update a product")
+    @Operation(summary = "Cập nhật sản phẩm")
     public ResponseEntity<Result<UUID>> updateProduct(
             @PathVariable UUID id, 
             @Valid @RequestBody UpdateProductRequest request) {
         if (!id.equals(request.getId())) {
-            return badRequest(Result.<UUID>failure("Product ID mismatch"));
-        }
+            return badRequest(Result.<UUID>failure("ID sản phẩm không khớp"));
         var result = updateProductUseCase.execute(request);
         return ok(result);
     }
@@ -161,7 +160,7 @@ public class ProductsController extends BaseController {
      */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Delete a product")
+    @Operation(summary = "Xóa sản phẩm")
     public ResponseEntity<Result<UUID>> deleteProduct(@PathVariable UUID id) {
         var result = deleteProductUseCase.execute(new DeleteProductRequest(id));
         return ok(result);
@@ -182,7 +181,7 @@ public class ProductsController extends BaseController {
      */
     @PostMapping("/export")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Export products")
+    @Operation(summary = "Xuất danh sách sản phẩm")
     public ResponseEntity<byte[]> exportProducts(@Valid @RequestBody ExportProductsRequest request) {
         var result = exportProductsUseCase.execute(request);
         return ResponseEntity.ok()

@@ -30,7 +30,7 @@ public class CreateDocumentUseCase {
             var saved = documentRepository.save(document);
             return Result.success(saved.getId());
         } catch (Exception ex) {
-            return Result.failure("Failed to create document: " + ex.getMessage());
+            return Result.failure("Tạo tài liệu thất bại: " + ex.getMessage());
         }
     }
 

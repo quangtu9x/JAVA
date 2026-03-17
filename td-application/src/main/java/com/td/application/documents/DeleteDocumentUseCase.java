@@ -18,12 +18,12 @@ public class DeleteDocumentUseCase {
         try {
             var documentOptional = documentRepository.findById(documentId);
             if (documentOptional.isEmpty()) {
-                return Result.failure("Document not found with ID: " + documentId);
+                return Result.failure("Không tìm thấy tài liệu với ID: " + documentId);
             }
 
             var document = documentOptional.get();
             if (document.isDeleted()) {
-                return Result.failure("Document already deleted");
+                return Result.failure("Tài liệu đã bị xóa trước đó");
             }
 
             // TODO: Replace random UUID with authenticated user ID when user context is available.
@@ -32,7 +32,7 @@ public class DeleteDocumentUseCase {
 
             return Result.success(saved.getId());
         } catch (Exception ex) {
-            return Result.failure("Failed to delete document: " + ex.getMessage());
+            return Result.failure("Xóa tài liệu thất bại: " + ex.getMessage());
         }
     }
 }

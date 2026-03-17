@@ -17,31 +17,31 @@ public class UpdateBrandUseCase {
 
     public Result<UUID> execute(UpdateBrandRequest request) {
         try {
-            // Find existing brand
+            // Tìm thương hiệu theo ID
             var existingBrand = brandRepository.findById(request.getId());
             if (existingBrand.isEmpty()) {
-                return Result.failure("Brand not found with ID: " + request.getId());
+                return Result.failure("Không tìm thấy thương hiệu với ID: " + request.getId());
             }
 
             var brand = existingBrand.get();
             
-            // Check if new name conflicts with existing brand (excluding current brand)
+            // Kiểm tra tên mới có trùng với thương hiệu khác không
             if (!brand.getName().equalsIgnoreCase(request.getName())) {
                 if (brandRepository.existsByNameIgnoreCase(request.getName())) {
-                    return Result.failure("Brand with name '" + request.getName() + "' already exists");
+                    return Result.failure("Thương hiệu '" + request.getName() + "' đã tồn tại");
                 }
             }
 
-            // Update brand
+            // Cập nhật thương hiệu
             brand.update(request.getName(), request.getDescription());
 
-            // Save brand
+            // Lưu vào database
             var savedBrand = brandRepository.save(brand);
             
             return Result.success(savedBrand.getId());
             
         } catch (Exception ex) {
-            return Result.failure("Failed to update brand: " + ex.getMessage());
+            return Result.failure("Cập nhật thương hiệu thất bại: " + ex.getMessage());
         }
     }
 }

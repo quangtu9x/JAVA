@@ -41,10 +41,10 @@ public class CreateProductUseCase {
      */
     public Result<UUID> execute(CreateProductRequest request) {
         try {
-            // Bước 1: Validate brand exists - Kiểm tra thương hiệu có tồn tại không
+            // Bước 1: Kiểm tra thương hiệu có tồn tại không
             var brand = brandRepository.findById(request.getBrandId());
             if (brand.isEmpty()) {
-                return Result.failure("Brand not found with ID: " + request.getBrandId());
+                return Result.failure("Không tìm thấy thương hiệu với ID: " + request.getBrandId());
             }
 
             // Bước 2: Create product - Tạo entity sản phẩm mới
@@ -63,7 +63,7 @@ public class CreateProductUseCase {
             return Result.success(savedProduct.getId());
             
         } catch (Exception ex) {
-            return Result.failure("Failed to create product: " + ex.getMessage());
+            return Result.failure("Tạo sản phẩm thất bại: " + ex.getMessage());
         }
     }
 }

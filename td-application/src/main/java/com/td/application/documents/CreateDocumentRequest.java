@@ -12,14 +12,14 @@ import java.util.Map;
 @Data
 public class CreateDocumentRequest {
 
-    @NotBlank(message = "Title is required")
-    @Size(min = 2, max = 300, message = "Title must be between 2 and 300 characters")
+    @NotBlank(message = "Tiêu đề không được để trống")
+    @Size(min = 2, max = 300, message = "Tiêu đề phải từ 2 đến 300 ký tự")
     private String title;
 
-    @Size(max = 100, message = "Document type cannot exceed 100 characters")
+    @Size(max = 100, message = "Loại tài liệu không vượt quá 100 ký tự")
     private String documentType;
 
-    @Size(max = 50, message = "Status cannot exceed 50 characters")
+    @Size(max = 50, message = "Trạng thái không vượt quá 50 ký tự")
     private String status;
 
     private String content;

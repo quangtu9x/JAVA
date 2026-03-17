@@ -23,18 +23,18 @@ public class DownloadFileUseCase implements UseCase<UUID, DownloadFileResponse> 
     @Transactional
     public DownloadFileResponse execute(UUID fileId) {
         try {
-            // Get file metadata
+            // Lấy thông tin file
             FileMetadata fileMetadata = fileStorageRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found with ID: " + fileId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy file với ID: " + fileId));
             
-            // Download from MinIO
+            // Tải xuống từ MinIO
             InputStream inputStream = minIOService.downloadFile(fileMetadata.getFilePath());
             
-            // Update download statistics
+            // Cập nhật số lần tải xuống
             fileMetadata.incrementDownloadCount();
             fileStorageRepository.save(fileMetadata);
             
-            log.info("File downloaded successfully: {} (ID: {})", 
+            log.info("Đã tải file xuống thành công: {} (ID: {})", 
                 fileMetadata.getOriginalFilename(), fileId);
             
             return new DownloadFileResponse(
@@ -45,8 +45,8 @@ public class DownloadFileUseCase implements UseCase<UUID, DownloadFileResponse> 
             );
             
         } catch (Exception e) {
-            log.error("Failed to download file with ID: {}", fileId, e);
-            throw new RuntimeException("Failed to download file: " + e.getMessage(), e);
+            log.error("Tải file xuống thất bại với ID: {}", fileId, e);
+            throw new RuntimeException("Tải file xuống thất bại: " + e.getMessage(), e);
         }
     }
 }

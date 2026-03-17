@@ -18,19 +18,19 @@ public class DeleteProductUseCase {
 
     public Result<UUID> execute(DeleteProductRequest request) {
         try {
-            // Find existing product
+            // Tìm sản phẩm theo ID
             var existingProduct = productRepository.findById(request.getId());
             if (existingProduct.isEmpty()) {
-                return Result.failure("Product not found with ID: " + request.getId());
+                return Result.failure("Không tìm thấy sản phẩm với ID: " + request.getId());
             }
 
-            // Delete product (soft delete if implemented)
+            // Xóa sản phẩm
             productRepository.delete(existingProduct.get());
             
             return Result.success(request.getId());
             
         } catch (Exception ex) {
-            return Result.failure("Failed to delete product: " + ex.getMessage());
+            return Result.failure("Xóa sản phẩm thất bại: " + ex.getMessage());
         }
     }
 }

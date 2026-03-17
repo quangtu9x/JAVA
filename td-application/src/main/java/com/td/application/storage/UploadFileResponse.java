@@ -31,7 +31,7 @@ public class UploadFileResponse {
         response.humanReadableSize = fileMetadata.getHumanReadableSize();
         response.contentType = fileMetadata.getContentType();
         response.downloadUrl = downloadUrl;
-        response.message = "File uploaded successfully";
+        response.message = "Đã tải file lên thành công";
         response.success = true;
         return response;
     }

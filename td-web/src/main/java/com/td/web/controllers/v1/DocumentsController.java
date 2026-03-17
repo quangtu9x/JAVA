@@ -37,7 +37,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/documents")
 @RequiredArgsConstructor
 @Validated
-@Tag(name = "Documents", description = "Dynamic document management endpoints")
+@Tag(name = "Documents", description = "Quản lý tài liệu linh hoạt")
 public class DocumentsController extends BaseController {
 
     private final CreateDocumentUseCase createDocumentUseCase;
@@ -48,7 +48,7 @@ public class DocumentsController extends BaseController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "List documents")
+    @Operation(summary = "Danh sách tài liệu")
     public ResponseEntity<PaginationResponse<DocumentDto>> listDocuments(
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
@@ -72,7 +72,7 @@ public class DocumentsController extends BaseController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Get document details")
+    @Operation(summary = "Xem chi tiết tài liệu")
         public ResponseEntity<Result<DocumentDto>> getDocument(
                 @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = getDocumentUseCase.execute(new GetDocumentRequest(id));
@@ -81,7 +81,7 @@ public class DocumentsController extends BaseController {
 
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Search documents with dynamic filters")
+    @Operation(summary = "Tìm kiếm tài liệu theo bộ lọc")
     public ResponseEntity<PaginationResponse<DocumentDto>> searchDocuments(
             @Valid @RequestBody SearchDocumentsRequest request) {
         var response = searchDocumentsUseCase.execute(request);
@@ -90,7 +90,7 @@ public class DocumentsController extends BaseController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Create a new document")
+    @Operation(summary = "Tạo tài liệu mới")
     public ResponseEntity<Result<UUID>> createDocument(@Valid @RequestBody CreateDocumentRequest request) {
         var result = createDocumentUseCase.execute(request);
         return created(result);
@@ -98,12 +98,12 @@ public class DocumentsController extends BaseController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Update an existing document")
+    @Operation(summary = "Cập nhật tài liệu")
     public ResponseEntity<Result<UUID>> updateDocument(
                 @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateDocumentRequest request) {
         if (!id.equals(request.getId())) {
-            return badRequest(Result.<UUID>failure("Document ID mismatch"));
+            return badRequest(Result.<UUID>failure("ID tài liệu không khớp"));
         }
 
         var result = updateDocumentUseCase.execute(request);
@@ -112,7 +112,7 @@ public class DocumentsController extends BaseController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Delete a document (soft delete)")
+    @Operation(summary = "Xóa tài liệu (soft delete)")
     public ResponseEntity<Result<UUID>> deleteDocument(
             @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = deleteDocumentUseCase.execute(id);

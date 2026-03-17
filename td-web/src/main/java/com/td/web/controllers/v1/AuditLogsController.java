@@ -24,14 +24,14 @@ import java.util.List;
 @RequestMapping("/api/v1/audit-logs")
 @RequiredArgsConstructor
 @Validated
-@Tag(name = "Audit Logs", description = "Audit log management endpoints")
+@Tag(name = "Audit Logs", description = "Quản lý nhật ký kiểm toán hệ thống")
 public class AuditLogsController extends BaseController {
 
     private final AuditLogRepository auditLogRepository;
 
     @PostMapping("/search")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Search audit logs with filters")
+    @Operation(summary = "Tìm kiếm nhật ký kiểm toán theo bộ lọc")
     public ResponseEntity<PaginationResponse<AuditLogDto>> searchAuditLogs(
             @Valid @RequestBody SearchAuditLogsRequest request) {
         

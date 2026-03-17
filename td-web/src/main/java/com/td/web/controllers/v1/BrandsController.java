@@ -19,7 +19,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/brands")
 @RequiredArgsConstructor
 @Validated
-@Tag(name = "Brands", description = "Brand management endpoints")
+@Tag(name = "Brands", description = "Quản lý thương hiệu")
 public class BrandsController extends BaseController {
 
     private final CreateBrandUseCase createBrandUseCase;
@@ -30,7 +30,7 @@ public class BrandsController extends BaseController {
 
     @PostMapping("/search")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Search brands using available filters")
+    @Operation(summary = "Tìm kiếm thương hiệu")
     public ResponseEntity<PaginationResponse<BrandDto>> searchBrands(
             @Valid @RequestBody SearchBrandsRequest request) {
         var response = searchBrandsUseCase.execute(request);
@@ -39,7 +39,7 @@ public class BrandsController extends BaseController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Get brand details")
+    @Operation(summary = "Xem chi tiết thương hiệu")
     public ResponseEntity<Result<BrandDto>> getBrand(@PathVariable UUID id) {
         var result = getBrandUseCase.execute(new GetBrandRequest(id));
         return ok(result);
@@ -47,7 +47,7 @@ public class BrandsController extends BaseController {
 
     @PostMapping
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Create a new brand")
+    @Operation(summary = "Tạo thương hiệu mới")
     public ResponseEntity<Result<UUID>> createBrand(@Valid @RequestBody CreateBrandRequest request) {
         var result = createBrandUseCase.execute(request);
         return created(result);
@@ -55,12 +55,12 @@ public class BrandsController extends BaseController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Update a brand")
+    @Operation(summary = "Cập nhật thương hiệu")
     public ResponseEntity<Result<UUID>> updateBrand(
             @PathVariable UUID id, 
             @Valid @RequestBody UpdateBrandRequest request) {
         if (!id.equals(request.getId())) {
-            return badRequest(Result.<UUID>failure("Brand ID mismatch"));
+            return badRequest(Result.<UUID>failure("ID thương hiệu không khớp"));
         }
         var result = updateBrandUseCase.execute(request);
         return ok(result);
@@ -68,7 +68,7 @@ public class BrandsController extends BaseController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    @Operation(summary = "Delete a brand")
+    @Operation(summary = "Xóa thương hiệu")
     public ResponseEntity<Result<UUID>> deleteBrand(@PathVariable UUID id) {
         var result = deleteBrandUseCase.execute(new DeleteBrandRequest(id));
         return ok(result);

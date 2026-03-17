@@ -22,23 +22,23 @@ public class DeleteFileUseCase implements UseCase<UUID, Boolean> {
     @Transactional
     public Boolean execute(UUID fileId) {
         try {
-            // Get file metadata
+            // Lấy thông tin file
             FileMetadata fileMetadata = fileStorageRepository.findById(fileId)
-                .orElseThrow(() -> new IllegalArgumentException("File not found with ID: " + fileId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy file với ID: " + fileId));
             
-            // Delete from MinIO
+            // Xóa khỏi MinIO
             minIOService.deleteFile(fileMetadata.getFilePath());
             
-            // Delete metadata from database
+            // Xóa metadata khỏi database
             fileStorageRepository.delete(fileMetadata);
             
-            log.info("File deleted successfully: {} (ID: {})", 
+            log.info("Đã xóa file thành công: {} (ID: {})", 
                 fileMetadata.getOriginalFilename(), fileId);
             
             return true;
             
         } catch (Exception e) {
-            log.error("Failed to delete file with ID: {}", fileId, e);
+            log.error("Xóa file thất bại với ID: {}", fileId, e);
             return false;
         }
     }

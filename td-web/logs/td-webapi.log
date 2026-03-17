@@ -1062,3 +1062,262 @@ java.lang.IllegalArgumentException: Name for argument of type [java.util.UUID] n
         (attributes_json, content, created_by, created_on, deleted_by, deleted_on, document_type, last_modified_by, last_modified_on, metadata_json, status, tags_json, title, version_no, id) 
     values
         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-03-17 11:49:04.870 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 11:49:04.873 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 11:49:10.274 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 11:49:10.274 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 11:59:56.996 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 11:59:56.999 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:00:12.159 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/v1/documents
+2026-03-17 12:00:12.318 [http-nio-8080-exec-8] DEBUG o.s.s.o.jwt.JwtTimestampValidator - Jwt expired at 2026-03-17T04:47:27Z
+2026-03-17 12:00:12.319 [http-nio-8080-exec-8] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Failed to authenticate since the JWT was invalid
+2026-03-17 12:00:29.981 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/v1/documents
+2026-03-17 12:00:29.983 [http-nio-8080-exec-1] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:00:29.983 [http-nio-8080-exec-1] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:00:29.984 [http-nio-8080-exec-1] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:00:29.986 [http-nio-8080-exec-1] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/v1/documents
+2026-03-17 12:00:29.996 [http-nio-8080-exec-1] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:00:29.999 [http-nio-8080-exec-1] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:00:30.009 [http-nio-8080-exec-1] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:00:30.021 [http-nio-8080-exec-1] DEBUG org.hibernate.SQL - 
+    insert 
+    into
+        documents
+        (attributes_json, content, created_by, created_on, deleted_by, deleted_on, document_type, last_modified_by, last_modified_on, metadata_json, status, tags_json, title, version_no, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-03-17 12:00:42.721 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:00:42.722 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:00:48.262 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:00:48.263 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:00:51.244 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents/68e3ebcc-6cae-4e3c-b9e8-3a77823f7627
+2026-03-17 12:00:51.246 [http-nio-8080-exec-4] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:00:51.246 [http-nio-8080-exec-4] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:00:51.247 [http-nio-8080-exec-4] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:00:51.248 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/v1/documents/68e3ebcc-6cae-4e3c-b9e8-3a77823f7627
+2026-03-17 12:00:51.249 [http-nio-8080-exec-4] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.getDocument(java.util.UUID); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:00:51.252 [http-nio-8080-exec-4] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.getDocument(java.util.UUID); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:00:51.258 [http-nio-8080-exec-4] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:01:10.815 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:01:10.816 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:01:20.713 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/v1/documents
+2026-03-17 12:01:20.715 [http-nio-8080-exec-7] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:01:20.715 [http-nio-8080-exec-7] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:01:20.715 [http-nio-8080-exec-7] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:01:20.716 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/v1/documents
+2026-03-17 12:01:20.717 [http-nio-8080-exec-7] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:20.717 [http-nio-8080-exec-7] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:20.719 [http-nio-8080-exec-7] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:01:20.723 [http-nio-8080-exec-7] DEBUG org.hibernate.SQL - 
+    insert 
+    into
+        documents
+        (attributes_json, content, created_by, created_on, deleted_by, deleted_on, document_type, last_modified_by, last_modified_on, metadata_json, status, tags_json, title, version_no, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-03-17 12:01:22.744 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/v1/documents
+2026-03-17 12:01:22.745 [http-nio-8080-exec-6] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:01:22.747 [http-nio-8080-exec-6] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:01:22.747 [http-nio-8080-exec-6] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:01:22.747 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/v1/documents
+2026-03-17 12:01:22.749 [http-nio-8080-exec-6] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:22.749 [http-nio-8080-exec-6] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:22.751 [http-nio-8080-exec-6] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:01:22.756 [http-nio-8080-exec-6] DEBUG org.hibernate.SQL - 
+    insert 
+    into
+        documents
+        (attributes_json, content, created_by, created_on, deleted_by, deleted_on, document_type, last_modified_by, last_modified_on, metadata_json, status, tags_json, title, version_no, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-03-17 12:01:37.482 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents/c2838187-36be-426f-b3e3-16a79c9a25fd
+2026-03-17 12:01:37.484 [http-nio-8080-exec-9] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:01:37.484 [http-nio-8080-exec-9] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:01:37.484 [http-nio-8080-exec-9] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:01:37.485 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/v1/documents/c2838187-36be-426f-b3e3-16a79c9a25fd
+2026-03-17 12:01:37.486 [http-nio-8080-exec-9] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.getDocument(java.util.UUID); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:37.487 [http-nio-8080-exec-9] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.getDocument(java.util.UUID); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:37.493 [http-nio-8080-exec-9] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:01:55.655 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing POST /api/v1/documents
+2026-03-17 12:01:55.658 [http-nio-8080-exec-10] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:01:55.658 [http-nio-8080-exec-10] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:01:55.658 [http-nio-8080-exec-10] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:01:55.659 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Secured POST /api/v1/documents
+2026-03-17 12:01:55.660 [http-nio-8080-exec-10] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:55.660 [http-nio-8080-exec-10] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.createDocument(com.td.application.documents.CreateDocumentRequest); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:01:55.661 [http-nio-8080-exec-10] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:01:55.673 [http-nio-8080-exec-10] DEBUG org.hibernate.SQL - 
+    insert 
+    into
+        documents
+        (attributes_json, content, created_by, created_on, deleted_by, deleted_on, document_type, last_modified_by, last_modified_on, metadata_json, status, tags_json, title, version_no, id) 
+    values
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+2026-03-17 12:02:05.126 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents/8f3059e7-5996-4ef9-8d68-48e1306d0392
+2026-03-17 12:02:05.128 [http-nio-8080-exec-8] DEBUG c.t.i.security.KeycloakJwtConverter - Extracted authorities from JWT: [ROLE_USER, ROLE_ADMIN]
+2026-03-17 12:02:05.128 [http-nio-8080-exec-8] DEBUG o.s.s.o.s.r.a.JwtAuthenticationProvider - Authenticated token
+2026-03-17 12:02:05.128 [http-nio-8080-exec-8] DEBUG o.s.s.o.s.r.w.a.BearerTokenAuthenticationFilter - Set SecurityContextHolder to JwtAuthenticationToken [Principal=org.springframework.security.oauth2.jwt.Jwt@1a73b3c7, Credentials=[PROTECTED], Authenticated=true, Details=WebAuthenticationDetails [RemoteIpAddress=0:0:0:0:0:0:0:1, SessionId=null], Granted Authorities=[ROLE_USER, ROLE_ADMIN]]
+2026-03-17 12:02:05.130 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Secured GET /api/v1/documents/8f3059e7-5996-4ef9-8d68-48e1306d0392
+2026-03-17 12:02:05.130 [http-nio-8080-exec-8] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorizing method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.getDocument(java.util.UUID); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:02:05.130 [http-nio-8080-exec-8] DEBUG o.s.s.a.m.AuthorizationManagerBeforeMethodInterceptor - Authorized method invocation ReflectiveMethodInvocation: public org.springframework.http.ResponseEntity com.td.web.controllers.v1.DocumentsController.getDocument(java.util.UUID); target is of class [com.td.web.controllers.v1.DocumentsController]
+2026-03-17 12:02:05.133 [http-nio-8080-exec-8] DEBUG org.hibernate.SQL - 
+    select
+        bd1_0.id,
+        bd1_0.attributes_json,
+        bd1_0.content,
+        bd1_0.created_by,
+        bd1_0.created_on,
+        bd1_0.deleted_by,
+        bd1_0.deleted_on,
+        bd1_0.document_type,
+        bd1_0.last_modified_by,
+        bd1_0.last_modified_on,
+        bd1_0.metadata_json,
+        bd1_0.status,
+        bd1_0.tags_json,
+        bd1_0.title,
+        bd1_0.version_no 
+    from
+        documents bd1_0 
+    where
+        bd1_0.id=?
+2026-03-17 12:30:40.187 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Securing GET /swagger-ui/index.html
+2026-03-17 12:30:40.187 [http-nio-8080-exec-3] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:30:40.189 [http-nio-8080-exec-3] DEBUG o.s.security.web.FilterChainProxy - Secured GET /swagger-ui/index.html
+2026-03-17 12:30:40.292 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /.well-known/appspecific/com.chrome.devtools.json
+2026-03-17 12:30:40.293 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:30:40.433 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /v3/api-docs
+2026-03-17 12:30:40.433 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:30:40.434 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Secured GET /v3/api-docs
+2026-03-17 12:30:40.450 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:30:40.451 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:31:01.311 [http-nio-8080-exec-7] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:31:01.312 [http-nio-8080-exec-7] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:31:09.583 [http-nio-8080-exec-6] DEBUG o.s.security.web.FilterChainProxy - Securing PUT /api/v1/documents/3fa85f64-5717-4562-b3fc-2c963f66afa6
+2026-03-17 12:31:09.584 [http-nio-8080-exec-6] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:31:22.672 [http-nio-8080-exec-9] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:31:22.673 [http-nio-8080-exec-9] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:31:23.146 [http-nio-8080-exec-10] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:31:23.147 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:31:27.411 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents?pageNumber=0&pageSize=10&sortBy=lastModifiedOn&sortDirection=desc
+2026-03-17 12:31:27.411 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext

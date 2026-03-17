@@ -18,12 +18,12 @@ public class UpdateDocumentUseCase {
         try {
             var documentOptional = documentRepository.findById(request.getId());
             if (documentOptional.isEmpty()) {
-                return Result.failure("Document not found with ID: " + request.getId());
+                return Result.failure("Không tìm thấy tài liệu với ID: " + request.getId());
             }
 
             var document = documentOptional.get();
             if (document.isDeleted()) {
-                return Result.failure("Document was deleted and cannot be updated");
+                return Result.failure("Tài liệu đã bị xóa và không thể cập nhật");
             }
 
             document.update(
@@ -39,7 +39,7 @@ public class UpdateDocumentUseCase {
             var saved = documentRepository.save(document);
             return Result.success(saved.getId());
         } catch (Exception ex) {
-            return Result.failure("Failed to update document: " + ex.getMessage());
+            return Result.failure("Cập nhật tài liệu thất bại: " + ex.getMessage());
         }
     }
 

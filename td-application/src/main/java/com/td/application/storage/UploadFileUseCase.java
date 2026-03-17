@@ -21,7 +21,7 @@ public class UploadFileUseCase implements UseCase<UploadFileRequest, UploadFileR
     @Transactional
     public UploadFileResponse execute(UploadFileRequest request) {
         try {
-            // Upload to MinIO
+            // Tải lên MinIO
             FileMetadata fileMetadata = minIOService.uploadFile(
                 request.getFile(),
                 request.getFileCategory(),
@@ -29,29 +29,29 @@ public class UploadFileUseCase implements UseCase<UploadFileRequest, UploadFileR
                 request.getDescription()
             );
             
-            // Set additional properties
+            // Cài đặt các thuộc tính bổ sung
             fileMetadata.setIsPublic(request.getIsPublic());
             fileMetadata.setTags(request.getTags());
             
-            // Save metadata to database
+            // Lưu metadata vào database
             FileMetadata savedMetadata = fileStorageRepository.save(fileMetadata);
             
-            // Generate download URL
+            // Tạo URL tải xuống
             String downloadUrl = minIOService.generatePresignedDownloadUrl(
-                savedMetadata.getFilePath(), 60); // 60 minutes expiry
+                savedMetadata.getFilePath(), 60); // hết hạn sau 60 phút
             
-            // Convert to DTO
+            // Chuyển sang DTO
             FileMetadataDto dto = fileMetadataMapper.toDto(savedMetadata);
             dto.setDownloadUrl(downloadUrl);
             
-            log.info("File uploaded successfully: {} (ID: {})", 
+            log.info("Đã tải file lên thành công: {} (ID: {})", 
                 savedMetadata.getOriginalFilename(), savedMetadata.getId());
             
             return UploadFileResponse.success(dto, downloadUrl);
             
         } catch (Exception e) {
-            log.error("Failed to upload file: {}", request.getFile().getOriginalFilename(), e);
-            return UploadFileResponse.failure("Failed to upload file: " + e.getMessage());
+            log.error("Tải file lên thất bại: {}", request.getFile().getOriginalFilename(), e);
+            return UploadFileResponse.failure("Tải file lên thất bại: " + e.getMessage());
         }
     }
 }

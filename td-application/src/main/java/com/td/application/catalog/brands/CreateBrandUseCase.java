@@ -17,21 +17,21 @@ public class CreateBrandUseCase {
 
     public Result<UUID> execute(CreateBrandRequest request) {
         try {
-            // Check if brand name already exists
+            // Kiểm tra tên thương hiệu đã tồn tại chưa
             if (brandRepository.existsByNameIgnoreCase(request.getName())) {
-                return Result.failure("Brand with name '" + request.getName() + "' already exists");
+                return Result.failure("Thương hiệu '" + request.getName() + "' đã tồn tại");
             }
 
-            // Create brand
+            // Tạo thương hiệu mới
             var brand = new Brand(request.getName(), request.getDescription());
 
-            // Save brand
+            // Lưu vào database
             var savedBrand = brandRepository.save(brand);
             
             return Result.success(savedBrand.getId());
             
         } catch (Exception ex) {
-            return Result.failure("Failed to create brand: " + ex.getMessage());
+            return Result.failure("Tạo thương hiệu thất bại: " + ex.getMessage());
         }
     }
 }

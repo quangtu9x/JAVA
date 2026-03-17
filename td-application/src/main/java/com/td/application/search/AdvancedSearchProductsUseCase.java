@@ -26,12 +26,12 @@ public class AdvancedSearchProductsUseCase implements UseCase<AdvancedSearchProd
 
     @Override
     public Page<ProductDocument> execute(AdvancedSearchProductsRequest request) {
-        logger.info("Executing advanced product search: {}", request);
+        logger.info("Bắt đầu tìm kiếm sản phẩm nâng cao: {}", request);
 
-        // Validate request
+        // Kiểm tra dữ liệu đầu vào
         validateRequest(request);
 
-        // Perform search
+        // Thực hiện tìm kiếm
         Page<ProductDocument> results = searchService.searchProducts(
                 request.getQuery(),
                 request.getBrandIds(),
@@ -45,35 +45,32 @@ public class AdvancedSearchProductsUseCase implements UseCase<AdvancedSearchProd
                 request.getSortDirection()
         );
 
-        logger.info("Advanced product search completed. Found {} results (Total: {})", 
+        logger.info("Tìm kiếm sản phẩm nâng cao hoàn thành. Tìm thấy {} kết quả (Tổng: {})", 
                    results.getNumberOfElements(), results.getTotalElements());
 
         return results;
     }
 
-    /**
-     * Validate search request
-     */
     private void validateRequest(AdvancedSearchProductsRequest request) {
         if (request == null) {
-            throw new IllegalArgumentException("Search request cannot be null");
+            throw new IllegalArgumentException("Yêu cầu tìm kiếm không được null");
         }
 
-        // Validate price range
+        // Kiểm tra khoảng giá
         if (request.getMinPrice() != null && request.getMaxPrice() != null) {
             if (request.getMinPrice().compareTo(request.getMaxPrice()) > 0) {
-                throw new IllegalArgumentException("Min price cannot be greater than max price");
+                throw new IllegalArgumentException("Giá nhỏ nhất không được lớn hơn giá lớn nhất");
             }
         }
 
-        // Validate rating
+        // Kiểm tra đánh giá
         if (request.getMinRating() != null) {
             if (request.getMinRating() < 0 || request.getMinRating() > 5) {
-                throw new IllegalArgumentException("Rating must be between 0 and 5");
+                throw new IllegalArgumentException("Đánh giá phải trong khoảng 0 đến 5");
             }
         }
 
-        // Validate pagination
+        // Kiểm tra phân trang
         if (request.getPage() < 0) {
             request.setPage(0);
         }
@@ -84,7 +81,7 @@ public class AdvancedSearchProductsUseCase implements UseCase<AdvancedSearchProd
             request.setSize(100);
         }
 
-        // Validate sort direction
+        // Kiểm tra chiều sắp xếp
         if (request.getSortDirection() != null) {
             String sortDir = request.getSortDirection().toLowerCase();
             if (!"asc".equals(sortDir) && !"desc".equals(sortDir)) {
@@ -92,6 +89,6 @@ public class AdvancedSearchProductsUseCase implements UseCase<AdvancedSearchProd
             }
         }
 
-        logger.debug("Search request validated successfully");
+        logger.debug("Kiểm tra yêu cầu tìm kiếm thành công");
     }
 }
