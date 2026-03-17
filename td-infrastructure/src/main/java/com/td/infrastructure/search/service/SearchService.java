@@ -56,7 +56,7 @@ public class SearchService implements com.td.application.search.SearchService {
                                               BigDecimal minPrice, BigDecimal maxPrice, Float minRating,
                                               int page, int size, String sortBy, String sortDirection) {
         
-        logger.info("Advanced product search - Query: {}, Brands: {}, Categories: {}, Price: {}-{}, Rating: {}", 
+        logger.info("Tim kiem san pham nang cao - Query: {}, Brands: {}, Danh muc: {}, Price: {}-{}, Rating: {}", 
                     query, brandIds, categories, minPrice, maxPrice, minRating);
 
         Sort.Direction direction = "desc".equalsIgnoreCase(sortDirection) ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -106,7 +106,7 @@ public class SearchService implements com.td.application.search.SearchService {
      */
     @Override
     public com.td.application.search.SearchService.GlobalSearchResult globalSearch(String query, int page, int size) {
-        logger.info("Global search for query: {}", query);
+        logger.info("Tim kiem tong hop for query: {}", query);
 
         Pageable pageable = PageRequest.of(page, size);
         

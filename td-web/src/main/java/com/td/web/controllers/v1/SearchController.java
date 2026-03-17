@@ -24,7 +24,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/search")
-@Tag(name = "Search", description = "Search and autocomplete operations using Elasticsearch")
+@Tag(name = "Tim kiem", description = "Cac thao tac tim kiem va goi y bang Elasticsearch")
 public class SearchController extends BaseController {
 
     private final AdvancedSearchProductsUseCase advancedSearchProductsUseCase;
@@ -43,8 +43,8 @@ public class SearchController extends BaseController {
      * Advanced Product Search
      */
     @PostMapping("/products/advanced")
-    @Operation(summary = "Advanced product search", 
-               description = "Search products with multiple filters, sorting, and pagination using Elasticsearch")
+    @Operation(summary = "Tim kiem san pham nang cao", 
+               description = "Tim kiem san pham voi nhieu bo loc, sap xep va phan trang bang Elasticsearch")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<ProductDocument>> advancedSearchProducts(
             @Valid @RequestBody AdvancedSearchProductsRequest request) {
@@ -57,20 +57,20 @@ public class SearchController extends BaseController {
      * Quick Product Search
      */
     @GetMapping("/products")
-    @Operation(summary = "Quick product search", 
-               description = "Simple product search by query string")
+    @Operation(summary = "Tim nhanh san pham", 
+               description = "Tim nhanh san pham theo tu khoa")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<ProductDocument>> searchProducts(
-            @Parameter(description = "Search query") @RequestParam(required = false) String q,
-            @Parameter(description = "Brand IDs") @RequestParam(required = false) List<String> brandIds,
-            @Parameter(description = "Categories") @RequestParam(required = false) List<String> categories,
-            @Parameter(description = "Minimum price") @RequestParam(required = false) BigDecimal minPrice,
-            @Parameter(description = "Maximum price") @RequestParam(required = false) BigDecimal maxPrice,
-            @Parameter(description = "Minimum rating") @RequestParam(required = false) Float minRating,
-            @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size,
-            @Parameter(description = "Sort by field") @RequestParam(defaultValue = "name") String sortBy,
-            @Parameter(description = "Sort direction") @RequestParam(defaultValue = "asc") String sortDirection) {
+            @Parameter(description = "Tu khoa tim kiem") @RequestParam(required = false) String q,
+            @Parameter(description = "Danh sach ID thuong hieu") @RequestParam(required = false) List<String> brandIds,
+            @Parameter(description = "Danh muc") @RequestParam(required = false) List<String> categories,
+            @Parameter(description = "Gia toi thieu") @RequestParam(required = false) BigDecimal minPrice,
+            @Parameter(description = "Gia toi da") @RequestParam(required = false) BigDecimal maxPrice,
+            @Parameter(description = "Danh gia toi thieu") @RequestParam(required = false) Float minRating,
+            @Parameter(description = "So trang") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Kich thuoc trang") @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Sap xep theo truong") @RequestParam(defaultValue = "name") String sortBy,
+            @Parameter(description = "Huong sap xep") @RequestParam(defaultValue = "asc") String sortDirection) {
         
         Page<ProductDocument> results = searchService.searchProducts(
                 q, brandIds, categories, minPrice, maxPrice, minRating,
@@ -83,17 +83,17 @@ public class SearchController extends BaseController {
      * Search Brands
      */
     @GetMapping("/brands")
-    @Operation(summary = "Search brands", 
-               description = "Search brands with filters and pagination")
+    @Operation(summary = "Tim kiem thuong hieu", 
+               description = "Tim kiem thuong hieu voi bo loc va phan trang")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<BrandDocument>> searchBrands(
-            @Parameter(description = "Search query") @RequestParam(required = false) String q,
-            @Parameter(description = "Active status filter") @RequestParam(required = false) Boolean isActive,
-            @Parameter(description = "Minimum product count") @RequestParam(required = false) Integer minProductCount,
-            @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size,
-            @Parameter(description = "Sort by field") @RequestParam(defaultValue = "name") String sortBy,
-            @Parameter(description = "Sort direction") @RequestParam(defaultValue = "asc") String sortDirection) {
+            @Parameter(description = "Tu khoa tim kiem") @RequestParam(required = false) String q,
+            @Parameter(description = "Bo loc trang thai kich hoat") @RequestParam(required = false) Boolean isActive,
+            @Parameter(description = "So luong san pham toi thieu") @RequestParam(required = false) Integer minProductCount,
+            @Parameter(description = "So trang") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Kich thuoc trang") @RequestParam(defaultValue = "20") int size,
+            @Parameter(description = "Sap xep theo truong") @RequestParam(defaultValue = "name") String sortBy,
+            @Parameter(description = "Huong sap xep") @RequestParam(defaultValue = "asc") String sortDirection) {
         
         Page<BrandDocument> results = searchService.searchBrands(
                 q, isActive, minProductCount, page, size, sortBy, sortDirection);
@@ -105,13 +105,13 @@ public class SearchController extends BaseController {
      * Global Search (Products + Brands)
      */
     @GetMapping("/global")
-    @Operation(summary = "Global search", 
-               description = "Search across products and brands simultaneously")
+    @Operation(summary = "Tim kiem tong hop", 
+               description = "Tim kiem dong thoi tren san pham va thuong hieu")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<SearchService.GlobalSearchResult> globalSearch(
-            @Parameter(description = "Search query", required = true) @RequestParam String q,
-            @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+            @Parameter(description = "Tu khoa tim kiem", required = true) @RequestParam String q,
+            @Parameter(description = "So trang") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Kich thuoc trang") @RequestParam(defaultValue = "20") int size) {
         
         SearchService.GlobalSearchResult results = searchService.globalSearch(q, page, size);
         return ok(results);
@@ -121,15 +121,15 @@ public class SearchController extends BaseController {
      * Autocomplete Suggestions
      */
     @GetMapping("/suggestions")
-    @Operation(summary = "Get search suggestions", 
-               description = "Get autocomplete suggestions for search queries")
+    @Operation(summary = "Lay goi y tim kiem", 
+               description = "Lay goi y tu dong hoan thanh cho tu khoa tim kiem")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<SearchSuggestionsResponse> getSuggestions(
-            @Parameter(description = "Search prefix", required = true) @RequestParam String q,
-            @Parameter(description = "Suggestion type") @RequestParam(defaultValue = "ALL") SearchSuggestionsRequest.SuggestionType type,
-            @Parameter(description = "Maximum suggestions") @RequestParam(defaultValue = "10") int limit,
-            @Parameter(description = "Include brands") @RequestParam(defaultValue = "true") boolean includeBrands,
-            @Parameter(description = "Include products") @RequestParam(defaultValue = "true") boolean includeProducts) {
+            @Parameter(description = "Tien to tim kiem", required = true) @RequestParam String q,
+            @Parameter(description = "Loai goi y") @RequestParam(defaultValue = "ALL") SearchSuggestionsRequest.SuggestionType type,
+            @Parameter(description = "So luong goi y toi da") @RequestParam(defaultValue = "10") int limit,
+            @Parameter(description = "Bao gom thuong hieu") @RequestParam(defaultValue = "true") boolean includeBrands,
+            @Parameter(description = "Bao gom san pham") @RequestParam(defaultValue = "true") boolean includeProducts) {
         
         SearchSuggestionsRequest request = new SearchSuggestionsRequest(q);
         request.setType(type);
@@ -145,12 +145,12 @@ public class SearchController extends BaseController {
      * Product Autocomplete
      */
     @GetMapping("/autocomplete/products")
-    @Operation(summary = "Product autocomplete", 
-               description = "Get product name autocomplete suggestions")
+    @Operation(summary = "Tu dong hoan thanh san pham", 
+               description = "Lay goi y tu dong hoan thanh ten san pham")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<ProductDocument>> getProductAutocomplete(
-            @Parameter(description = "Search prefix", required = true) @RequestParam String q,
-            @Parameter(description = "Maximum suggestions") @RequestParam(defaultValue = "10") int limit) {
+            @Parameter(description = "Tien to tim kiem", required = true) @RequestParam String q,
+            @Parameter(description = "So luong goi y toi da") @RequestParam(defaultValue = "10") int limit) {
         
         Page<ProductDocument> suggestions = searchService.getProductSuggestions(q, limit);
         return ok(suggestions);
@@ -160,12 +160,12 @@ public class SearchController extends BaseController {
      * Brand Autocomplete
      */
     @GetMapping("/autocomplete/brands")
-    @Operation(summary = "Brand autocomplete", 
-               description = "Get brand name autocomplete suggestions")
+    @Operation(summary = "Tu dong hoan thanh thuong hieu", 
+               description = "Lay goi y tu dong hoan thanh ten thuong hieu")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<BrandDocument>> getBrandAutocomplete(
-            @Parameter(description = "Search prefix", required = true) @RequestParam String q,
-            @Parameter(description = "Maximum suggestions") @RequestParam(defaultValue = "10") int limit) {
+            @Parameter(description = "Tien to tim kiem", required = true) @RequestParam String q,
+            @Parameter(description = "So luong goi y toi da") @RequestParam(defaultValue = "10") int limit) {
         
         Page<BrandDocument> suggestions = searchService.getBrandSuggestions(q, limit);
         return ok(suggestions);
@@ -175,14 +175,14 @@ public class SearchController extends BaseController {
      * Similar Products
      */
     @GetMapping("/products/{productId}/similar")
-    @Operation(summary = "Get similar products", 
-               description = "Find products similar to the given product")
+    @Operation(summary = "Lay san pham tuong tu", 
+               description = "Tim cac san pham tuong tu voi san pham da cho")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<ProductDocument>> getSimilarProducts(
-            @Parameter(description = "Product ID") @PathVariable String productId,
-            @Parameter(description = "Product name") @RequestParam String productName,
-            @Parameter(description = "Brand name") @RequestParam String brandName,
-            @Parameter(description = "Maximum results") @RequestParam(defaultValue = "10") int limit) {
+            @Parameter(description = "ID san pham") @PathVariable String productId,
+            @Parameter(description = "Ten san pham") @RequestParam String productName,
+            @Parameter(description = "Ten thuong hieu") @RequestParam String brandName,
+            @Parameter(description = "So ket qua toi da") @RequestParam(defaultValue = "10") int limit) {
         
         Page<ProductDocument> similarProducts = searchService.getSimilarProducts(
                 productId, productName, brandName, limit);
@@ -194,12 +194,12 @@ public class SearchController extends BaseController {
      * Popular Products
      */
     @GetMapping("/products/popular")
-    @Operation(summary = "Get popular products", 
-               description = "Get popular products based on views and orders")
+    @Operation(summary = "Lay san pham pho bien", 
+               description = "Lay san pham pho bien based on views and orders")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<ProductDocument>> getPopularProducts(
-            @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+            @Parameter(description = "So trang") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Kich thuoc trang") @RequestParam(defaultValue = "20") int size) {
         
         Page<ProductDocument> popularProducts = searchService.getPopularProducts(page, size);
         return ok(popularProducts);
@@ -209,13 +209,13 @@ public class SearchController extends BaseController {
      * Top Rated Products
      */
     @GetMapping("/products/top-rated")
-    @Operation(summary = "Get top rated products", 
-               description = "Get highest rated products")
+    @Operation(summary = "Lay san pham danh gia cao", 
+               description = "Lay cac san pham co diem danh gia cao nhat")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER')")
     public ResponseEntity<Page<ProductDocument>> getTopRatedProducts(
-            @Parameter(description = "Minimum rating") @RequestParam(defaultValue = "4.0") Float minRating,
-            @Parameter(description = "Page number") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+            @Parameter(description = "Danh gia toi thieu") @RequestParam(defaultValue = "4.0") Float minRating,
+            @Parameter(description = "So trang") @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "Kich thuoc trang") @RequestParam(defaultValue = "20") int size) {
         
         Page<ProductDocument> topRatedProducts = searchService.getTopRatedProducts(minRating, page, size);
         return ok(topRatedProducts);
@@ -225,15 +225,17 @@ public class SearchController extends BaseController {
      * Search Analytics
      */
     @GetMapping("/analytics")
-    @Operation(summary = "Get search analytics", 
-               description = "Get aggregation data for search results (Admin only)")
+    @Operation(summary = "Lay thong ke tim kiem", 
+               description = "Lay du lieu tong hop cho ket qua tim kiem (chi Admin)")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SearchService.SearchAnalytics> getSearchAnalytics(
-            @Parameter(description = "Search query") @RequestParam(required = false) String q,
-            @Parameter(description = "Brand IDs") @RequestParam(required = false) List<String> brandIds,
-            @Parameter(description = "Categories") @RequestParam(required = false) List<String> categories) {
+            @Parameter(description = "Tu khoa tim kiem") @RequestParam(required = false) String q,
+            @Parameter(description = "Danh sach ID thuong hieu") @RequestParam(required = false) List<String> brandIds,
+            @Parameter(description = "Danh muc") @RequestParam(required = false) List<String> categories) {
         
         SearchService.SearchAnalytics analytics = searchService.getSearchAnalytics(q, brandIds, categories);
         return ok(analytics);
     }
 }
+
+

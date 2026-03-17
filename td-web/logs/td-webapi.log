@@ -1321,3 +1321,9 @@ java.lang.IllegalArgumentException: Name for argument of type [java.util.UUID] n
 2026-03-17 12:31:23.147 [http-nio-8080-exec-10] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
 2026-03-17 12:31:27.411 [http-nio-8080-exec-8] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents?pageNumber=0&pageSize=10&sortBy=lastModifiedOn&sortDirection=desc
 2026-03-17 12:31:27.411 [http-nio-8080-exec-8] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:33:16.166 [http-nio-8080-exec-2] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents?pageNumber=1&pageSize=10&sortBy=lastModifiedOn&sortDirection=desc
+2026-03-17 12:33:16.167 [http-nio-8080-exec-2] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:33:31.826 [http-nio-8080-exec-4] DEBUG o.s.security.web.FilterChainProxy - Securing GET /api/v1/documents?pageNumber=1&pageSize=10&sortBy=lastModifiedOn&sortDirection=desc&documentType=POLICY
+2026-03-17 12:33:31.826 [http-nio-8080-exec-4] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
+2026-03-17 12:33:40.746 [http-nio-8080-exec-5] DEBUG o.s.security.web.FilterChainProxy - Securing GET /favicon.ico
+2026-03-17 12:33:40.746 [http-nio-8080-exec-5] DEBUG o.s.s.w.a.AnonymousAuthenticationFilter - Set SecurityContextHolder to anonymous SecurityContext
