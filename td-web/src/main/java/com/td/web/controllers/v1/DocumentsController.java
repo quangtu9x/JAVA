@@ -6,8 +6,10 @@ import com.td.application.documents.CreateDocumentRequest;
 import com.td.application.documents.CreateDocumentUseCase;
 import com.td.application.documents.DeleteDocumentUseCase;
 import com.td.application.documents.DocumentDto;
+import com.td.application.documents.GetDeletedDocumentsUseCase;
 import com.td.application.documents.GetDocumentRequest;
 import com.td.application.documents.GetDocumentUseCase;
+import com.td.application.documents.HardDeleteDocumentUseCase;
 import com.td.application.documents.SearchDocumentsRequest;
 import com.td.application.documents.SearchDocumentsUseCase;
 import com.td.application.documents.UpdateDocumentRequest;
@@ -43,8 +45,10 @@ public class DocumentsController extends BaseController {
     private final CreateDocumentUseCase createDocumentUseCase;
     private final UpdateDocumentUseCase updateDocumentUseCase;
     private final DeleteDocumentUseCase deleteDocumentUseCase;
+    private final HardDeleteDocumentUseCase hardDeleteDocumentUseCase;
     private final GetDocumentUseCase getDocumentUseCase;
     private final SearchDocumentsUseCase searchDocumentsUseCase;
+    private final GetDeletedDocumentsUseCase getDeletedDocumentsUseCase;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
@@ -117,5 +121,25 @@ public class DocumentsController extends BaseController {
             @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = deleteDocumentUseCase.execute(id);
         return ok(result);
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Xóa vĩnh viễn tài liệu",
+               description = "Xóa hoàn toàn tài liệu khỏi database, không thể khôi phục. Chỉ dành cho Admin")
+    public ResponseEntity<Result<UUID>> hardDeleteDocument(
+            @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
+        var result = hardDeleteDocumentUseCase.execute(id);
+        return ok(result);
+    }
+
+    @PostMapping("/deleted/search")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Danh sách tài liệu đã xóa",
+               description = "Lấy danh sách tài liệu đã bị soft delete (chưa hoạt động)")
+    public ResponseEntity<PaginationResponse<DocumentDto>> searchDeletedDocuments(
+            @Valid @RequestBody SearchDocumentsRequest request) {
+        var response = getDeletedDocumentsUseCase.execute(request);
+        return ok(response);
     }
 }

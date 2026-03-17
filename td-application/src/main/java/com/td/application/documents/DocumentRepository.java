@@ -8,4 +8,8 @@ import org.springframework.data.domain.Pageable;
 public interface DocumentRepository extends IRepository<BusinessDocument> {
 
     Page<BusinessDocument> search(SearchDocumentsRequest request, Pageable pageable);
+
+    Page<BusinessDocument> searchDeleted(SearchDocumentsRequest request, Pageable pageable);
+
+    void hardDelete(BusinessDocument entity);
 }

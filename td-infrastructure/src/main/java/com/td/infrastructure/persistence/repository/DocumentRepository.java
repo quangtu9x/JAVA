@@ -41,6 +41,16 @@ public abstract class DocumentRepository implements com.td.application.documents
     }
 
     @Override
+    public void hardDelete(BusinessDocument entity) {
+        jpaRepository.delete(entity);
+    }
+
+    @Override
+    public Page<BusinessDocument> searchDeleted(SearchDocumentsRequest request, Pageable pageable) {
+        return DocumentSearchSupport.searchDeletedWithJpa(jpaRepository, request, pageable);
+    }
+
+    @Override
     public Page<BusinessDocument> search(SearchDocumentsRequest request, Pageable pageable) {
         List<DocumentSearchSupport.AttributeFilterRule> filterRules =
             DocumentSearchSupport.parseAttributeFilters(request == null ? null : request.getAttributeFilters());

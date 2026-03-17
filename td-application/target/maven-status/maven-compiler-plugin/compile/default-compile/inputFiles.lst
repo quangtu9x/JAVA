@@ -42,6 +42,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\cata
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\search\SearchSuggestionsResponse.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\catalog\brands\UpdateBrandUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\storage\FileMetadataDto.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\GetDeletedDocumentsUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\CreateDocumentRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\catalog\products\DeleteProductRequest.java
@@ -59,6 +60,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\stor
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\catalog\brands\BrandDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\catalog\products\SearchProductsRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\catalog\brands\SearchBrandsUseCase.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\HardDeleteDocumentUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\search\AdvancedSearchProductsRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\logs\SearchAuditLogsRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentRepository.java

@@ -144,6 +144,7 @@ public class ProductsController extends BaseController {
             @Valid @RequestBody UpdateProductRequest request) {
         if (!id.equals(request.getId())) {
             return badRequest(Result.<UUID>failure("ID sản phẩm không khớp"));
+        }
         var result = updateProductUseCase.execute(request);
         return ok(result);
     }

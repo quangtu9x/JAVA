@@ -23,7 +23,8 @@ public class DeleteDocumentUseCase {
 
             var document = documentOptional.get();
             if (document.isDeleted()) {
-                return Result.failure("Tài liệu đã bị xóa trước đó");
+                // Đã xóa trước đó — trả về thành công (idempotent)
+                return Result.success(documentId);
             }
 
             // TODO: Replace random UUID with authenticated user ID when user context is available.

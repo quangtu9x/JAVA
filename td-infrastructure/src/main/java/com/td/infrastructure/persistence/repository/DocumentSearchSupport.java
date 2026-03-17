@@ -40,6 +40,16 @@ final class DocumentSearchSupport {
         return repository.findAll(baseSpecification(request), pageable, false);
     }
 
+    static Page<BusinessDocument> searchDeletedWithJpa(
+            DocumentJpaRepository repository,
+            SearchDocumentsRequest request,
+            Pageable pageable) {
+        Specification<BusinessDocument> deletedSpec = (root, query, cb) ->
+            cb.isNotNull(root.get("deletedOn"));
+        Specification<BusinessDocument> combined = deletedSpec.and(baseSpecification(request));
+        return repository.findAll(combined, pageable);
+    }
+
     static Page<BusinessDocument> filterSortAndPage(
             List<BusinessDocument> candidates,
             List<AttributeFilterRule> filterRules,
