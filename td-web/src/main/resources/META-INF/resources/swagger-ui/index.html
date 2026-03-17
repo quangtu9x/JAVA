@@ -4,9 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TD WebAPI Swagger UI</title>
-  <link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
-  <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
-  <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
   <style>
     html {
       box-sizing: border-box;
@@ -219,10 +217,10 @@
 
   <div id="swagger-ui"></div>
 
-  <script src="./swagger-ui-bundle.js" charset="UTF-8"></script>
-  <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
   <script>
-    (function () {
+    document.addEventListener("DOMContentLoaded", function () {
       function basePath() {
         var path = window.location.pathname || "";
         var marker = "/swagger-ui";
@@ -231,10 +229,10 @@
       }
 
       var appBasePath = basePath();
-      var swaggerConfigUrl = appBasePath + "/v3/api-docs/swagger-config";
+      var openApiUrl = appBasePath + "/v3/api-docs";
 
       var ui = SwaggerUIBundle({
-        configUrl: swaggerConfigUrl,
+        url: openApiUrl,
         dom_id: "#swagger-ui",
         deepLinking: true,
         displayOperationId: true,
@@ -261,11 +259,13 @@
       var tokenStorageKey = "td.swagger.token";
 
       function setStatus(message, isError) {
+        if (!statusEl) return;
         statusEl.textContent = message || "";
         statusEl.style.color = isError ? "#b91c1c" : "#0f172a";
       }
 
       function applyToken(token) {
+        if (!tokenInput) return;
         var value = (token || tokenInput.value || "").trim();
         if (!value) {
           setStatus("Token is empty.", true);
@@ -283,6 +283,7 @@
       }
 
       function clearToken() {
+        if (!tokenInput) return;
         tokenInput.value = "";
         localStorage.removeItem(tokenStorageKey);
         setStatus("Token cleared.", false);
@@ -290,19 +291,26 @@
 
       async function fetchToken() {
         var button = document.getElementById("btn-fetch-token");
+        if (!button) return;
         button.disabled = true;
 
         try {
           setStatus("Fetching token...", false);
 
-          var form = new URLSearchParams();
-          form.set("client_id", document.getElementById("client-id").value.trim());
-          form.set("client_secret", document.getElementById("client-secret").value.trim());
-          form.set("grant_type", "password");
-          form.set("username", document.getElementById("username").value.trim());
-          form.set("password", document.getElementById("password").value);
+          var clientIdInput = document.getElementById("client-id");
+          var clientSecretInput = document.getElementById("client-secret");
+          var usernameInput = document.getElementById("username");
+          var passwordInput = document.getElementById("password");
+          var endpointInput = document.getElementById("token-endpoint");
 
-          var response = await fetch(document.getElementById("token-endpoint").value.trim(), {
+          var form = new URLSearchParams();
+          form.set("client_id", clientIdInput.value.trim());
+          form.set("client_secret", clientSecretInput.value.trim());
+          form.set("grant_type", "password");
+          form.set("username", usernameInput.value.trim());
+          form.set("password", passwordInput.value);
+
+          var response = await fetch(endpointInput.value.trim(), {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded"
@@ -328,23 +336,33 @@
         }
       }
 
-      document.getElementById("btn-apply-token").addEventListener("click", function () {
-        applyToken();
-      });
+      var applyBtn = document.getElementById("btn-apply-token");
+      var clearBtn = document.getElementById("btn-clear-token");
+      var fetchBtn = document.getElementById("btn-fetch-token");
 
-      document.getElementById("btn-clear-token").addEventListener("click", function () {
-        clearToken();
-      });
+      if (applyBtn) {
+        applyBtn.addEventListener("click", function () {
+          applyToken();
+        });
+      }
 
-      document.getElementById("btn-fetch-token").addEventListener("click", function () {
-        fetchToken();
-      });
+      if (clearBtn) {
+        clearBtn.addEventListener("click", function () {
+          clearToken();
+        });
+      }
+
+      if (fetchBtn) {
+        fetchBtn.addEventListener("click", function () {
+          fetchToken();
+        });
+      }
 
       var savedToken = localStorage.getItem(tokenStorageKey);
       if (savedToken) {
         applyToken(savedToken);
       }
-    })();
+    });
   </script>
 </body>
 </html>

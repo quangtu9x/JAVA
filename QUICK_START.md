@@ -56,7 +56,7 @@ $createResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/v1/documents
   -Method POST -Headers $headers `
   -ContentType "application/json" `
   -Body '{
-    "title": "Quy trinh phe duyet chi phi",
+    "title": "Quy trinh phe duyet chi phi!",
     "documentType": "POLICY",
     "status": "ACTIVE",
     "content": "Noi dung van ban",

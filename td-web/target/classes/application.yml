@@ -138,11 +138,7 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: alpha
-    tags-sorter: alpha
-    doc-expansion: none
-    disable-swagger-default-url: true
+    enabled: false
 
 # Logging Configuration
 logging:

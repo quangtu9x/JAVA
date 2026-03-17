@@ -15,6 +15,7 @@ import com.td.application.documents.UpdateDocumentUseCase;
 import com.td.web.controllers.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Parameter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -72,7 +73,8 @@ public class DocumentsController extends BaseController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Get document details")
-    public ResponseEntity<Result<DocumentDto>> getDocument(@PathVariable("id") UUID id) {
+        public ResponseEntity<Result<DocumentDto>> getDocument(
+                @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = getDocumentUseCase.execute(new GetDocumentRequest(id));
         return ok(result);
     }
@@ -98,7 +100,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Update an existing document")
     public ResponseEntity<Result<UUID>> updateDocument(
-            @PathVariable("id") UUID id,
+                @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateDocumentRequest request) {
         if (!id.equals(request.getId())) {
             return badRequest(Result.<UUID>failure("Document ID mismatch"));
@@ -111,7 +113,8 @@ public class DocumentsController extends BaseController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Delete a document (soft delete)")
-    public ResponseEntity<Result<UUID>> deleteDocument(@PathVariable("id") UUID id) {
+    public ResponseEntity<Result<UUID>> deleteDocument(
+            @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = deleteDocumentUseCase.execute(id);
         return ok(result);
     }
