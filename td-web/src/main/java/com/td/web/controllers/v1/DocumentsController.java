@@ -5,6 +5,7 @@ import com.td.application.common.models.Result;
 import com.td.application.documents.CreateDocumentRequest;
 import com.td.application.documents.CreateDocumentUseCase;
 import com.td.application.documents.DeleteDocumentUseCase;
+import com.td.application.documents.DocumentDetailWithFilesDto;
 import com.td.application.documents.DocumentDto;
 import com.td.application.documents.GetDeletedDocumentsUseCase;
 import com.td.application.documents.GetDocumentRequest;
@@ -23,6 +24,7 @@ import com.td.application.documents.UploadFileRequest;
 import com.td.application.documents.FileDto;
 import com.td.application.documents.DeleteFileRequest;
 import com.td.application.documents.DownloadFileRequest;
+import com.td.infrastructure.config.MinioService;
 import com.td.web.controllers.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,6 +32,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -46,6 +50,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.UUID;
 
 @RestController
@@ -67,6 +72,7 @@ public class DocumentsController extends BaseController {
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final DeleteFileUseCase deleteFileUseCase;
     private final UpdateDocumentWithFileUseCase updateDocumentWithFileUseCase;
+    private final MinioService minioService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
@@ -100,6 +106,30 @@ public class DocumentsController extends BaseController {
         var result = getDocumentUseCase.execute(new GetDocumentRequest(id));
         return ok(result);
     }
+
+            @GetMapping("/{id}/with-files")
+            @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+            @Operation(summary = "Xem chi tiết tài liệu kèm danh sách tệp tin",
+                description = "Lấy chi tiết một tài liệu và toàn bộ tệp tin gắn với tài liệu đó trong một API")
+            public ResponseEntity<Result<DocumentDetailWithFilesDto>> getDocumentWithFiles(
+                @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
+            var documentResult = getDocumentUseCase.execute(new GetDocumentRequest(id));
+            if (!documentResult.isSuccess() || documentResult.getData() == null) {
+                return ok(Result.failure(documentResult.getError() != null
+                    ? documentResult.getError()
+                    : "Không tìm thấy tài liệu"));
+            }
+
+            var filesResponse = listDocumentFilesUseCase.execute(id);
+            var payload = DocumentDetailWithFilesDto.builder()
+                .document(documentResult.getData())
+                .files(filesResponse != null && filesResponse.getItems() != null
+                    ? filesResponse.getItems()
+                    : Collections.emptyList())
+                .build();
+
+            return ok(Result.success(payload));
+            }
 
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
@@ -296,6 +326,26 @@ public class DocumentsController extends BaseController {
                 .documentId(documentId)
                 .fileId(fileId)
                 .build();
-        return ok("File download endpoint - implementation pending");
+        var fileResult = getFileUseCase.execute(request);
+        if (!fileResult.isSuccess() || fileResult.getData() == null) {
+            return badRequest(Result.failure(fileResult.getError() != null ? fileResult.getError() : "File không tồn tại"));
+        }
+
+        var file = fileResult.getData();
+        try {
+            InputStream inputStream = minioService.getObject(file.getStoragePath());
+            var mediaType = (file.getMimeType() != null && !file.getMimeType().isBlank())
+                    ? MediaType.parseMediaType(file.getMimeType())
+                    : MediaType.APPLICATION_OCTET_STREAM;
+            var fileName = file.getOriginalFileName() != null ? file.getOriginalFileName() : file.getFileName();
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .contentLength(file.getFileSize() != null ? file.getFileSize() : -1)
+                    .body(new InputStreamResource(inputStream));
+        } catch (Exception e) {
+            return badRequest(Result.failure("Lỗi tải tệp tin: " + e.getMessage()));
+        }
     }
 }

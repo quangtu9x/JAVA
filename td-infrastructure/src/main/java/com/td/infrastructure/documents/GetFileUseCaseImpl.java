@@ -4,36 +4,39 @@ import com.td.application.common.models.Result;
 import com.td.application.documents.GetFileUseCase;
 import com.td.application.documents.DownloadFileRequest;
 import com.td.application.documents.FileDto;
+import com.td.infrastructure.persistence.entity.FileMetadataEntity;
+import com.td.infrastructure.persistence.repository.FileMetadataJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class GetFileUseCaseImpl implements GetFileUseCase {
 
+    private final FileMetadataJpaRepository fileMetadataRepo;
+
     @Override
     public Result<FileDto> execute(DownloadFileRequest request) {
-        // TODO: Implement get file logic
-        // 1. Validate document and file exist
-        // 2. Check access permissions
-        // 3. Fetch file metadata from database
-        // 4. Return file details
+        Optional<FileMetadataEntity> opt = fileMetadataRepo
+                .findByIdAndDocumentId(request.getFileId(), request.getDocumentId());
+        if (opt.isEmpty()) {
+            return Result.failure("File không tìm thấy");
+        }
+        FileMetadataEntity e = opt.get();
         return Result.success(FileDto.builder()
-                .fileId(request.getFileId())
-                .documentId(request.getDocumentId())
-                .fileName("placeholder_file.pdf")
-                .originalFileName("placeholder.pdf")
-                .fileSize(0L)
-                .mimeType("application/pdf")
-                .uploadDate(LocalDateTime.now())
-                .uploadedBy("system")
-                .storagePath("/storage/placeholder")
+                .fileId(e.getId())
+                .documentId(e.getDocumentId())
+                .fileName(e.getStoredFilename())
+                .originalFileName(e.getOriginalFilename())
+                .fileSize(e.getFileSize())
+                .mimeType(e.getContentType())
+                .uploadDate(e.getUploadedAt())
+                .uploadedBy(e.getUploadedBy() != null ? e.getUploadedBy().toString() : null)
+                .storagePath(e.getFilePath())
                 .isPrimary(false)
                 .version(1)
-                .checksum("placeholder_checksum")
                 .build());
     }
 }

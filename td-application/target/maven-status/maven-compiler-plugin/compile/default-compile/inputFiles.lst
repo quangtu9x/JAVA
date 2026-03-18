@@ -26,6 +26,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\comm
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\GetDocumentUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\UpdateWorkflowDefinitionRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\SearchDocumentsRequest.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentDetailWithFilesDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\ListDocumentFilesUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowTransitionDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\UpdateDocumentRequest.java

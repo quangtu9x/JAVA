@@ -30,6 +30,7 @@ com\td\application\workflows\WorkflowPageRequest.class
 com\td\application\workflows\WorkflowRuntimeFacade.class
 com\td\application\workflows\WorkflowActionRequest.class
 com\td\application\common\models\Result.class
+com\td\application\documents\DocumentDetailWithFilesDto$DocumentDetailWithFilesDtoBuilder.class
 com\td\application\workflows\WorkflowTaskDto.class
 com\td\application\common\models\PaginationResponse.class
 com\td\application\documents\UpdateDocumentWithFileRequest.class
@@ -38,6 +39,7 @@ com\td\application\documents\UpdateDocumentRequest.class
 com\td\application\common\interfaces\IRepository.class
 com\td\application\workflows\WorkflowDefinitionSummaryDto.class
 com\td\application\documents\DocumentJsonMapper$2.class
+com\td\application\documents\DocumentDetailWithFilesDto.class
 com\td\application\documents\DocumentFieldLayout$ResponseProjection.class
 com\td\application\documents\GetDocumentUseCase.class
 com\td\application\workflows\DelegateWorkflowTaskRequest.class

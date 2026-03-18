@@ -6,7 +6,7 @@ import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 @SpringBootApplication(scanBasePackages = "com.td")
-@EntityScan("com.td.domain")
+@EntityScan({"com.td.domain", "com.td.infrastructure.persistence.entity"})
 @EnableJpaRepositories("com.td.infrastructure.persistence.repository")
 public class TdWebApiApplication {
 

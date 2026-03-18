@@ -10,6 +10,12 @@ spring:
     name: td-webapi
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # File Upload Limits
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 105MB
   
   # Database Configuration - PostgreSQL
   datasource:
@@ -67,6 +73,11 @@ app:
       realm: ${KEYCLOAK_REALM:td-webapi-realm}
       client-id: ${KEYCLOAK_CLIENT_ID:td-webapi-client}
       client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+  minio:
+    url: ${MINIO_URL:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
 
 # Management Endpoints
 management:
