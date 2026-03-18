@@ -20,11 +20,14 @@ com\td\application\documents\SearchDocumentsUseCase.class
 com\td\application\documents\UploadFileRequest$UploadFileRequestBuilder.class
 com\td\application\common\cqrs\CommandHandler.class
 com\td\application\documents\FileDto$FileDtoBuilder.class
+com\td\application\documents\SimpleFileDto$SimpleFileDtoBuilder.class
 com\td\application\documents\UploadFileRequest.class
 com\td\application\workflows\WorkflowTransitionRequest.class
+com\td\application\documents\SimpleFileDto.class
 com\td\application\common\cqrs\UseCase.class
 com\td\application\documents\GetFileUseCase.class
 com\td\application\common\cqrs\Command.class
+com\td\application\documents\DocumentXemChiTietDto$DocumentXemChiTietDtoBuilder.class
 com\td\application\documents\DocumentFieldLayout.class
 com\td\application\workflows\WorkflowPageRequest.class
 com\td\application\workflows\WorkflowRuntimeFacade.class
@@ -41,6 +44,7 @@ com\td\application\workflows\WorkflowDefinitionSummaryDto.class
 com\td\application\documents\DocumentJsonMapper$2.class
 com\td\application\documents\DocumentDetailWithFilesDto.class
 com\td\application\documents\DocumentFieldLayout$ResponseProjection.class
+com\td\application\documents\DocumentXemChiTietDto.class
 com\td\application\documents\GetDocumentUseCase.class
 com\td\application\workflows\DelegateWorkflowTaskRequest.class
 com\td\application\workflows\WorkflowInstanceDto.class

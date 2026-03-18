@@ -6,6 +6,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\comm
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowRuntimeFacade.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowActionRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowStepDto.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentXemChiTietDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\cqrs\CommandHandler.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowPageRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowTransitionRequest.java
@@ -39,6 +40,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\docu
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentFieldLayout.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DownloadFileRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DeleteDocumentUseCase.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\SimpleFileDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DeleteFileUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\SearchDocumentsUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\GetFileUseCase.java

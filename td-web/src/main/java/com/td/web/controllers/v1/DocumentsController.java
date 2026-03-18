@@ -7,7 +7,9 @@ import com.td.application.documents.CreateDocumentUseCase;
 import com.td.application.documents.DeleteDocumentUseCase;
 import com.td.application.documents.DocumentDetailWithFilesDto;
 import com.td.application.documents.DocumentDto;
+import com.td.application.documents.DocumentXemChiTietDto;
 import com.td.application.documents.GetDeletedDocumentsUseCase;
+import com.td.application.documents.SimpleFileDto;
 import com.td.application.documents.GetDocumentRequest;
 import com.td.application.documents.GetDocumentUseCase;
 import com.td.application.documents.HardDeleteDocumentUseCase;
@@ -51,6 +53,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -76,7 +79,8 @@ public class DocumentsController extends BaseController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Danh sách tài liệu")
+    @Operation(summary = "Danh sách tài liệu",
+        description = "Lấy danh sách tài liệu, mỗi tài liệu có thêm trường files để mở/tải lại file")
     public ResponseEntity<PaginationResponse<DocumentDto>> listDocuments(
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
@@ -95,7 +99,7 @@ public class DocumentsController extends BaseController {
         request.setStatus(status);
 
         var response = searchDocumentsUseCase.execute(request);
-        return ok(response);
+        return ok(enrichDocumentsWithFiles(response));
     }
 
     @GetMapping("/{id}")
@@ -131,13 +135,109 @@ public class DocumentsController extends BaseController {
             return ok(Result.success(payload));
             }
 
+    @GetMapping("/{id}/xem-chi-tiet")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Xem chi tiết tài liệu kèm danh sách tệp tin (dạng đơn giản)",
+        description = "Lấy chi tiết tài liệu và danh sách tệp tin để hiển thị nhanh và mở/tải lại file")
+    public ResponseEntity<Result<DocumentXemChiTietDto>> getDocumentXemChiTiet(
+            @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
+        var documentResult = getDocumentUseCase.execute(new GetDocumentRequest(id));
+        if (!documentResult.isSuccess() || documentResult.getData() == null) {
+            return ok(Result.failure(documentResult.getError() != null
+                ? documentResult.getError()
+                : "Không tìm thấy tài liệu"));
+        }
+
+        var filesResponse = listDocumentFilesUseCase.execute(id);
+        List<SimpleFileDto> simpleFiles = mapSimpleFiles(filesResponse != null ? filesResponse.getItems() : null);
+
+        var payload = DocumentXemChiTietDto.builder()
+            .document(documentResult.getData())
+            .files(simpleFiles)
+            .build();
+
+        return ok(Result.success(payload));
+    }
+
+    private String extractFileExtension(String fileName) {
+        if (fileName == null || !fileName.contains(".")) {
+            return "";
+        }
+        return fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
+    }
+
+    private String buildDownloadUrl(UUID documentId, UUID fileId) {
+        if (documentId == null || fileId == null) {
+            return null;
+        }
+        return "/api/v1/documents/" + documentId + "/files/" + fileId + "/download";
+    }
+
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Tìm kiếm tài liệu theo bộ lọc")
+    @Operation(summary = "Tìm kiếm tài liệu theo bộ lọc",
+        description = "Trả về danh sách tài liệu theo bộ lọc, mỗi tài liệu có thêm trường files")
     public ResponseEntity<PaginationResponse<DocumentDto>> searchDocuments(
             @Valid @RequestBody SearchDocumentsRequest request) {
         var response = searchDocumentsUseCase.execute(request);
-        return ok(response);
+        return ok(enrichDocumentsWithFiles(response));
+    }
+
+    private PaginationResponse<DocumentDto> enrichDocumentsWithFiles(PaginationResponse<DocumentDto> response) {
+        if (response == null || response.getItems() == null || response.getItems().isEmpty()) {
+            return response;
+        }
+
+        List<DocumentDto> enrichedItems = response.getItems().stream()
+            .map(this::attachFilesToDocument)
+            .collect(java.util.stream.Collectors.toList());
+
+        return new PaginationResponse<>(
+            enrichedItems,
+            response.getPageNumber(),
+            response.getPageSize(),
+            response.getTotalItems(),
+            response.getTotalPages(),
+            response.isFirst(),
+            response.isLast()
+        );
+    }
+
+    private DocumentDto attachFilesToDocument(DocumentDto document) {
+        if (document == null || document.getId() == null) {
+            return document;
+        }
+
+        var filesResponse = listDocumentFilesUseCase.execute(document.getId());
+        List<SimpleFileDto> simpleFiles = mapSimpleFiles(filesResponse != null ? filesResponse.getItems() : null);
+
+        document.setFiles(simpleFiles);
+        return document;
+    }
+
+    private List<SimpleFileDto> mapSimpleFiles(List<FileDto> files) {
+        if (files == null || files.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return files.stream()
+            .filter(java.util.Objects::nonNull)
+            .map(file -> {
+                String fileName = file.getOriginalFileName() != null
+                    ? file.getOriginalFileName()
+                    : file.getFileName();
+
+                return SimpleFileDto.builder()
+                    .fileId(file.getFileId())
+                    .documentId(file.getDocumentId())
+                    .name(fileName)
+                    .size(file.getFileSize())
+                    .type(extractFileExtension(fileName))
+                    .mimeType(file.getMimeType())
+                    .downloadUrl(buildDownloadUrl(file.getDocumentId(), file.getFileId()))
+                    .build();
+            })
+            .collect(java.util.stream.Collectors.toList());
     }
 
     @PostMapping

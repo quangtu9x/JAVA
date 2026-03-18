@@ -20,6 +20,7 @@ public class DocumentDto {
     private String status;
     private String content;
     private List<String> tags;
+    private List<SimpleFileDto> files = Collections.emptyList();
     private Map<String, Object> attributes;
     private Map<String, Object> metadata;
     private long versionNo;
