@@ -2,5 +2,6 @@ com\td\web\config\OpenApiConfig.class
 com\td\web\controllers\BaseController.class
 com\td\web\config\GlobalExceptionHandler.class
 com\td\web\TdWebApiApplication.class
+com\td\web\controllers\SwaggerUiController.class
 com\td\web\controllers\v1\DocumentsController.class
 com\td\web\controllers\v1\WorkflowsController.class

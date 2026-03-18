@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TD Documents API Swagger UI</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow-y: scroll;
+    }
+
+    *, *:before, *:after {
+      box-sizing: inherit;
+    }
+
+    body {
+      margin: 0;
+      background: #f5f7fb;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: #1f2937;
+    }
+
+    .td-header {
+      background: linear-gradient(110deg, #0f172a, #1d4ed8);
+      color: #ffffff;
+      padding: 14px 18px;
+      border-bottom: 1px solid #0b3a8f;
+    }
+
+    .td-header h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    .td-header p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      opacity: 0.92;
+    }
+
+    .td-toolbar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+      padding: 12px 16px;
+      background: #ffffff;
+      border-bottom: 1px solid #dbe2ef;
+    }
+
+    .td-card {
+      background: #ffffff;
+      border: 1px solid #dbe2ef;
+      border-radius: 8px;
+      padding: 10px;
+    }
+
+    .td-card h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .td-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .td-card label {
+      font-size: 12px;
+      color: #334155;
+      font-weight: 600;
+    }
+
+    .td-card input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .td-card select,
+    .td-card textarea {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 12px;
+      background: #ffffff;
+    }
+
+    .td-card textarea {
+      min-height: 74px;
+      resize: vertical;
+      font-family: Consolas, "Courier New", monospace;
+    }
+
+    .td-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .td-actions button {
+      border: 1px solid #1d4ed8;
+      background: #1d4ed8;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: 6px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    .td-actions button.secondary {
+      background: #ffffff;
+      color: #1d4ed8;
+    }
+
+    .td-actions button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .td-note {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.45;
+    }
+
+    .td-status {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #0f172a;
+      min-height: 18px;
+    }
+
+    .td-quick-list {
+      margin: 0;
+      padding-left: 16px;
+      font-size: 12px;
+      color: #334155;
+      line-height: 1.45;
+    }
+
+    .td-quick-list li {
+      margin-bottom: 4px;
+    }
+
+    .td-meta {
+      margin-top: 8px;
+      font-size: 11px;
+      color: #334155;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .td-meta code {
+      background: #e2e8f0;
+      padding: 1px 4px;
+      border-radius: 4px;
+    }
+
+    #swagger-ui {
+      background: #ffffff;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="td-header">
+    <h1>TD Documents API - Swagger UI</h1>
+    <p>Trang test API quan ly van ban voi bo tro lay token Keycloak nhanh.</p>
+  </div>
+
+  <div class="td-toolbar">
+    <div class="td-card">
+      <h2>Quick Token (Keycloak)</h2>
+
+      <div class="td-row">
+        <label for="token-endpoint">Token endpoint</label>
+        <input id="token-endpoint" value="http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token" />
+      </div>
+
+      <div class="td-row">
+        <label for="grant-type">Grant type</label>
+        <select id="grant-type">
+          <option value="password" selected>password</option>
+          <option value="client_credentials">client_credentials</option>
+        </select>
+      </div>
+
+      <div class="td-row">
+        <label for="client-id">Client ID</label>
+        <input id="client-id" value="td-webapi-client" />
+      </div>
+
+      <div class="td-row">
+        <label for="client-secret">Client Secret</label>
+        <input id="client-secret" value="td-webapi-secret-2024" />
+      </div>
+
+      <div class="td-row">
+        <label for="username">Username</label>
+        <input id="username" value="admin" />
+      </div>
+
+      <div class="td-row">
+        <label for="password">Password</label>
+        <input id="password" type="password" value="admin123" />
+      </div>
+
+      <div class="td-row">
+        <label for="scope">Scope (optional)</label>
+        <input id="scope" placeholder="Để trống nếu không cần scope" />
+      </div>
+
+      <div class="td-row">
+        <label for="remember-config">Lưu cấu hình lấy token</label>
+        <select id="remember-config">
+          <option value="true" selected>Có</option>
+          <option value="false">Không</option>
+        </select>
+      </div>
+
+      <div class="td-actions">
+        <button id="btn-fetch-token" type="button">Fetch token</button>
+        <button id="btn-save-config" class="secondary" type="button">Save config</button>
+      </div>
+
+      <div class="td-row" style="margin-top: 8px;">
+        <label for="bearer-token">Bearer token</label>
+        <textarea id="bearer-token" placeholder="Paste JWT token here"></textarea>
+      </div>
+
+      <div class="td-actions">
+        <button id="btn-apply-token" type="button">Apply token</button>
+        <button id="btn-copy-token" class="secondary" type="button">Copy token</button>
+        <button id="btn-clear-token" class="secondary" type="button">Clear token</button>
+      </div>
+
+      <div id="token-status" class="td-status"></div>
+      <div id="token-meta" class="td-meta">Chưa có token.</div>
+      <div class="td-note">Token lưu tại localStorage key <code>td.swagger.token</code>, cấu hình lưu ở <code>td.swagger.token.config</code>.</div>
+    </div>
+
+    <div class="td-card">
+      <h2>Recommended Test Flow</h2>
+      <ol class="td-quick-list">
+        <li>POST /api/v1/documents</li>
+        <li>GET /api/v1/documents</li>
+        <li>GET /api/v1/documents/{id}</li>
+        <li>PUT /api/v1/documents/{id}</li>
+        <li>POST /api/v1/documents/search</li>
+        <li>POST /api/v1/documents/deleted/search</li>
+        <li>DELETE /api/v1/documents/{id}</li>
+        <li>DELETE /api/v1/documents/{id}/permanent (ADMIN)</li>
+      </ol>
+      <div class="td-note">
+        Luu y: xoa mem va xoa cung la 2 endpoint khac nhau. Xoa cung chi danh cho ADMIN.
+      </div>
+    </div>
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      function basePath() {
+        var path = window.location.pathname || "";
+        var markers = ["/swagger-custom", "/swagger-ui", "/swagger-native"];
+        for (var i = 0; i < markers.length; i++) {
+          var index = path.indexOf(markers[i]);
+          if (index >= 0) {
+            return path.substring(0, index);
+          }
+        }
+        return "";
+      }
+
+      var appBasePath = basePath();
+      var openApiUrl = appBasePath + "/v3/api-docs";
+
+      var ui = SwaggerUIBundle({
+        url: openApiUrl,
+        dom_id: "#swagger-ui",
+        deepLinking: true,
+        displayOperationId: true,
+        filter: true,
+        persistAuthorization: true,
+        tryItOutEnabled: true,
+        tagsSorter: "alpha",
+        operationsSorter: "alpha",
+        supportedSubmitMethods: ["get", "post", "put", "delete", "patch"],
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
+      });
+
+      window.ui = ui;
+
+      var tokenInput = document.getElementById("bearer-token");
+      var statusEl = document.getElementById("token-status");
+      var metaEl = document.getElementById("token-meta");
+      var tokenStorageKey = "td.swagger.token";
+      var tokenConfigKey = "td.swagger.token.config";
+
+      function decodeJwtPayload(token) {
+        try {
+          var parts = token.split(".");
+          if (parts.length < 2) return null;
+          var payload = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+          var padLength = payload.length % 4;
+          if (padLength) {
+            payload += "=".repeat(4 - padLength);
+          }
+          return JSON.parse(atob(payload));
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function renderTokenMeta(token, expiresIn) {
+        if (!metaEl) return;
+        if (!token) {
+          metaEl.textContent = "Chưa có token.";
+          return;
+        }
+
+        var payload = decodeJwtPayload(token);
+        if (!payload) {
+          metaEl.textContent = "Không đọc được payload JWT.";
+          return;
+        }
+
+        var expText = "N/A";
+        if (payload.exp) {
+          var expDate = new Date(payload.exp * 1000);
+          expText = expDate.toLocaleString();
+        }
+
+        var roles = [];
+        if (payload.realm_access && payload.realm_access.roles) {
+          roles = payload.realm_access.roles;
+        }
+
+        var lines = [
+          "sub: " + (payload.sub || "N/A"),
+          "preferred_username: " + (payload.preferred_username || "N/A"),
+          "expires_at: " + expText,
+          "expires_in: " + (typeof expiresIn === "number" ? expiresIn + "s" : "N/A"),
+          "roles: " + (roles.length ? roles.join(", ") : "N/A")
+        ];
+        metaEl.textContent = lines.join("\n");
+      }
+
+      function currentConfig() {
+        return {
+          tokenEndpoint: (document.getElementById("token-endpoint") || {}).value || "",
+          grantType: (document.getElementById("grant-type") || {}).value || "password",
+          clientId: (document.getElementById("client-id") || {}).value || "",
+          clientSecret: (document.getElementById("client-secret") || {}).value || "",
+          username: (document.getElementById("username") || {}).value || "",
+          password: (document.getElementById("password") || {}).value || "",
+          scope: (document.getElementById("scope") || {}).value || "",
+          rememberConfig: (document.getElementById("remember-config") || {}).value || "true"
+        };
+      }
+
+      function saveConfig() {
+        var cfg = currentConfig();
+        if (cfg.rememberConfig === "true") {
+          localStorage.setItem(tokenConfigKey, JSON.stringify(cfg));
+          setStatus("Đã lưu cấu hình lấy token.", false);
+        } else {
+          localStorage.removeItem(tokenConfigKey);
+          setStatus("Đã tắt lưu cấu hình và xóa cấu hình đã lưu.", false);
+        }
+      }
+
+      function loadConfig() {
+        var raw = localStorage.getItem(tokenConfigKey);
+        if (!raw) return;
+        try {
+          var cfg = JSON.parse(raw);
+          if (cfg.tokenEndpoint) document.getElementById("token-endpoint").value = cfg.tokenEndpoint;
+          if (cfg.grantType) document.getElementById("grant-type").value = cfg.grantType;
+          if (cfg.clientId) document.getElementById("client-id").value = cfg.clientId;
+          if (cfg.clientSecret) document.getElementById("client-secret").value = cfg.clientSecret;
+          if (cfg.username) document.getElementById("username").value = cfg.username;
+          if (cfg.password) document.getElementById("password").value = cfg.password;
+          if (cfg.scope) document.getElementById("scope").value = cfg.scope;
+          if (cfg.rememberConfig) document.getElementById("remember-config").value = cfg.rememberConfig;
+        } catch (e) {
+          localStorage.removeItem(tokenConfigKey);
+        }
+      }
+
+      function setStatus(message, isError) {
+        if (!statusEl) return;
+        statusEl.textContent = message || "";
+        statusEl.style.color = isError ? "#b91c1c" : "#0f172a";
+      }
+
+      function applyToken(token) {
+        if (!tokenInput) return;
+        var value = (token || tokenInput.value || "").trim();
+        if (!value) {
+          setStatus("Token is empty.", true);
+          return;
+        }
+
+        try {
+          tokenInput.value = value;
+          localStorage.setItem(tokenStorageKey, value);
+          ui.preauthorizeApiKey("bearer-jwt", value);
+          renderTokenMeta(value);
+          setStatus("Token đã được áp dụng. Có thể gọi API bảo mật.", false);
+        } catch (error) {
+          setStatus("Không thể áp dụng token: " + error.message, true);
+        }
+      }
+
+      function clearToken() {
+        if (!tokenInput) return;
+        tokenInput.value = "";
+        localStorage.removeItem(tokenStorageKey);
+        renderTokenMeta(null);
+        setStatus("Đã xóa token.", false);
+      }
+
+      async function copyToken() {
+        var value = (tokenInput.value || "").trim();
+        if (!value) {
+          setStatus("Không có token để copy.", true);
+          return;
+        }
+        try {
+          await navigator.clipboard.writeText(value);
+          setStatus("Đã copy token vào clipboard.", false);
+        } catch (e) {
+          setStatus("Copy thất bại: " + e.message, true);
+        }
+      }
+
+      async function fetchToken() {
+        var button = document.getElementById("btn-fetch-token");
+        if (!button) return;
+        button.disabled = true;
+
+        try {
+          setStatus("Đang lấy token...", false);
+
+          var clientIdInput = document.getElementById("client-id");
+          var clientSecretInput = document.getElementById("client-secret");
+          var usernameInput = document.getElementById("username");
+          var passwordInput = document.getElementById("password");
+          var endpointInput = document.getElementById("token-endpoint");
+          var scopeInput = document.getElementById("scope");
+          var grantTypeInput = document.getElementById("grant-type");
+          var grantType = grantTypeInput ? grantTypeInput.value : "password";
+
+          var form = new URLSearchParams();
+          form.set("client_id", clientIdInput.value.trim());
+          if ((clientSecretInput.value || "").trim()) {
+            form.set("client_secret", clientSecretInput.value.trim());
+          }
+          form.set("grant_type", grantType);
+
+          if ((scopeInput.value || "").trim()) {
+            form.set("scope", scopeInput.value.trim());
+          }
+
+          if (grantType === "password") {
+            form.set("username", usernameInput.value.trim());
+            form.set("password", passwordInput.value);
+          }
+
+          var response = await fetch(endpointInput.value.trim(), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            body: form.toString()
+          });
+
+          if (!response.ok) {
+            var text = await response.text();
+            throw new Error("Token endpoint trả về " + response.status + ". " + text);
+          }
+
+          var data = await response.json();
+          if (!data.access_token) {
+            throw new Error("Không có access_token trong response.");
+          }
+
+          applyToken(data.access_token);
+          renderTokenMeta(data.access_token, data.expires_in);
+          if ((document.getElementById("remember-config") || {}).value === "true") {
+            saveConfig();
+          }
+        } catch (error) {
+          setStatus("Lấy token thất bại: " + error.message, true);
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      var applyBtn = document.getElementById("btn-apply-token");
+      var copyBtn = document.getElementById("btn-copy-token");
+      var clearBtn = document.getElementById("btn-clear-token");
+      var fetchBtn = document.getElementById("btn-fetch-token");
+      var saveCfgBtn = document.getElementById("btn-save-config");
+
+      loadConfig();
+
+      if (!document.getElementById("token-endpoint").value.trim()) {
+        var defaultEndpoint = window.location.protocol + "//" + window.location.hostname + ":8180/realms/td-webapi-realm/protocol/openid-connect/token";
+        document.getElementById("token-endpoint").value = defaultEndpoint;
+      }
+
+      if (applyBtn) {
+        applyBtn.addEventListener("click", function () {
+          applyToken();
+        });
+      }
+
+      if (copyBtn) {
+        copyBtn.addEventListener("click", function () {
+          copyToken();
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener("click", function () {
+          clearToken();
+        });
+      }
+
+      if (fetchBtn) {
+        fetchBtn.addEventListener("click", function () {
+          fetchToken();
+        });
+      }
+
+      if (saveCfgBtn) {
+        saveCfgBtn.addEventListener("click", function () {
+          saveConfig();
+        });
+      }
+
+      var savedToken = localStorage.getItem(tokenStorageKey);
+      if (savedToken) {
+        applyToken(savedToken);
+      } else {
+        renderTokenMeta(null);
+      }
+    });
+  </script>
+</body>
+</html>
