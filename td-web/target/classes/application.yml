@@ -86,7 +86,16 @@ springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
-    enabled: false
+    enabled: true
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    display-request-duration: true
+    doc-expansion: list
+    try-it-out-enabled: true
+    show-extensions: true
+  show-actuator: false
+  use-management-port: false
 
 # Logging Configuration
 logging:
