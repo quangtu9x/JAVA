@@ -40,26 +40,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 
                 // Protected endpoints with role-based access
-                .requestMatchers(HttpMethod.GET, "/api/v1/products/**").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER")
-                .requestMatchers(HttpMethod.POST, "/api/v1/products/search").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER")
-                .requestMatchers(HttpMethod.POST, "/api/v1/products").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
-                .requestMatchers(HttpMethod.PUT, "/api/v1/products/**").hasAnyRole("ADMIN", "PRODUCT_MANAGER")
-                .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**").hasRole("ADMIN")
-                
-                .requestMatchers(HttpMethod.GET, "/api/v1/brands/**").hasAnyRole("USER", "ADMIN", "BRAND_MANAGER")
-                .requestMatchers(HttpMethod.POST, "/api/v1/brands/search").hasAnyRole("USER", "ADMIN", "BRAND_MANAGER")
-                .requestMatchers(HttpMethod.POST, "/api/v1/brands").hasAnyRole("ADMIN", "BRAND_MANAGER")
-                .requestMatchers(HttpMethod.PUT, "/api/v1/brands/**").hasAnyRole("ADMIN", "BRAND_MANAGER")
-                .requestMatchers(HttpMethod.DELETE, "/api/v1/brands/**").hasRole("ADMIN")
-
                 .requestMatchers(HttpMethod.GET, "/api/v1/documents/**").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
                 .requestMatchers(HttpMethod.POST, "/api/v1/documents/search").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
                 .requestMatchers(HttpMethod.POST, "/api/v1/documents").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
                 .requestMatchers(HttpMethod.PUT, "/api/v1/documents/**").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
                 .requestMatchers(HttpMethod.DELETE, "/api/v1/documents/**").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
-                
-                .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/v1/audit-logs/**").hasRole("ADMIN")
                 
                 .anyRequest().authenticated()
             )

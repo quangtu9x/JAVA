@@ -106,9 +106,11 @@ public class DocumentsController extends BaseController {
     public ResponseEntity<Result<UUID>> updateDocument(
                 @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateDocumentRequest request) {
-        if (!id.equals(request.getId())) {
+        if (request.getId() != null && !id.equals(request.getId())) {
             return badRequest(Result.<UUID>failure("ID tài liệu không khớp"));
         }
+
+        request.setId(id);
 
         var result = updateDocumentUseCase.execute(request);
         return ok(result);

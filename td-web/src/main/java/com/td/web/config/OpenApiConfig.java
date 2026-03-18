@@ -17,8 +17,8 @@ public class OpenApiConfig {
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("TD WebAPI")
-                        .description("Hệ thống quản lý sản phẩm, thương hiệu và tài liệu - Spring Boot API")
+                        .title("TD Documents API")
+                        .description("Hệ thống quản lý văn bản - Spring Boot API")
                         .version("v1.0.0")
                         .contact(new Contact()
                                 .name("Nhóm phát triển TD")

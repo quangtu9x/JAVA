@@ -44,13 +44,6 @@ spring:
           provider_disables_autocommit: true
     open-in-view: false
   
-  # MongoDB Configuration
-  data:
-    mongodb:
-      host: ${MONGODB_HOST:localhost}
-      port: ${MONGODB_PORT:27017}
-      database: ${MONGODB_DATABASE:tdwebapi_logs}
-  
   # Flyway Configuration
   flyway:
     enabled: true
@@ -66,14 +59,6 @@ spring:
     deserialization:
       fail-on-unknown-properties: false
   
-  # Cache Configuration
-  cache:
-    type: simple
-    cache-names:
-      - products
-      - brands
-      - users
-
 # Security Configuration with Keycloak
 app:
   security:
@@ -82,43 +67,6 @@ app:
       realm: ${KEYCLOAK_REALM:td-webapi-realm}
       client-id: ${KEYCLOAK_CLIENT_ID:td-webapi-client}
       client-secret: ${KEYCLOAK_CLIENT_SECRET:}
-  
-  # MinIO Configuration
-  minio:
-    url: ${MINIO_URL:http://localhost:9000}
-    access-key: ${MINIO_ACCESS_KEY:minioadmin}
-    secret-key: ${MINIO_SECRET_KEY:minioadmin}
-    bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
-    connect-timeout: 30
-    read-timeout: 60
-    write-timeout: 60
-    max-file-size: 10485760  # 10MB in bytes
-    allowed-extensions: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,txt,zip,mp4,avi,mov
-
-# Elasticsearch Configuration
-elasticsearch:
-  hosts:
-    - ${ELASTICSEARCH_HOST:localhost:9200}
-  cluster-name: ${ELASTICSEARCH_CLUSTER_NAME:td-cluster}
-  node-name-prefix: ${ELASTICSEARCH_NODE_PREFIX:td-node}
-  connection-timeout: ${ELASTICSEARCH_CONNECTION_TIMEOUT:10s}
-  socket-timeout: ${ELASTICSEARCH_SOCKET_TIMEOUT:30s}
-  index:
-    number-of-shards: ${ELASTICSEARCH_SHARDS:1}
-    number-of-replicas: ${ELASTICSEARCH_REPLICAS:0}
-    refresh-interval: ${ELASTICSEARCH_REFRESH_INTERVAL:1s}
-    max-result-window: ${ELASTICSEARCH_MAX_RESULT_WINDOW:10000}
-    analysis:
-      default-analyzer: standard
-      search-analyzer: standard
-      enable-vietnamese-analysis: true
-      autocomplete:
-        enabled: true
-        min-gram: 2
-        max-gram: 20
-        token-chars:
-          - letter
-          - digit
 
 # Management Endpoints
 management:
@@ -143,11 +91,10 @@ springdoc:
 # Logging Configuration
 logging:
   level:
-    com.td: DEBUG
-    org.springframework.security: DEBUG
-    org.springframework.security.oauth2: DEBUG
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    com.td: INFO
+    org.springframework.security: INFO
+    org.springframework.security.oauth2: INFO
+    org.hibernate.SQL: INFO
   pattern:
     console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

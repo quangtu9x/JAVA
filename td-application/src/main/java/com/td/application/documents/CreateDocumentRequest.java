@@ -1,11 +1,14 @@
 package com.td.application.documents;
 
+import com.fasterxml.jackson.annotation.JsonAnySetter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,4 +32,22 @@ public class CreateDocumentRequest {
     private Map<String, Object> attributes = new HashMap<>();
 
     private Map<String, Object> metadata = new HashMap<>();
+
+    @JsonIgnore
+    private final Map<String, Object> dynamicFields = new LinkedHashMap<>();
+
+    @JsonAnySetter
+    public void captureDynamicField(String key, Object value) {
+        dynamicFields.put(key, value);
+    }
+
+    @JsonIgnore
+    public Map<String, Object> resolveCustomFieldsForPersistence() {
+        return DocumentFieldLayout.mergeCustomFields(attributes, dynamicFields);
+    }
+
+    @JsonIgnore
+    public Map<String, Object> resolveMetadataForPersistence() {
+        return DocumentFieldLayout.metadataForPersistence(metadata, attributes);
+    }
 }

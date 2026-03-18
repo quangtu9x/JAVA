@@ -26,11 +26,9 @@
         
         <!-- Spring Boot -->
         <spring.boot.version>3.2.0</spring.boot.version>
-        <spring.cloud.version>2023.0.0</spring.cloud.version>
         
         <!-- Database -->
         <postgresql.version>42.7.0</postgresql.version>
-        <mongodb.version>4.11.1</mongodb.version>
         <flyway.version>9.22.3</flyway.version>
         
         <!-- Mapping & Validation -->
@@ -51,12 +49,6 @@
         <lombok.version>1.18.38</lombok.version>
         <apache.commons.lang3.version>3.13.0</apache.commons.lang3.version>
         
-        <!-- File Storage -->
-        <minio.version>8.5.7</minio.version>
-        
-        <!-- Search -->
-        <elasticsearch.version>8.11.3</elasticsearch.version>
-        
         <!-- Plugins -->
         <maven.compiler.plugin.version>3.11.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.2.2</maven.surefire.plugin.version>
@@ -74,15 +66,6 @@
                 <scope>import</scope>
             </dependency>
             
-            <!-- Spring Cloud BOM -->
-            <dependency>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-dependencies</artifactId>
-                <version>${spring.cloud.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-
             <!-- Internal Modules -->
             <dependency>
                 <groupId>com.td</groupId>
@@ -105,11 +88,6 @@
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>${postgresql.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.mongodb</groupId>
-                <artifactId>mongodb-driver-sync</artifactId>
-                <version>${mongodb.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.flywaydb</groupId>
@@ -174,23 +152,6 @@
                 <version>${apache.commons.lang3.version}</version>
             </dependency>
 
-            <!-- File Storage -->
-            <dependency>
-                <groupId>io.minio</groupId>
-                <artifactId>minio</artifactId>
-                <version>${minio.version}</version>
-            </dependency>
-
-            <!-- Search -->
-            <dependency>
-                <groupId>org.springframework.data</groupId>
-                <artifactId>spring-data-elasticsearch</artifactId>
-            </dependency>
-            <dependency>
-                <groupId>co.elastic.clients</groupId>
-                <artifactId>elasticsearch-java</artifactId>
-                <version>${elasticsearch.version}</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 

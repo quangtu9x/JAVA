@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TD WebAPI Swagger UI</title>
+  <title>TD Documents API Swagger UI</title>
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css" />
   <style>
     html {
@@ -147,8 +147,8 @@
 
 <body>
   <div class="td-header">
-    <h1>TD WebAPI - Swagger UI (Updated APIs)</h1>
-    <p>Use Authorize to test secured endpoints. This page is prepared for full API testing flow.</p>
+    <h1>TD Documents API - Swagger UI</h1>
+    <p>Trang test API quan ly van ban voi bo tro lay token Keycloak nhanh.</p>
   </div>
 
   <div class="td-toolbar">
@@ -206,11 +206,12 @@
         <li>GET /api/v1/documents/{id}</li>
         <li>PUT /api/v1/documents/{id}</li>
         <li>POST /api/v1/documents/search</li>
+        <li>POST /api/v1/documents/deleted/search</li>
         <li>DELETE /api/v1/documents/{id}</li>
-        <li>POST /api/v1/audit-logs/search (ADMIN)</li>
+        <li>DELETE /api/v1/documents/{id}/permanent (ADMIN)</li>
       </ol>
       <div class="td-note">
-        After soft delete, GET detail currently returns business failure in response body (success=false) instead of HTTP 404.
+        Luu y: xoa mem va xoa cung la 2 endpoint khac nhau. Xoa cung chi danh cho ADMIN.
       </div>
     </div>
   </div>

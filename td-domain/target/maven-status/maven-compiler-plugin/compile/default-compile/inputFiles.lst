@@ -1,19 +1,11 @@
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityDeletedEvent.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\search\BrandDocument.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\ISoftDelete.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\BaseEntity.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\logs\ApiLog.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DefaultAuditableEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Repository.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\logs\AuditLog.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\storage\FileCategory.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\catalog\Product.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\documents\BusinessDocument.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableBaseEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableEntity.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\storage\FileMetadata.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\search\ProductDocument.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\storage\FileStorageRepository.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AbstractEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DomainEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Entity.java
@@ -21,4 +13,3 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityUpdatedEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\IAggregateRoot.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityCreatedEvent.java
-D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\catalog\Brand.java

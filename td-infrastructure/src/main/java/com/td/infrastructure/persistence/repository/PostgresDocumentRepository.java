@@ -1,13 +1,11 @@
 package com.td.infrastructure.persistence.repository;
 
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Map;
 
 @Repository
-@Profile("!tidb & !mariadb")
 public class PostgresDocumentRepository extends DocumentRepository {
 
 	public PostgresDocumentRepository(DocumentJpaRepository jpaRepository) {

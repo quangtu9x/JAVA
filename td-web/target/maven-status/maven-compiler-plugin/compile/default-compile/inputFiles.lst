@@ -1,11 +1,5 @@
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\TdWebApiApplication.java
-D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\ProductsController.java
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\DocumentsController.java
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\BaseController.java
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\GlobalExceptionHandler.java
-D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\SearchAdminController.java
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\OpenApiConfig.java
-D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\AuditLogsController.java
-D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\FileController.java
-D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\SearchController.java
-D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\BrandsController.java

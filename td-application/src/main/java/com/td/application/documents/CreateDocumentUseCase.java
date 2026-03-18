@@ -23,8 +23,8 @@ public class CreateDocumentUseCase {
                 normalizeDefault(request.getStatus(), "DRAFT"),
                 request.getContent(),
                 DocumentJsonMapper.toJsonArray(request.getTags()),
-                DocumentJsonMapper.toJsonObject(request.getAttributes()),
-                DocumentJsonMapper.toJsonObject(request.getMetadata())
+                DocumentJsonMapper.toJsonObject(request.resolveCustomFieldsForPersistence()),
+                DocumentJsonMapper.toJsonObject(request.resolveMetadataForPersistence())
             );
 
             var saved = documentRepository.save(document);
