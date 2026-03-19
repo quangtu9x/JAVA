@@ -116,7 +116,7 @@ public class GetLegacyOrganizationTreeUseCase {
             Organization organization,
             Map<UUID, List<Organization>> childrenByParent,
             NodeContext context) {
-        String form = resolveForm(organization.getLevel());
+        String form = resolveForm(organization);
         NodeContext nextContext = nextContext(organization, form, context);
 
         List<LegacyOrganizationTreeNode> children = childrenByParent
@@ -175,17 +175,15 @@ public class GetLegacyOrganizationTreeUseCase {
         return data;
     }
 
-    private String resolveForm(int level) {
-        if (level <= 1) {
-            return "agency_level";
-        }
-        if (level == 2) {
-            return "agency";
-        }
-        if (level == 3) {
-            return "unit";
-        }
-        return "department";
+    private String resolveForm(Organization organization) {
+        String nodeType = OrganizationHierarchyRules.resolveNodeType(organization);
+        return switch (nodeType) {
+            case OrganizationHierarchyRules.AGENCY_LEVEL -> "agency_level";
+            case OrganizationHierarchyRules.AGENCY -> "agency";
+            case OrganizationHierarchyRules.UNIT -> "unit";
+            case OrganizationHierarchyRules.DEPARTMENT -> "department";
+            default -> "agency_level";
+        };
     }
 
     private NodeContext nextContext(Organization organization, String form, NodeContext current) {

@@ -6,6 +6,7 @@ com\td\application\documents\DocumentListCacheEntry$DocumentListCacheEntryBuilde
 com\td\application\workflows\WorkflowDefinitionFacade.class
 com\td\application\documents\CreateDocumentUseCase.class
 com\td\application\documents\DocumentDto.class
+com\td\application\sharedcore\UpdateOrganizationRequest.class
 com\td\application\documents\UploadFileRequest$UploadFileRequestBuilder.class
 com\td\application\documents\FileDto$FileDtoBuilder.class
 com\td\application\sharedcore\OrganizationDtoMapper.class
@@ -15,6 +16,7 @@ com\td\application\common\TextNormalizer.class
 com\td\application\documents\SimpleFileDto.class
 com\td\application\documents\GetFileUseCase.class
 com\td\application\documents\DocumentXemChiTietDto$DocumentXemChiTietDtoBuilder.class
+com\td\application\sharedcore\CreateOrganizationRequest.class
 com\td\application\workflows\WorkflowPageRequest.class
 com\td\application\workflows\WorkflowRuntimeFacade.class
 com\td\application\workflows\WorkflowActionRequest.class

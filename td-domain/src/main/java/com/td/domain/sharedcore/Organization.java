@@ -31,6 +31,9 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
     @Column(name = "parent_id")
     private UUID parentId;
 
+    @Column(name = "node_type", nullable = false, length = 30)
+    private String nodeType = "agency_level";
+
     @Column(name = "level", nullable = false)
     private int level = 0;
 
@@ -43,12 +46,14 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
-    public Organization(String code, String name, String description, UUID parentId, int level, String fullPath, int sortOrder) {
+    public Organization(String code, String name, String description, UUID parentId,
+                        String nodeType, int level, String fullPath, int sortOrder) {
         this.id = UUID.randomUUID();
         this.code = code;
         this.name = name;
         this.description = description;
         this.parentId = parentId;
+        this.nodeType = nodeType;
         this.level = level;
         this.fullPath = fullPath;
         this.sortOrder = sortOrder;
@@ -56,7 +61,7 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
     }
 
     public Organization update(String code, String name, String description,
-                               UUID parentId, int level, String fullPath,
+                               UUID parentId, String nodeType, int level, String fullPath,
                                Integer sortOrder, Boolean isActive) {
         if (code != null) {
             this.code = code;
@@ -68,6 +73,9 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
             this.description = description;
         }
         this.parentId = parentId;
+        if (nodeType != null) {
+            this.nodeType = nodeType;
+        }
         this.level = level;
         this.fullPath = fullPath;
         if (sortOrder != null) {

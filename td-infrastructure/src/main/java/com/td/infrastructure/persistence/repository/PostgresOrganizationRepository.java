@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +27,11 @@ public class PostgresOrganizationRepository implements OrganizationRepository {
     @Override
     public Optional<Organization> findByIdAndDeletedOnIsNull(UUID id) {
         return jpa.findByIdAndDeletedOnIsNull(id);
+    }
+
+    @Override
+    public List<Organization> findByParentIdAndDeletedOnIsNull(UUID parentId) {
+        return jpa.findByParentIdAndDeletedOnIsNull(parentId);
     }
 
     @Override

@@ -14,6 +14,7 @@ final class OrganizationDtoMapper {
         dto.setName(entity.getName());
         dto.setDescription(entity.getDescription());
         dto.setParentId(entity.getParentId());
+        dto.setForm(entity.getNodeType());
         dto.setLevel(entity.getLevel());
         dto.setFullPath(entity.getFullPath());
         dto.setSortOrder(entity.getSortOrder());

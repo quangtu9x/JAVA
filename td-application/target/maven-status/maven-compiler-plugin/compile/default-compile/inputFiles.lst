@@ -9,6 +9,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\docu
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\cqrs\CommandHandler.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowPageRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowTransitionRequest.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\OrganizationHierarchyRules.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\GetOrganizationUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\GetDocumentRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\AppPermissionRepository.java
@@ -31,6 +32,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\shar
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\SearchAppPermissionsUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\models\CachedResult.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentDetailWithFilesDto.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\UpdateOrganizationUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\template\department\application\DepartmentCacheService.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\ListDocumentFilesUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\UpdateDocumentRequest.java
@@ -61,6 +63,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\docu
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\SearchAppUsersUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowInstanceDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\models\CachedPaginationResponse.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\CreateOrganizationRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\template\department\application\DepartmentRepository.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\template\department\application\DeleteDepartmentUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentListCacheEntry.java
@@ -71,6 +74,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\work
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\SearchUserDataScopesRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\TextNormalizer.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\template\department\application\CreateDepartmentUseCase.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\UpdateOrganizationRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\AppRoleDtoMapper.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\SearchOrganizationsRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\UpdateDocumentWithFileRequest.java
@@ -86,6 +90,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\shar
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\CreateWorkflowDefinitionRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\categories\CategoryListCacheEntry.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\AppUserDtoMapper.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\DeleteOrganizationUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\models\PaginationResponse.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\categories\CategoryDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\cqrs\Command.java
@@ -112,6 +117,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\template\department\app
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DeleteDocumentUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\LegacyOrganizationTreeResponse.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DeleteFileUseCase.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\CreateOrganizationUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\UploadFileUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\sharedcore\GetAppRoleUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\template\department\application\SearchDepartmentsUseCase.java

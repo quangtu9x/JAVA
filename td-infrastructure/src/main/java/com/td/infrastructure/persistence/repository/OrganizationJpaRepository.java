@@ -4,6 +4,7 @@ import com.td.domain.sharedcore.Organization;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +17,7 @@ public interface OrganizationJpaRepository extends BaseRepository<Organization> 
 
     @Query("SELECT o FROM Organization o WHERE o.id = :id AND o.deletedOn IS NULL")
     Optional<Organization> findByIdAndDeletedOnIsNull(@Param("id") UUID id);
+
+    @Query("SELECT o FROM Organization o WHERE o.parentId = :parentId AND o.deletedOn IS NULL")
+    List<Organization> findByParentIdAndDeletedOnIsNull(@Param("parentId") UUID parentId);
 }

@@ -12,6 +12,7 @@ public class OrganizationDto {
     private String name;
     private String description;
     private UUID parentId;
+    private String form;
     private int level;
     private String fullPath;
     private int sortOrder;
