@@ -2,6 +2,7 @@ package com.td.web.config;
 
 import com.td.application.categories.CategoryCacheService;
 import com.td.application.documents.DocumentCacheService;
+import com.td.infrastructure.security.CurrentUserContextResolver;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -53,6 +54,10 @@ public class RedisCacheConfig {
         cacheConfigurations.put(
             CategoryCacheService.CATEGORY_LIST_CACHE,
             defaultConfig.entryTtl(Duration.ofMinutes(10))
+        );
+        cacheConfigurations.put(
+            CurrentUserContextResolver.USER_CONTEXT_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(5))
         );
 
         return RedisCacheManager.builder(connectionFactory)

@@ -5,6 +5,7 @@
 ## 1. Tài liệu nên mở đầu tiên
 
 - Tổng quan chi tiết: [HUONG_DAN_NHAN_BAN_VA_SUA_API.md](HUONG_DAN_NHAN_BAN_VA_SUA_API.md)
+- Tách phân hệ độc lập: [HUONG_DAN_TACH_PHAN_HE_DOC_LAP.md](HUONG_DAN_TACH_PHAN_HE_DOC_LAP.md)
 - Checklist tổng hợp: [CHECKLIST_NHAN_BAN_VA_SUA_API.md](CHECKLIST_NHAN_BAN_VA_SUA_API.md)
 - Checklist siêu ngắn khi sửa API: [CHECKLIST_SUA_API_NHANH.md](CHECKLIST_SUA_API_NHANH.md)
 - Quy ước đặt tên: [QUY_UOC_DAT_TEN_FEATURE_API.md](QUY_UOC_DAT_TEN_FEATURE_API.md)
@@ -19,6 +20,7 @@
 Nếu anh muốn nhân một feature mới:
 
 - Mở [CHECKLIST_NHAN_BAN_VA_SUA_API.md](CHECKLIST_NHAN_BAN_VA_SUA_API.md)
+- Nếu là bài toán phân hệ độc lập, mở [HUONG_DAN_TACH_PHAN_HE_DOC_LAP.md](HUONG_DAN_TACH_PHAN_HE_DOC_LAP.md)
 - Mở thêm [QUY_UOC_DAT_TEN_FEATURE_API.md](QUY_UOC_DAT_TEN_FEATURE_API.md)
 - Sau đó chọn một trong hai template thực chiến phù hợp
 

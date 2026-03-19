@@ -6,6 +6,7 @@ D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructur
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\entity\FileMetadataEntity.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\search\DocumentSearchMapper.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\security\KeycloakJwtConverter.java
+D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\security\CurrentUserContext.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\search\ElasticsearchDocumentSearchService.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\config\MinioService.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\BaseRepository.java
@@ -15,6 +16,7 @@ D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructur
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\FileMetadataJpaRepository.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresCategoryRepository.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\CategoryJpaRepository.java
+D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\security\CurrentUserContextResolver.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\documents\ListDocumentFilesUseCaseImpl.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresDocumentRepository.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\search\DocumentSearchDocument.java

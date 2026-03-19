@@ -2,7 +2,6 @@ com\td\infrastructure\persistence\repository\PostgresDocumentRepository.class
 com\td\infrastructure\persistence\repository\DocumentRepository.class
 com\td\infrastructure\config\MinIOProperties.class
 com\td\infrastructure\config\MinioService.class
-com\td\infrastructure\config\AuditingConfig$AuditorAwareImpl.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport$AttributeFilterRule.class
 com\td\infrastructure\persistence\entity\FileMetadataEntity$FileMetadataEntityBuilder.class
 com\td\infrastructure\config\AuditingConfig.class
