@@ -14,6 +14,7 @@ public class HardDeleteDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
+    private final DocumentSearchService documentSearchService;
 
     public Result<UUID> execute(UUID documentId) {
         try {
@@ -23,6 +24,7 @@ public class HardDeleteDocumentUseCase {
             }
 
             documentRepository.hardDelete(documentOptional.get());
+            documentSearchService.delete(documentId);
             documentCacheService.evict(documentId);
             documentCacheService.evictAllListCaches();
             return Result.success(documentId);

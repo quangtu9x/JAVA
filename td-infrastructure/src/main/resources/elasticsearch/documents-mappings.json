@@ -1,0 +1,63 @@
+{
+  "dynamic": false,
+  "properties": {
+    "title": {
+      "type": "text",
+      "analyzer": "vi_index_analyzer",
+      "search_analyzer": "vi_search_analyzer",
+      "fields": {
+        "raw": {
+          "type": "keyword",
+          "ignore_above": 256,
+          "normalizer": "folding_normalizer"
+        }
+      }
+    },
+    "documentType": {
+      "type": "keyword",
+      "normalizer": "folding_normalizer"
+    },
+    "status": {
+      "type": "keyword",
+      "normalizer": "folding_normalizer"
+    },
+    "content": {
+      "type": "text",
+      "analyzer": "vi_index_analyzer",
+      "search_analyzer": "vi_search_analyzer"
+    },
+    "tags": {
+      "type": "keyword",
+      "normalizer": "folding_normalizer"
+    },
+    "attributes": {
+      "type": "object",
+      "enabled": false
+    },
+    "metadata": {
+      "type": "object",
+      "enabled": false
+    },
+    "extraFields": {
+      "type": "object",
+      "enabled": false
+    },
+    "searchText": {
+      "type": "text",
+      "analyzer": "vi_index_analyzer",
+      "search_analyzer": "vi_search_analyzer"
+    },
+    "versionNo": {
+      "type": "long"
+    },
+    "createdOnEpochMs": {
+      "type": "long"
+    },
+    "lastModifiedOnEpochMs": {
+      "type": "long"
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  }
+}

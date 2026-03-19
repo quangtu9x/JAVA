@@ -15,6 +15,7 @@ public class CreateDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
+    private final DocumentSearchService documentSearchService;
 
     public Result<UUID> execute(CreateDocumentRequest request) {
         try {
@@ -29,6 +30,7 @@ public class CreateDocumentUseCase {
             );
 
             var saved = documentRepository.save(document);
+            documentSearchService.index(saved);
             documentCacheService.evictAllListCaches();
             return Result.success(saved.getId());
         } catch (Exception ex) {

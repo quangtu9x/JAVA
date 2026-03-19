@@ -8,12 +8,11 @@ Du an da duoc rut gon ve dung pham vi quan ly van ban de phuc vu migration tu he
 - Xac thuc OAuth2/JWT qua Keycloak
 - Luu tru PostgreSQL + Flyway
 - Swagger/OpenAPI de test API
+- Elasticsearch search module cho documents
 
 Da loai bo khoi source:
 
 - Product/Brand module
-- Elasticsearch search module
-- File storage MinIO module
 - Audit logs MongoDB module
 
 ## Kien truc
@@ -41,6 +40,10 @@ mvn -pl td-web spring-boot:run
 - `GET /api/v1/documents`
 - `GET /api/v1/documents/{id}`
 - `POST /api/v1/documents/search`
+- `POST /api/v1/documents/search/elastic`
+- `GET /api/v1/documents/search/admin/status`
+- `POST /api/v1/documents/search/admin/reindex`
+- `POST /api/v1/documents/search/admin/sync/{id}`
 - `POST /api/v1/documents`
 - `PUT /api/v1/documents/{id}`
 - `DELETE /api/v1/documents/{id}`

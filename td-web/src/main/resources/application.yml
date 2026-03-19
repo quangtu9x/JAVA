@@ -75,6 +75,13 @@ spring:
       write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: false
+
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: ${ELASTICSEARCH_CONNECTION_TIMEOUT:3s}
+    socket-timeout: ${ELASTICSEARCH_SOCKET_TIMEOUT:10s}
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
   
 # Security Configuration with Keycloak
 app:
@@ -89,6 +96,8 @@ app:
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
+  elasticsearch:
+    enabled: ${ELASTICSEARCH_ENABLED:true}
 
 # Management Endpoints
 management:

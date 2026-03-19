@@ -14,6 +14,7 @@ public class DeleteDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
+    private final DocumentSearchService documentSearchService;
 
     public Result<UUID> execute(UUID documentId) {
         try {
@@ -25,6 +26,7 @@ public class DeleteDocumentUseCase {
             var document = documentOptional.get();
             if (document.isDeleted()) {
                 // Đã xóa trước đó — trả về thành công (idempotent)
+                documentSearchService.delete(documentId);
                 documentCacheService.evict(documentId);
                 documentCacheService.evictAllListCaches();
                 return Result.success(documentId);
@@ -33,6 +35,7 @@ public class DeleteDocumentUseCase {
             // TODO: Replace random UUID with authenticated user ID when user context is available.
             document.markAsDeleted(UUID.randomUUID());
             var saved = documentRepository.save(document);
+            documentSearchService.delete(saved.getId());
             documentCacheService.evict(saved.getId());
             documentCacheService.evictAllListCaches();
 

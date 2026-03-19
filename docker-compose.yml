@@ -68,12 +68,29 @@ services:
     networks:
       - td-network
 
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.2
+    container_name: td-elasticsearch
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - td-network
+
 volumes:
   keycloak_postgres_data:
     driver: local
   app_postgres_data:
     driver: local
   redis_data:
+    driver: local
+  elasticsearch_data:
     driver: local
 
 networks:

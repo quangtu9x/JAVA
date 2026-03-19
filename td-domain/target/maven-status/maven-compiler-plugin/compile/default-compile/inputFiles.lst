@@ -5,6 +5,7 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Repository.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\documents\BusinessDocument.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableBaseEntity.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\template\department\domain\Department.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AbstractEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DomainEvent.java

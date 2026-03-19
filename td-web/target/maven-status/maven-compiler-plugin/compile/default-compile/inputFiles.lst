@@ -2,6 +2,7 @@ d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\Workf
 d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\TdWebApiApplication.java
 d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\v1\DocumentsController.java
 d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\BaseController.java
+d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\template\department\web\DepartmentsController.java
 d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\NormalizeStringDeserializer.java
 d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\StringNormalizationConfig.java
 d:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\SwaggerUiController.java
