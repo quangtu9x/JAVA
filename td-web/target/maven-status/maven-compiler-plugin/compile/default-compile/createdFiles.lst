@@ -5,7 +5,11 @@ com\td\web\config\StringNormalizationConfig$StringNormalizationAdvice.class
 com\td\web\controllers\v1\DocumentsController.class
 com\td\web\controllers\v1\WorkflowsController.class
 com\td\web\config\OpenApiConfig.class
+com\td\web\controllers\v1\SharedCorePermissionsController.class
+com\td\web\controllers\v1\SharedCoreUsersController.class
+com\td\web\controllers\v1\SharedCoreOrganizationsController.class
 com\td\web\config\NormalizeStringDeserializer.class
+com\td\web\controllers\v1\SharedCoreRolesController.class
 com\td\web\config\StringNormalizationConfig$StringNormalizationAdvice$1.class
 com\td\web\config\GlobalExceptionHandler.class
 com\td\web\TdWebApiApplication.class

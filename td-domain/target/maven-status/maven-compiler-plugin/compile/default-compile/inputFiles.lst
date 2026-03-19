@@ -3,10 +3,16 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\BaseEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DefaultAuditableEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Repository.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\Organization.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\UserRoleAssignment.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\documents\BusinessDocument.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\AppUser.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableBaseEntity.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\AppPermission.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\template\department\domain\Department.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AuditableEntity.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\RolePermission.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\AppRole.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AbstractEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DomainEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Entity.java
@@ -15,3 +21,4 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityUpdatedEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\IAggregateRoot.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityCreatedEvent.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\sharedcore\UserDataScope.java

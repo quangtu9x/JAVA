@@ -8,6 +8,7 @@ com\td\application\documents\CreateDocumentUseCase.class
 com\td\application\documents\DocumentDto.class
 com\td\application\documents\UploadFileRequest$UploadFileRequestBuilder.class
 com\td\application\documents\FileDto$FileDtoBuilder.class
+com\td\application\sharedcore\OrganizationDtoMapper.class
 com\td\application\documents\DocumentSearchStatusDto$DocumentSearchStatusDtoBuilder.class
 com\td\application\documents\UploadFileRequest.class
 com\td\application\common\TextNormalizer.class
@@ -56,11 +57,14 @@ com\td\application\documents\UploadFileUseCase.class
 com\td\application\workflows\CreateWorkflowDefinitionRequest.class
 com\td\application\documents\DownloadFileRequest.class
 com\td\application\documents\SearchDocumentsUseCase.class
+com\td\application\sharedcore\OrganizationRepository.class
 com\td\application\common\cqrs\CommandHandler.class
+com\td\application\sharedcore\GetOrganizationUseCase.class
 com\td\application\documents\DocumentCacheStatsDto.class
 com\td\application\documents\SimpleFileDto$SimpleFileDtoBuilder.class
 com\td\application\workflows\WorkflowTransitionRequest.class
 com\td\application\common\cqrs\UseCase.class
+com\td\application\sharedcore\OrganizationDto.class
 com\td\application\common\cqrs\Command.class
 com\td\application\documents\DocumentFieldLayout.class
 com\td\application\common\models\Result.class
