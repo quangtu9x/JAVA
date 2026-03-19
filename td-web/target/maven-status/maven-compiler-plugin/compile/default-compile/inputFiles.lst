@@ -5,3 +5,4 @@ D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\BaseCont
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\controllers\SwaggerUiController.java
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\GlobalExceptionHandler.java
 D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\OpenApiConfig.java
+D:\TD.WebAPI\td-webapi-java\td-web\src\main\java\com\td\web\config\RedisCacheConfig.java

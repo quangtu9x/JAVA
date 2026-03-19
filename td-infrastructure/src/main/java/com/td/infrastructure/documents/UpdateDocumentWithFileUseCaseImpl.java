@@ -1,6 +1,7 @@
 package com.td.infrastructure.documents;
 
 import com.td.application.common.models.Result;
+import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.UpdateDocumentWithFileUseCase;
 import com.td.application.documents.UpdateDocumentWithFileRequest;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,8 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class UpdateDocumentWithFileUseCaseImpl implements UpdateDocumentWithFileUseCase {
+
+    private final DocumentCacheService documentCacheService;
 
     @Override
     public Result<UUID> execute(UpdateDocumentWithFileRequest request) {
@@ -24,6 +27,8 @@ public class UpdateDocumentWithFileUseCaseImpl implements UpdateDocumentWithFile
         //    d. Save file metadata to database
         // 4. Mark document as updated
         // 5. Record audit event
+        documentCacheService.evict(request.getDocumentId());
+        documentCacheService.evictAllListCaches();
         return Result.success(request.getDocumentId());
     }
 }

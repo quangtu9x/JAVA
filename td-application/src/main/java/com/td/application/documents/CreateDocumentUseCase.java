@@ -14,6 +14,7 @@ import java.util.UUID;
 public class CreateDocumentUseCase {
 
     private final DocumentRepository documentRepository;
+    private final DocumentCacheService documentCacheService;
 
     public Result<UUID> execute(CreateDocumentRequest request) {
         try {
@@ -28,6 +29,7 @@ public class CreateDocumentUseCase {
             );
 
             var saved = documentRepository.save(document);
+            documentCacheService.evictAllListCaches();
             return Result.success(saved.getId());
         } catch (Exception ex) {
             return Result.failure("Tạo tài liệu thất bại: " + ex.getMessage());

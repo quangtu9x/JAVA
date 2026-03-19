@@ -1,10 +1,14 @@
 package com.td.web.controllers.v1;
 
+import com.td.application.common.models.CachedPaginationResponse;
+import com.td.application.common.models.CachedResult;
 import com.td.application.common.models.PaginationResponse;
 import com.td.application.common.models.Result;
 import com.td.application.documents.CreateDocumentRequest;
 import com.td.application.documents.CreateDocumentUseCase;
 import com.td.application.documents.DeleteDocumentUseCase;
+import com.td.application.documents.DocumentCacheService;
+import com.td.application.documents.DocumentCacheStatsDto;
 import com.td.application.documents.DocumentDetailWithFilesDto;
 import com.td.application.documents.DocumentDto;
 import com.td.application.documents.DocumentXemChiTietDto;
@@ -76,6 +80,7 @@ public class DocumentsController extends BaseController {
     private final DeleteFileUseCase deleteFileUseCase;
     private final UpdateDocumentWithFileUseCase updateDocumentWithFileUseCase;
     private final MinioService minioService;
+    private final DocumentCacheService documentCacheService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
@@ -88,7 +93,9 @@ public class DocumentsController extends BaseController {
             @RequestParam(name = "sortDirection", defaultValue = "desc") String sortDirection,
             @RequestParam(name = "keyword", required = false) String keyword,
             @RequestParam(name = "documentType", required = false) String documentType,
-            @RequestParam(name = "status", required = false) String status) {
+            @RequestParam(name = "status", required = false) String status,
+            @Parameter(description = "Bật/tắt cache. Khi false, luôn lấy dữ liệu mới từ DB và cập nhật lại cache")
+            @RequestParam(name = "useCache", defaultValue = "true") boolean useCache) {
         var request = new SearchDocumentsRequest();
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
@@ -98,17 +105,45 @@ public class DocumentsController extends BaseController {
         request.setDocumentType(documentType);
         request.setStatus(status);
 
-        var response = searchDocumentsUseCase.execute(request);
-        return ok(enrichDocumentsWithFiles(response));
+        if (useCache) {
+            var cachedResponse = documentCacheService.getList(request);
+            if (cachedResponse != null) {
+                return ResponseEntity.ok()
+                    .header("X-Cache", "HIT")
+                    .body(new CachedPaginationResponse<>(cachedResponse, documentCacheService.getListCacheKey(request)));
+            }
+        }
+
+        var response = enrichDocumentsWithFiles(searchDocumentsUseCase.execute(request));
+        documentCacheService.putList(request, response);
+        return ResponseEntity.ok()
+            .header("X-Cache", "MISS")
+            .body(response);
+    }
+
+    @GetMapping("/cache/stats")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Thống kê cache document",
+        description = "Theo dõi hit, miss, put và evict của cache document chi tiết và danh sách")
+    public ResponseEntity<Result<DocumentCacheStatsDto>> getDocumentCacheStats() {
+        return ok(Result.success(documentCacheService.getStats()));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Xem chi tiết tài liệu")
         public ResponseEntity<Result<DocumentDto>> getDocument(
-                @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
+                @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
+                @Parameter(description = "Bật/tắt cache. Khi false, luôn lấy dữ liệu mới từ DB và cập nhật lại cache")
+                @RequestParam(name = "useCache", defaultValue = "true") boolean useCache) {
+        boolean cached = useCache && documentCacheService.isCachedById(id);
+        if (!useCache) {
+            documentCacheService.evict(id);
+        }
         var result = getDocumentUseCase.execute(new GetDocumentRequest(id));
-        return ok(result);
+        return ResponseEntity.ok()
+            .header("X-Cache", cached ? "HIT" : "MISS")
+            .body(cached ? new CachedResult<>(result, documentCacheService.getDocumentCacheKey(id)) : result);
     }
 
             @GetMapping("/{id}/with-files")
@@ -178,9 +213,23 @@ public class DocumentsController extends BaseController {
     @Operation(summary = "Tìm kiếm tài liệu theo bộ lọc",
         description = "Trả về danh sách tài liệu theo bộ lọc, mỗi tài liệu có thêm trường files")
     public ResponseEntity<PaginationResponse<DocumentDto>> searchDocuments(
-            @Valid @RequestBody SearchDocumentsRequest request) {
-        var response = searchDocumentsUseCase.execute(request);
-        return ok(enrichDocumentsWithFiles(response));
+            @Valid @RequestBody SearchDocumentsRequest request,
+            @Parameter(description = "Bật/tắt cache. Khi false, luôn lấy dữ liệu mới từ DB và cập nhật lại cache")
+            @RequestParam(name = "useCache", defaultValue = "true") boolean useCache) {
+        if (useCache) {
+            var cachedResponse = documentCacheService.getList(request);
+            if (cachedResponse != null) {
+                return ResponseEntity.ok()
+                    .header("X-Cache", "HIT")
+                    .body(new CachedPaginationResponse<>(cachedResponse, documentCacheService.getListCacheKey(request)));
+            }
+        }
+
+        var response = enrichDocumentsWithFiles(searchDocumentsUseCase.execute(request));
+        documentCacheService.putList(request, response);
+        return ResponseEntity.ok()
+            .header("X-Cache", "MISS")
+            .body(response);
     }
 
     private PaginationResponse<DocumentDto> enrichDocumentsWithFiles(PaginationResponse<DocumentDto> response) {

@@ -57,10 +57,23 @@ services:
     networks:
       - td-network
 
+  redis:
+    image: redis:7-alpine
+    container_name: td-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - td-network
+
 volumes:
   keycloak_postgres_data:
     driver: local
   app_postgres_data:
+    driver: local
+  redis_data:
     driver: local
 
 networks:

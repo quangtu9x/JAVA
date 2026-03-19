@@ -1,6 +1,7 @@
 package com.td.application.documents;
 
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
+import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
@@ -34,5 +35,13 @@ public class DocumentDto {
     @JsonAnyGetter
     public Map<String, Object> extraFieldsForResponse() {
         return extraFields == null ? Collections.emptyMap() : extraFields;
+    }
+
+    @JsonAnySetter
+    public void addExtraField(String key, Object value) {
+        if (extraFields == null) {
+            extraFields = new LinkedHashMap<>();
+        }
+        extraFields.put(key, value);
     }
 }

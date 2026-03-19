@@ -1,9 +1,13 @@
+com\td\application\common\models\CachedResult.class
+com\td\application\documents\DocumentCacheStatsDto$DocumentCacheStatsDtoBuilder.class
 com\td\application\documents\GetDeletedDocumentsUseCase.class
 com\td\application\workflows\WorkflowHistoryDto.class
 com\td\application\documents\DeleteDocumentUseCase.class
+com\td\application\documents\DocumentCacheService.class
 com\td\application\documents\DocumentJsonMapper$1.class
 com\td\application\workflows\WorkflowStepRequest.class
 com\td\application\documents\DeleteFileRequest.class
+com\td\application\documents\DocumentListCacheEntry$DocumentListCacheEntryBuilder.class
 com\td\application\workflows\WorkflowDefinitionFacade.class
 com\td\application\documents\CreateDocumentUseCase.class
 com\td\application\workflows\WorkflowCancelRequest.class
@@ -20,6 +24,7 @@ com\td\application\documents\SearchDocumentsUseCase.class
 com\td\application\documents\UploadFileRequest$UploadFileRequestBuilder.class
 com\td\application\common\cqrs\CommandHandler.class
 com\td\application\documents\FileDto$FileDtoBuilder.class
+com\td\application\documents\DocumentCacheStatsDto.class
 com\td\application\documents\SimpleFileDto$SimpleFileDtoBuilder.class
 com\td\application\documents\UploadFileRequest.class
 com\td\application\workflows\WorkflowTransitionRequest.class
@@ -35,6 +40,7 @@ com\td\application\workflows\WorkflowActionRequest.class
 com\td\application\common\models\Result.class
 com\td\application\documents\DocumentDetailWithFilesDto$DocumentDetailWithFilesDtoBuilder.class
 com\td\application\workflows\WorkflowTaskDto.class
+com\td\application\common\models\CachedPaginationResponse.class
 com\td\application\common\models\PaginationResponse.class
 com\td\application\documents\UpdateDocumentWithFileRequest.class
 com\td\application\documents\GetDocumentRequest.class
@@ -59,6 +65,7 @@ com\td\application\workflows\WorkflowStepDto.class
 com\td\application\workflows\WorkflowTransitionDto.class
 com\td\application\documents\CreateDocumentRequest.class
 com\td\application\documents\DocumentJsonMapper.class
+com\td\application\documents\DocumentListCacheEntry.class
 com\td\application\common\cqrs\Query.class
 com\td\application\documents\UpdateDocumentWithFileUseCase.class
 com\td\application\documents\HardDeleteDocumentUseCase.class

@@ -1,3 +1,4 @@
+com\td\web\config\RedisCacheConfig.class
 com\td\web\config\OpenApiConfig.class
 com\td\web\controllers\BaseController.class
 com\td\web\config\GlobalExceptionHandler.class

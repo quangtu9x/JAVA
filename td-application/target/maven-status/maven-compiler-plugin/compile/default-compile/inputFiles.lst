@@ -1,8 +1,11 @@
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\UpdateDocumentWithFileUseCase.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentCacheService.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DeleteFileRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowInstanceDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentDtoMapper.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\models\CachedPaginationResponse.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\cqrs\UseCase.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentListCacheEntry.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowRuntimeFacade.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowActionRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowStepDto.java
@@ -27,6 +30,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\comm
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\GetDocumentUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\UpdateWorkflowDefinitionRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\SearchDocumentsRequest.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\models\CachedResult.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentDetailWithFilesDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\ListDocumentFilesUseCase.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowTransitionDto.java
@@ -52,3 +56,4 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\docu
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\UploadFileRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentRepository.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowDefinitionFacade.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentCacheStatsDto.java

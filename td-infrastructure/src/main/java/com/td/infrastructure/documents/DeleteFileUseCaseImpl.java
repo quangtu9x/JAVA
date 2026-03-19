@@ -1,6 +1,7 @@
 package com.td.infrastructure.documents;
 
 import com.td.application.common.models.Result;
+import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DeleteFileRequest;
 import com.td.application.documents.DeleteFileUseCase;
 import com.td.infrastructure.config.MinioService;
@@ -20,6 +21,7 @@ public class DeleteFileUseCaseImpl implements DeleteFileUseCase {
 
     private final FileMetadataJpaRepository fileMetadataRepo;
     private final MinioService minioService;
+    private final DocumentCacheService documentCacheService;
 
     @Override
     public Result<UUID> execute(DeleteFileRequest request) {
@@ -31,6 +33,7 @@ public class DeleteFileUseCaseImpl implements DeleteFileUseCase {
         FileMetadataEntity entity = opt.get();
         minioService.removeObject(entity.getFilePath());
         fileMetadataRepo.delete(entity);
+        documentCacheService.evictAllListCaches();
         log.info("Deleted file {} from document {}", request.getFileId(), request.getDocumentId());
         return Result.success(request.getFileId());
     }

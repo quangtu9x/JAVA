@@ -15,6 +15,7 @@ import java.util.UUID;
 public class UpdateDocumentUseCase {
 
     private final DocumentRepository documentRepository;
+    private final DocumentCacheService documentCacheService;
 
     public Result<UUID> execute(UpdateDocumentRequest request) {
         try {
@@ -97,6 +98,8 @@ public class UpdateDocumentUseCase {
             );
 
             var saved = documentRepository.save(document);
+            documentCacheService.evict(saved.getId());
+            documentCacheService.evictAllListCaches();
             return Result.success(saved.getId());
         } catch (Exception ex) {
             return Result.failure("Cập nhật tài liệu thất bại: " + ex.getMessage());

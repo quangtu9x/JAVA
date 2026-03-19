@@ -13,6 +13,7 @@ import java.util.UUID;
 public class HardDeleteDocumentUseCase {
 
     private final DocumentRepository documentRepository;
+    private final DocumentCacheService documentCacheService;
 
     public Result<UUID> execute(UUID documentId) {
         try {
@@ -22,6 +23,8 @@ public class HardDeleteDocumentUseCase {
             }
 
             documentRepository.hardDelete(documentOptional.get());
+            documentCacheService.evict(documentId);
+            documentCacheService.evictAllListCaches();
             return Result.success(documentId);
         } catch (Exception ex) {
             return Result.failure("Xóa vĩnh viễn tài liệu thất bại: " + ex.getMessage());

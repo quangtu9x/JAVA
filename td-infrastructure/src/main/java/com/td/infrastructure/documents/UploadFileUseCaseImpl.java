@@ -1,6 +1,7 @@
 package com.td.infrastructure.documents;
 
 import com.td.application.common.models.Result;
+import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.UploadFileRequest;
 import com.td.application.documents.UploadFileUseCase;
 import com.td.infrastructure.config.MinioService;
@@ -20,6 +21,7 @@ public class UploadFileUseCaseImpl implements UploadFileUseCase {
 
     private final MinioService minioService;
     private final FileMetadataJpaRepository fileMetadataRepo;
+    private final DocumentCacheService documentCacheService;
 
     @Override
     public Result<UUID> execute(UploadFileRequest request) {
@@ -49,6 +51,7 @@ public class UploadFileUseCaseImpl implements UploadFileUseCase {
                 .build();
 
         fileMetadataRepo.save(entity);
+        documentCacheService.evictAllListCaches();
         log.info("Uploaded file {} for document {}", fileId, request.getDocumentId());
         return Result.success(fileId);
     }
