@@ -10,6 +10,7 @@ com\td\infrastructure\documents\UpdateDocumentWithFileUseCaseImpl.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport$1.class
 com\td\infrastructure\security\KeycloakJwtConverter.class
 com\td\infrastructure\config\MinIOConfig.class
+com\td\infrastructure\persistence\repository\PostgresCategoryRepository.class
 com\td\infrastructure\documents\UploadFileUseCaseImpl.class
 com\td\infrastructure\security\KeycloakProperties.class
 com\td\infrastructure\security\SecurityConfig.class
@@ -20,6 +21,7 @@ com\td\infrastructure\documents\DeleteFileUseCaseImpl.class
 com\td\infrastructure\documents\ListDocumentFilesUseCaseImpl.class
 com\td\infrastructure\persistence\entity\FileMetadataEntity.class
 com\td\infrastructure\documents\GetFileUseCaseImpl.class
+com\td\infrastructure\persistence\repository\CategoryJpaRepository.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport.class
 com\td\infrastructure\persistence\repository\FileMetadataJpaRepository.class
 com\td\infrastructure\config\DatabaseConfig$Hikari.class

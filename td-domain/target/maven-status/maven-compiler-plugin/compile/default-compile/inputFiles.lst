@@ -9,6 +9,7 @@ D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contrac
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\AbstractEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\DomainEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\Entity.java
+D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\categories\Category.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\IAuditableEntity.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\events\EntityUpdatedEvent.java
 D:\TD.WebAPI\td-webapi-java\td-domain\src\main\java\com\td\domain\common\contracts\IAggregateRoot.java

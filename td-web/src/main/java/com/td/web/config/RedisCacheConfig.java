@@ -1,5 +1,6 @@
 package com.td.web.config;
 
+import com.td.application.categories.CategoryCacheService;
 import com.td.application.documents.DocumentCacheService;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,6 +44,14 @@ public class RedisCacheConfig {
         );
         cacheConfigurations.put(
             DocumentCacheService.DOCUMENT_LIST_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(10))
+        );
+        cacheConfigurations.put(
+            CategoryCacheService.CATEGORY_BY_ID_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(60))
+        );
+        cacheConfigurations.put(
+            CategoryCacheService.CATEGORY_LIST_CACHE,
             defaultConfig.entryTtl(Duration.ofMinutes(10))
         );
 
