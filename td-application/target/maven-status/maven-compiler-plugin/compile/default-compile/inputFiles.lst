@@ -11,6 +11,7 @@ D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\work
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowStepDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\DocumentXemChiTietDto.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\cqrs\CommandHandler.java
+D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\common\TextNormalizer.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowPageRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\workflows\WorkflowTransitionRequest.java
 D:\TD.WebAPI\td-webapi-java\td-application\src\main\java\com\td\application\documents\GetDocumentRequest.java

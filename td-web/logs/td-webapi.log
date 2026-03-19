@@ -162,3 +162,132 @@
 2026-03-19 08:30:05.017 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
 2026-03-19 08:30:05.090 [http-nio-8080-exec-1] WARN  o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/api/v1/documents' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
 2026-03-19 08:33:37.941 [http-nio-8080-exec-4] INFO  o.s.api.AbstractOpenApiResource - Init duration for springdoc-openapi is: 292 ms
+2026-03-19 09:03:27.270 [main] INFO  com.td.web.TdWebApiApplication - Starting TdWebApiApplication using Java 25.0.1 with PID 28896 (D:\TD.WebAPI\td-webapi-java\td-web\target\classes started by Admin in D:\TD.WebAPI\td-webapi-java\td-web)
+2026-03-19 09:03:27.271 [main] INFO  com.td.web.TdWebApiApplication - The following 1 profile is active: "dev"
+2026-03-19 09:03:27.731 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-03-19 09:03:27.731 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-03-19 09:03:27.813 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 78 ms. Found 2 JPA repository interfaces.
+2026-03-19 09:03:28.064 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-03-19 09:03:28.065 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-03-19 09:03:28.077 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 7 ms. Found 0 Redis repository interfaces.
+2026-03-19 09:03:28.657 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-03-19 09:03:28.663 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-03-19 09:03:28.663 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2026-03-19 09:03:28.708 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-03-19 09:03:28.709 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1405 ms
+2026-03-19 09:03:28.912 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-03-19 09:03:29.002 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@57839834
+2026-03-19 09:03:29.003 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-03-19 09:03:29.049 [main] INFO  o.f.c.i.license.VersionPrinter - Flyway Community Edition 9.22.3 by Redgate
+2026-03-19 09:03:29.049 [main] INFO  o.f.c.i.license.VersionPrinter - See release notes here: https://rd.gt/416ObMi
+2026-03-19 09:03:29.049 [main] INFO  o.f.c.i.license.VersionPrinter - 
+2026-03-19 09:03:29.058 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://localhost:5432/tdwebapi (PostgreSQL 15.17)
+2026-03-19 09:03:29.092 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 6 migrations (execution time 00:00.018s)
+2026-03-19 09:03:29.120 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.6
+2026-03-19 09:03:29.123 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-03-19 09:03:29.209 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-03-19 09:03:29.236 [main] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.3.1.Final
+2026-03-19 09:03:29.255 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-03-19 09:03:29.408 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-03-19 09:03:29.434 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-03-19 09:03:29.927 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-03-19 09:03:29.937 [main] INFO  o.hibernate.orm.connections.access - HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@5c04685] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2026-03-19 09:03:29.961 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-03-19 09:03:30.164 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-03-19 09:03:31.310 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-03-19 09:03:31.404 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@75b45343, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@553fdf58, org.springframework.security.web.context.SecurityContextHolderFilter@3f0cdd5b, org.springframework.security.web.header.HeaderWriterFilter@42d060f1, org.springframework.web.filter.CorsFilter@3a9d88ca, org.springframework.security.web.authentication.logout.LogoutFilter@34fa61ad, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter@20865ff2, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@4bea0314, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@21624bde, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4468fdae, org.springframework.security.web.session.SessionManagementFilter@33b92d63, org.springframework.security.web.access.ExceptionTranslationFilter@3e5a40e7, org.springframework.security.web.access.intercept.AuthorizationFilter@1bf5745]
+2026-03-19 09:03:31.979 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-03-19 09:03:31.986 [main] INFO  com.td.web.TdWebApiApplication - Started TdWebApiApplication in 5.036 seconds (process running for 5.279)
+2026-03-19 09:03:33.854 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-03-19 09:03:33.855 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-03-19 09:03:33.856 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-03-19 09:03:33.878 [http-nio-8080-exec-1] WARN  o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/favicon.ico' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
+2026-03-19 09:03:59.518 [main] INFO  com.td.web.TdWebApiApplication - Starting TdWebApiApplication using Java 25.0.1 with PID 29424 (D:\TD.WebAPI\td-webapi-java\td-web\target\classes started by Admin in D:\TD.WebAPI\td-webapi-java\td-web)
+2026-03-19 09:03:59.519 [main] INFO  com.td.web.TdWebApiApplication - The following 1 profile is active: "dev"
+2026-03-19 09:03:59.986 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-03-19 09:03:59.987 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-03-19 09:04:00.065 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 75 ms. Found 2 JPA repository interfaces.
+2026-03-19 09:04:00.298 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-03-19 09:04:00.299 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-03-19 09:04:00.312 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 7 ms. Found 0 Redis repository interfaces.
+2026-03-19 09:04:00.872 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-03-19 09:04:00.878 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-03-19 09:04:00.878 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2026-03-19 09:04:00.921 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-03-19 09:04:00.922 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1366 ms
+2026-03-19 09:04:01.116 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-03-19 09:04:01.203 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@35f01759
+2026-03-19 09:04:01.204 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-03-19 09:04:01.250 [main] INFO  o.f.c.i.license.VersionPrinter - Flyway Community Edition 9.22.3 by Redgate
+2026-03-19 09:04:01.250 [main] INFO  o.f.c.i.license.VersionPrinter - See release notes here: https://rd.gt/416ObMi
+2026-03-19 09:04:01.250 [main] INFO  o.f.c.i.license.VersionPrinter - 
+2026-03-19 09:04:01.260 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://localhost:5432/tdwebapi (PostgreSQL 15.17)
+2026-03-19 09:04:01.292 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 6 migrations (execution time 00:00.018s)
+2026-03-19 09:04:01.320 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.6
+2026-03-19 09:04:01.322 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-03-19 09:04:01.390 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-03-19 09:04:01.416 [main] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.3.1.Final
+2026-03-19 09:04:01.435 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-03-19 09:04:01.572 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-03-19 09:04:01.602 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-03-19 09:04:02.122 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-03-19 09:04:02.133 [main] INFO  o.hibernate.orm.connections.access - HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@4446e1d9] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2026-03-19 09:04:02.158 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-03-19 09:04:02.360 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-03-19 09:04:03.456 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-03-19 09:04:03.577 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@4c68550d, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@31cced7, org.springframework.security.web.context.SecurityContextHolderFilter@6c32da37, org.springframework.security.web.header.HeaderWriterFilter@4f944ff5, org.springframework.web.filter.CorsFilter@2928c493, org.springframework.security.web.authentication.logout.LogoutFilter@915ac5c, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter@1391802b, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@7bd804ed, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@1e418480, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@29843829, org.springframework.security.web.session.SessionManagementFilter@70382eb1, org.springframework.security.web.access.ExceptionTranslationFilter@5a22eec0, org.springframework.security.web.access.intercept.AuthorizationFilter@2aa43751]
+2026-03-19 09:04:04.126 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-03-19 09:04:04.134 [main] INFO  com.td.web.TdWebApiApplication - Started TdWebApiApplication in 4.914 seconds (process running for 5.158)
+2026-03-19 09:05:14.371 [main] INFO  com.td.web.TdWebApiApplication - Starting TdWebApiApplication using Java 25.0.1 with PID 23852 (D:\TD.WebAPI\td-webapi-java\td-web\target\classes started by Admin in D:\TD.WebAPI\td-webapi-java\td-web)
+2026-03-19 09:05:14.372 [main] INFO  com.td.web.TdWebApiApplication - The following 1 profile is active: "dev"
+2026-03-19 09:05:14.822 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-03-19 09:05:14.822 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-03-19 09:05:14.894 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 68 ms. Found 2 JPA repository interfaces.
+2026-03-19 09:05:15.146 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-03-19 09:05:15.147 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-03-19 09:05:15.160 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 9 ms. Found 0 Redis repository interfaces.
+2026-03-19 09:05:15.707 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-03-19 09:05:15.713 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-03-19 09:05:15.713 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2026-03-19 09:05:15.755 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-03-19 09:05:15.756 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 1352 ms
+2026-03-19 09:05:15.943 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-03-19 09:05:16.032 [main] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@2cff5aa3
+2026-03-19 09:05:16.032 [main] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-03-19 09:05:16.078 [main] INFO  o.f.c.i.license.VersionPrinter - Flyway Community Edition 9.22.3 by Redgate
+2026-03-19 09:05:16.078 [main] INFO  o.f.c.i.license.VersionPrinter - See release notes here: https://rd.gt/416ObMi
+2026-03-19 09:05:16.078 [main] INFO  o.f.c.i.license.VersionPrinter - 
+2026-03-19 09:05:16.088 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://localhost:5432/tdwebapi (PostgreSQL 15.17)
+2026-03-19 09:05:16.119 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 6 migrations (execution time 00:00.017s)
+2026-03-19 09:05:16.146 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.6
+2026-03-19 09:05:16.148 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-03-19 09:05:16.216 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-03-19 09:05:16.242 [main] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.3.1.Final
+2026-03-19 09:05:16.261 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-03-19 09:05:16.403 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-03-19 09:05:16.430 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-03-19 09:05:16.916 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-03-19 09:05:16.927 [main] INFO  o.hibernate.orm.connections.access - HHH10001501: Connection obtained from JdbcConnectionAccess [org.hibernate.engine.jdbc.env.internal.JdbcEnvironmentInitiator$ConnectionProviderJdbcConnectionAccess@1aee0f49] for (non-JTA) DDL execution was not in auto-commit mode; the Connection 'local transaction' will be committed and the Connection will be set into auto-commit mode.
+2026-03-19 09:05:16.951 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-03-19 09:05:17.148 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-03-19 09:05:18.266 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-03-19 09:05:18.374 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@5910aa2e, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@6a68754, org.springframework.security.web.context.SecurityContextHolderFilter@1e418480, org.springframework.security.web.header.HeaderWriterFilter@69339b3b, org.springframework.web.filter.CorsFilter@63a1bee7, org.springframework.security.web.authentication.logout.LogoutFilter@27946cee, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter@42c5d861, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@772dfe03, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@2b465e1a, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@5b751bab, org.springframework.security.web.session.SessionManagementFilter@523198f0, org.springframework.security.web.access.ExceptionTranslationFilter@4f944ff5, org.springframework.security.web.access.intercept.AuthorizationFilter@564519de]
+2026-03-19 09:05:18.974 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path ''
+2026-03-19 09:05:18.981 [main] INFO  com.td.web.TdWebApiApplication - Started TdWebApiApplication in 4.901 seconds (process running for 5.147)
+2026-03-19 09:05:54.357 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-03-19 09:05:54.357 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-03-19 09:05:54.358 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 1 ms
+2026-03-19 09:05:54.375 [http-nio-8080-exec-1] WARN  o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/actuator/health' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
+2026-03-19 09:09:48.892 [http-nio-8080-exec-5] INFO  o.a.coyote.http11.Http11Processor - Error parsing HTTP request header
+ Note: further occurrences of HTTP request parsing errors will be logged at DEBUG level.
+java.lang.IllegalArgumentException: Invalid character found in the HTTP protocol [RTSP/1.00x0d0x0a0x0d0x0a...]
+	at org.apache.coyote.http11.Http11InputBuffer.parseRequestLine(Http11InputBuffer.java:558)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:264)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:896)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1744)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1191)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+	at java.base/java.lang.Thread.run(Thread.java:1474)

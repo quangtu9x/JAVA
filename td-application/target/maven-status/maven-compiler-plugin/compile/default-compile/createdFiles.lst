@@ -28,6 +28,7 @@ com\td\application\documents\DocumentCacheStatsDto.class
 com\td\application\documents\SimpleFileDto$SimpleFileDtoBuilder.class
 com\td\application\documents\UploadFileRequest.class
 com\td\application\workflows\WorkflowTransitionRequest.class
+com\td\application\common\TextNormalizer.class
 com\td\application\documents\SimpleFileDto.class
 com\td\application\common\cqrs\UseCase.class
 com\td\application\documents\GetFileUseCase.class
