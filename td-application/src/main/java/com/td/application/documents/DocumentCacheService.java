@@ -23,8 +23,8 @@ import java.util.concurrent.atomic.LongAdder;
 @Slf4j
 public class DocumentCacheService {
 
-    public static final String DOCUMENT_BY_ID_CACHE = "documents:by-id";
-    public static final String DOCUMENT_LIST_CACHE = "documents:list";
+    public static final String DOCUMENT_BY_ID_CACHE = "doc:";
+    public static final String DOCUMENT_LIST_CACHE = "docs:";
 
     private final CacheManager cacheManager;
     private final ObjectMapper cacheKeyObjectMapper = buildCacheKeyObjectMapper();
