@@ -31,7 +31,7 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
     @Column(name = "parent_id")
     private UUID parentId;
 
-    @Column(name = "node_type", nullable = false, length = 30)
+    @Column(name = "form", nullable = false, length = 30)
     private String nodeType = "agency_level";
 
     @Column(name = "level", nullable = false)

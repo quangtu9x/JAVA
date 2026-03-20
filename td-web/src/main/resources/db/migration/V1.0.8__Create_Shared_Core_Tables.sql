@@ -6,6 +6,7 @@ CREATE TABLE organizations (
     name             VARCHAR(300) NOT NULL,
     description      TEXT,
     parent_id        UUID         REFERENCES organizations(id),
+    form             VARCHAR(30)  NOT NULL DEFAULT 'agency_level',
     level            INT          NOT NULL DEFAULT 0,
     full_path        TEXT         NOT NULL,
     sort_order       INT          NOT NULL DEFAULT 0,
