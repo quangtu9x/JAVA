@@ -17,6 +17,9 @@ public class UpdateCategoryRequest {
 
     private String description;
 
+    @Size(max = 100, message = "Form tối đa 100 ký tự")
+    private String form;
+
     /**
      * Cờ nội bộ - true khi FE đã truyền parentId vào body.
      * Nếu false: giữ nguyên parent hiện tại.

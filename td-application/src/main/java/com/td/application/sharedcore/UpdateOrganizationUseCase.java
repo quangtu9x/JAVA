@@ -26,19 +26,21 @@ public class UpdateOrganizationUseCase {
 
             var current = currentOpt.get();
 
-            String code = request.getCode() != null
-                ? TextNormalizer.normalize(request.getCode()).toUpperCase().replaceAll("\\s+", "_")
+            String identifier = request.getIdentifier() != null
+                ? TextNormalizer.normalize(request.getIdentifier()).toUpperCase().replaceAll("\\s+", "_")
                 : null;
             String name = TextNormalizer.normalizeAndSanitize(request.getName());
-            String description = TextNormalizer.normalizeAndSanitize(request.getDescription());
+            String parentName = TextNormalizer.normalizeAndSanitize(request.getParent());
+            String legacyParentId = request.getParentid() == null ? null : TextNormalizer.normalize(request.getParentid());
 
-            if (code != null && !code.equals(current.getCode())
-                    && organizationRepository.existsByCodeAndIdNotAndDeletedOnIsNull(code, id)) {
-                return Result.failure("Mã tổ chức '" + code + "' đã được sử dụng");
+            if (identifier != null && !identifier.equals(current.getIdentifier())
+                    && organizationRepository.existsByIdentifierAndIdNotAndDeletedOnIsNull(identifier, id)) {
+                return Result.failure("Identifier '" + identifier + "' đã được sử dụng");
             }
 
-            UUID effectiveParentId = request.isUpdateParent()
-                ? request.getParentId()
+            boolean updateParent = request.getParentid() != null;
+            UUID effectiveParentId = updateParent
+                ? parseLegacyUuid(legacyParentId)
                 : current.getParentId();
 
             if (effectiveParentId != null && effectiveParentId.equals(id)) {
@@ -74,6 +76,10 @@ public class UpdateOrganizationUseCase {
                     return Result.failure("Node cha đang bị vô hiệu hóa, không thể gán node con");
                 }
 
+                if (parentName == null || parentName.isBlank()) {
+                    parentName = parent.getName();
+                }
+
                 String parentNodeType = OrganizationHierarchyRules.resolveNodeType(parent);
                 if (!OrganizationHierarchyRules.canBeChild(parentNodeType, effectiveNodeType)) {
                     return Result.failure("Quan hệ cha-con không hợp lệ: parent=" + parentNodeType + ", child=" + effectiveNodeType);
@@ -90,16 +96,34 @@ public class UpdateOrganizationUseCase {
                     + "' có loại " + childType + " không tương thích với cha loại " + effectiveNodeType);
             }
 
+            if (updateParent && effectiveParentId == null) {
+                parentName = "";
+                legacyParentId = "";
+            }
+
             current.update(
-                code,
+                identifier,
                 name,
-                description,
+                null,
                 effectiveParentId,
                 effectiveNodeType,
                 newLevel,
                 newFullPath,
-                request.getSortOrder(),
-                request.getIsActive()
+                request.getSort_order(),
+                request.getIs_active()
+            );
+
+            current.updateLegacyData(
+                request.getSystem(),
+                TextNormalizer.normalize(request.getReceiver_id()),
+                TextNormalizer.normalizeAndSanitize(request.getReceiver()),
+                TextNormalizer.normalizeAndSanitize(request.getReceiver_position()),
+                parentName,
+                legacyParentId,
+                TextNormalizer.normalize(request.getServername()),
+                TextNormalizer.normalize(request.getServer_id()),
+                TextNormalizer.normalize(request.getIpserver()),
+                TextNormalizer.normalize(request.getDbpath())
             );
 
             var saved = organizationRepository.save(current);
@@ -160,6 +184,28 @@ public class UpdateOrganizationUseCase {
 
             Organization savedChild = organizationRepository.save(child);
             refreshDescendants(savedChild);
+        }
+    }
+
+    private UUID parseLegacyUuid(String legacyId) {
+        if (legacyId == null || legacyId.isBlank()) {
+            return null;
+        }
+
+        String normalized = legacyId.trim();
+        try {
+            return UUID.fromString(normalized);
+        } catch (IllegalArgumentException ignored) {
+            String hex = normalized.replace("-", "");
+            if (hex.matches("(?i)[0-9a-f]{32}")) {
+                String uuid = hex.substring(0, 8) + "-"
+                    + hex.substring(8, 12) + "-"
+                    + hex.substring(12, 16) + "-"
+                    + hex.substring(16, 20) + "-"
+                    + hex.substring(20);
+                return UUID.fromString(uuid);
+            }
+            throw new IllegalArgumentException("parentid không đúng định dạng UUID: " + legacyId);
         }
     }
 }

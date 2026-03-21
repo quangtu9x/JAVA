@@ -10,10 +10,10 @@ import java.util.UUID;
 
 public interface OrganizationJpaRepository extends BaseRepository<Organization> {
 
-    boolean existsByCodeAndDeletedOnIsNull(String code);
+    boolean existsByIdentifierAndDeletedOnIsNull(String identifier);
 
-    @Query("SELECT CASE WHEN COUNT(o) > 0 THEN TRUE ELSE FALSE END FROM Organization o WHERE o.code = :code AND o.id <> :id AND o.deletedOn IS NULL")
-    boolean existsByCodeAndIdNotAndDeletedOnIsNull(@Param("code") String code, @Param("id") UUID id);
+    @Query("SELECT CASE WHEN COUNT(o) > 0 THEN TRUE ELSE FALSE END FROM Organization o WHERE o.identifier = :identifier AND o.id <> :id AND o.deletedOn IS NULL")
+    boolean existsByIdentifierAndIdNotAndDeletedOnIsNull(@Param("identifier") String identifier, @Param("id") UUID id);
 
     @Query("SELECT o FROM Organization o WHERE o.id = :id AND o.deletedOn IS NULL")
     Optional<Organization> findByIdAndDeletedOnIsNull(@Param("id") UUID id);

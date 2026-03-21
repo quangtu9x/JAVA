@@ -23,6 +23,7 @@ public class CreateCategoryUseCase {
             String code        = normalizeCode(request.getCode());
             String name        = TextNormalizer.normalizeAndSanitize(request.getName());
             String description = TextNormalizer.normalizeAndSanitize(request.getDescription());
+            String form        = normalizeForm(request.getForm());
 
             // 2. Code phải duy nhất
             if (categoryRepository.existsByCodeAndDeletedOnIsNull(code)) {
@@ -48,7 +49,7 @@ public class CreateCategoryUseCase {
             }
 
             // 4. Lưu
-            var category = new Category(code, name, description, parentId, level, fullPath, request.getSortOrder());
+            var category = new Category(code, name, description, form, parentId, level, fullPath, request.getSortOrder());
             var saved    = categoryRepository.save(category);
 
             // 5. Cache: xóa toàn bộ list cache (dữ liệu cũ lỗi thời)
@@ -64,5 +65,12 @@ public class CreateCategoryUseCase {
     private String normalizeCode(String code) {
         if (code == null) return null;
         return TextNormalizer.normalize(code).toUpperCase().replaceAll("\\s+", "_");
+    }
+
+    private String normalizeForm(String form) {
+        if (form == null || form.isBlank()) {
+            return null;
+        }
+        return TextNormalizer.normalizeAndSanitize(form);
     }
 }

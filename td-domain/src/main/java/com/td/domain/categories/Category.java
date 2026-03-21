@@ -28,6 +28,9 @@ public class Category extends AuditableEntity<UUID> implements IAggregateRoot {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(length = 100)
+    private String form;
+
     @Column(name = "parent_id")
     private UUID parentId;
 
@@ -43,12 +46,13 @@ public class Category extends AuditableEntity<UUID> implements IAggregateRoot {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
-    public Category(String code, String name, String description,
+    public Category(String code, String name, String description, String form,
                     UUID parentId, int level, String fullPath, int sortOrder) {
         this.id = UUID.randomUUID();
         this.code = code;
         this.name = name;
         this.description = description;
+        this.form = form;
         this.parentId = parentId;
         this.level = level;
         this.fullPath = fullPath;
@@ -56,12 +60,13 @@ public class Category extends AuditableEntity<UUID> implements IAggregateRoot {
         this.isActive = true;
     }
 
-    public Category update(String code, String name, String description,
+    public Category update(String code, String name, String description, String form,
                            UUID parentId, int level, String fullPath,
                            Integer sortOrder, Boolean isActive) {
         if (code != null)        this.code = code;
         if (name != null)        this.name = name;
         if (description != null) this.description = description;
+        if (form != null)        this.form = form;
         this.parentId = parentId;
         this.level    = level;
         this.fullPath = fullPath;

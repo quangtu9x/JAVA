@@ -30,6 +30,7 @@ public class UpdateCategoryUseCase {
                 : null;
             String name        = TextNormalizer.normalizeAndSanitize(request.getName());
             String description = TextNormalizer.normalizeAndSanitize(request.getDescription());
+            String form        = normalizeForm(request.getForm());
 
             // Kiểm tra tính duy nhất của code khi có thay đổi
             if (code != null && !code.equals(category.getCode())) {
@@ -63,7 +64,7 @@ public class UpdateCategoryUseCase {
                 newFullPath = parent.getFullPath() + " / " + effectiveName;
             }
 
-            category.update(code, name, description, effectiveParentId,
+            category.update(code, name, description, form, effectiveParentId,
                             newLevel, newFullPath, request.getSortOrder(), request.getIsActive());
 
             var saved = categoryRepository.save(category);
@@ -76,5 +77,12 @@ public class UpdateCategoryUseCase {
         } catch (Exception ex) {
             return Result.failure("Cập nhật danh mục thất bại: " + ex.getMessage());
         }
+    }
+
+    private String normalizeForm(String form) {
+        if (form == null || form.isBlank()) {
+            return null;
+        }
+        return TextNormalizer.normalizeAndSanitize(form);
     }
 }

@@ -30,6 +30,7 @@ D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructur
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\search\DocumentSearchDocument.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\config\DatabaseConfig.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\OrganizationJpaRepository.java
+D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\security\CorsProperties.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\documents\GetFileUseCaseImpl.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\DocumentJpaRepository.java
 D:\TD.WebAPI\td-webapi-java\td-infrastructure\src\main\java\template\department\infrastructure\DepartmentJpaRepository.java

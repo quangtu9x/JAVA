@@ -10,17 +10,24 @@ final class OrganizationDtoMapper {
     static OrganizationDto map(Organization entity) {
         var dto = new OrganizationDto();
         dto.setId(entity.getId());
-        dto.setCode(entity.getCode());
+        dto.setIdentifier(entity.getIdentifier());
         dto.setName(entity.getName());
-        dto.setDescription(entity.getDescription());
-        dto.setParentId(entity.getParentId());
+        dto.setParent(entity.getParent());
+        dto.setParentid(entity.getLegacyParentId());
         dto.setForm(entity.getNodeType());
+        dto.setSystem(entity.getSystem());
+        dto.setReceiver_id(entity.getReceiverId());
+        dto.setReceiver(entity.getReceiver());
+        dto.setReceiver_position(entity.getReceiverPosition());
+        dto.setServername(entity.getServername());
+        dto.setServer_id(entity.getServerId());
+        dto.setIpserver(entity.getIpserver());
+        dto.setDbpath(entity.getDbpath());
         dto.setLevel(entity.getLevel());
-        dto.setFullPath(entity.getFullPath());
-        dto.setSortOrder(entity.getSortOrder());
-        dto.setActive(entity.isActive());
-        dto.setCreatedOn(entity.getCreatedOn());
-        dto.setLastModifiedOn(entity.getLastModifiedOn());
+        dto.setSort_order(entity.getSortOrder());
+        dto.setIs_active(entity.isActive());
+        dto.setCreated_on(entity.getCreatedOn());
+        dto.setLast_modified_on(entity.getLastModifiedOn());
         return dto;
     }
 }

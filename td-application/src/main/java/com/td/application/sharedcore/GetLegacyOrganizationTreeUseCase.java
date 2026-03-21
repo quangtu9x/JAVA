@@ -136,8 +136,8 @@ public class GetLegacyOrganizationTreeUseCase {
 
     private Map<String, String> buildNodeData(Organization organization, String form, NodeContext context) {
         String orgId = organization.getId().toString();
-        String identifier = safe(organization.getCode());
-        String dbPath = "";
+        String identifier = safe(organization.getIdentifier());
+        String dbPath = safe(organization.getDbpath());
 
         Map<String, String> data = new LinkedHashMap<>();
         switch (form) {
@@ -193,7 +193,7 @@ public class GetLegacyOrganizationTreeUseCase {
 
         if ("agency".equals(form)) {
             agencyId = organization.getId().toString();
-            agencyIdentifier = safe(organization.getCode());
+            agencyIdentifier = safe(organization.getIdentifier());
             unitId = null;
         } else if ("unit".equals(form)) {
             unitId = organization.getId().toString();

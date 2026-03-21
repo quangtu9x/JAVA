@@ -72,7 +72,8 @@ public class PostgresCategoryRepository implements CategoryRepository {
             cb.like(cb.lower(root.get("name")),        kw),
             cb.like(cb.lower(root.get("code")),        kw),
             cb.like(cb.lower(root.get("description")), kw),
-            cb.like(cb.lower(root.get("fullPath")),    kw)
+            cb.like(cb.lower(root.get("fullPath")),    kw),
+            cb.like(cb.lower(root.get("form")),        kw)
         );
     }
 

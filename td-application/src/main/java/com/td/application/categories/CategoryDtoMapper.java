@@ -12,6 +12,7 @@ final class CategoryDtoMapper {
         dto.setCode(c.getCode());
         dto.setName(c.getName());
         dto.setDescription(c.getDescription());
+        dto.setForm(c.getForm());
         dto.setParentId(c.getParentId());
         dto.setLevel(c.getLevel());
         dto.setFullPath(c.getFullPath());

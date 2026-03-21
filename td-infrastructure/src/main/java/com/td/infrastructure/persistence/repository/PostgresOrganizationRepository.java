@@ -45,13 +45,13 @@ public class PostgresOrganizationRepository implements OrganizationRepository {
     }
 
     @Override
-    public boolean existsByCodeAndDeletedOnIsNull(String code) {
-        return jpa.existsByCodeAndDeletedOnIsNull(code);
+    public boolean existsByIdentifierAndDeletedOnIsNull(String identifier) {
+        return jpa.existsByIdentifierAndDeletedOnIsNull(identifier);
     }
 
     @Override
-    public boolean existsByCodeAndIdNotAndDeletedOnIsNull(String code, UUID id) {
-        return jpa.existsByCodeAndIdNotAndDeletedOnIsNull(code, id);
+    public boolean existsByIdentifierAndIdNotAndDeletedOnIsNull(String identifier, UUID id) {
+        return jpa.existsByIdentifierAndIdNotAndDeletedOnIsNull(identifier, id);
     }
 
     @Override
@@ -76,7 +76,7 @@ public class PostgresOrganizationRepository implements OrganizationRepository {
         String kw = "%" + req.getKeyword().trim().toLowerCase() + "%";
         return (root, q, cb) -> cb.or(
             cb.like(cb.lower(root.get("name")), kw),
-            cb.like(cb.lower(root.get("code")), kw),
+            cb.like(cb.lower(root.get("identifier")), kw),
             cb.like(cb.lower(root.get("description")), kw),
             cb.like(cb.lower(root.get("fullPath")), kw)
         );

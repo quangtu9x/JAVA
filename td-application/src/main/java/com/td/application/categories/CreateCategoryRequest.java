@@ -19,6 +19,9 @@ public class CreateCategoryRequest {
 
     private String description;
 
+    @Size(max = 100, message = "Form tối đa 100 ký tự")
+    private String form;
+
     /** null = tạo ở cấp gốc */
     private UUID parentId;
 

@@ -15,14 +15,24 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true)
 @RequiredArgsConstructor
 public class SecurityConfig {
+
+    private static final List<String> REQUIRED_PUBLIC_ORIGIN_PATTERNS = List.of(
+        "http://hp.tandan.com.vn",
+        "https://hp.tandan.com.vn",
+        "https://qlvbjava.tandan.com.vn",
+        "https://*.tandan.com.vn"
+    );
 
     private final KeycloakJwtConverter keycloakJwtConverter;
     private final KeycloakProperties keycloakProperties;
@@ -65,13 +75,31 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        List<String> allowedOriginPatterns = new ArrayList<>(corsProperties.getAllowedOriginPatterns());
-        // Keep Keycloak origin allowed by default for token helper flows in Swagger.
-        if (keycloakProperties.getServerUrl() != null && !keycloakProperties.getServerUrl().isBlank()) {
-            allowedOriginPatterns.add(keycloakProperties.getServerUrl());
+        Set<String> allowedOriginPatterns = new LinkedHashSet<>();
+        for (String originPattern : corsProperties.getAllowedOriginPatterns()) {
+            String normalizedOriginPattern = normalizeOriginPattern(originPattern);
+            if (!normalizedOriginPattern.isBlank()) {
+                allowedOriginPatterns.add(normalizedOriginPattern);
+            }
         }
 
-        configuration.setAllowedOriginPatterns(allowedOriginPatterns);
+        // Always keep required public domains allowed even when env vars override defaults.
+        for (String requiredOriginPattern : REQUIRED_PUBLIC_ORIGIN_PATTERNS) {
+            String normalizedRequiredOriginPattern = normalizeOriginPattern(requiredOriginPattern);
+            if (!normalizedRequiredOriginPattern.isBlank()) {
+                allowedOriginPatterns.add(normalizedRequiredOriginPattern);
+            }
+        }
+
+        // Keep Keycloak origin allowed by default for token helper flows in Swagger.
+        if (keycloakProperties.getServerUrl() != null && !keycloakProperties.getServerUrl().isBlank()) {
+            String keycloakOrigin = normalizeOriginPattern(keycloakProperties.getServerUrl());
+            if (!keycloakOrigin.isBlank()) {
+                allowedOriginPatterns.add(keycloakOrigin);
+            }
+        }
+
+        configuration.setAllowedOriginPatterns(new ArrayList<>(allowedOriginPatterns));
         configuration.setAllowedMethods(corsProperties.getAllowedMethods());
         configuration.setAllowedHeaders(corsProperties.getAllowedHeaders());
         configuration.setAllowCredentials(corsProperties.isAllowCredentials());
@@ -80,6 +108,43 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private String normalizeOriginPattern(String originPattern) {
+        if (originPattern == null) {
+            return "";
+        }
+
+        String normalized = originPattern.trim();
+        if (normalized.isEmpty()) {
+            return "";
+        }
+
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+
+        // Keep wildcard patterns as-is (for example: https://*.example.com).
+        if (normalized.contains("*")) {
+            return normalized;
+        }
+
+        try {
+            URI uri = URI.create(normalized);
+            if (uri.getScheme() != null && uri.getHost() != null) {
+                StringBuilder origin = new StringBuilder(uri.getScheme())
+                    .append("://")
+                    .append(uri.getHost());
+                if (uri.getPort() != -1) {
+                    origin.append(":").append(uri.getPort());
+                }
+                return origin.toString();
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Fall back to original normalized value if not a strict URI.
+        }
+
+        return normalized;
     }
 
     @Bean

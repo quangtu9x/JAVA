@@ -18,7 +18,11 @@ public class CorsProperties {
         "http://127.0.0.1:*",
         "https://127.0.0.1:*",
         "http://[::1]:*",
-        "https://[::1]:*"
+        "https://[::1]:*",
+        "http://hp.tandan.com.vn",
+        "https://hp.tandan.com.vn",
+        "https://qlvbjava.tandan.com.vn",
+        "https://*.tandan.com.vn"
     ));
 
     private List<String> allowedMethods = new ArrayList<>(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));

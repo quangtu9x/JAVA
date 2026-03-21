@@ -11,6 +11,7 @@ public class CategoryDto {
     private String code;
     private String name;
     private String description;
+    private String form;
     private UUID parentId;
     private int level;
     private String fullPath;

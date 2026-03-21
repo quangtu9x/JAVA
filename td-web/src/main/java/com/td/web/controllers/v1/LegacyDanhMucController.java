@@ -97,32 +97,39 @@ public class LegacyDanhMucController extends BaseController {
             @Valid
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 required = true,
-                description = "Payload tao node. Truong form bat buoc, ho tro parent_id cho parent",
+                                description = "Payload tao node theo dung field FE (identifier, parentid, sort_order, Form)",
                 content = @Content(mediaType = "application/json", examples = {
                     @ExampleObject(
-                        name = "Create root agency_level",
+                                                name = "Create root agency_level",
                         value = """
                             {
-                              "code": "CO_QUAN_CAP_TINH",
-                              "name": "Co quan cap tinh",
-                              "description": "Nut goc cap co quan",
-                              "form": "agency_level",
-                              "sortOrder": 1,
-                              "isActive": true
+                                                            "name": "UBND tinh Thanh Hoa",
+                                                            "sort_order": 1,
+                                                            "system": 0,
+                                                            "receiver_id": "user_receiver",
+                                                            "receiver": "receiver_position",
+                                                            "parent": "",
+                                                            "parentid": "",
+                                                            "level": 1,
+                                                            "servername": "tdoffice2/tandan853/VN",
+                                                            "server_id": "F6652A67508B82A647258B2E000FB206",
+                                                            "ipserver": "10.10.10.77",
+                                                            "dbpath": "_ubnd",
+                                                            "identifier": "H05",
+                                                            "Form": "agency_level"
                             }
                             """
                     ),
                     @ExampleObject(
-                        name = "Create child agency",
+                                                name = "Create child agency",
                         value = """
                             {
-                              "code": "SO_NOI_VU",
                               "name": "So Noi Vu",
-                              "description": "Co quan truc thuoc",
-                              "parent_id": "49d9f76a-07b4-4b44-9c62-a20b0b3ef62f",
-                              "form": "agency",
-                              "sortOrder": 10,
-                              "isActive": true
+                                                            "sort_order": 10,
+                                                            "parent": "UBND tinh Thanh Hoa",
+                                                            "parentid": "49d9f76a07b44b449c62a20b0b3ef62f",
+                                                            "identifier": "SNV",
+                                                            "Form": "agency"
                             }
                             """
                     )
@@ -175,17 +182,17 @@ public class LegacyDanhMucController extends BaseController {
             @Valid
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                 required = true,
-                description = "Payload cap nhat node. Truong form bat buoc, ho tro parent_id cho parent",
+                                description = "Payload cap nhat node theo dung field FE (identifier, parentid, sort_order, Form)",
                 content = @Content(mediaType = "application/json", examples = {
                     @ExampleObject(
                         name = "Update name and order",
                         value = """
                             {
                               "name": "Phong To Chuc - Hanh Chinh",
-                              "description": "Cap nhat ten phong ban",
-                              "form": "department",
-                              "sortOrder": 20,
-                              "isActive": true
+                                                            "sort_order": 20,
+                                                            "identifier": "PTCHC",
+                                                            "Form": "department",
+                                                            "is_active": true
                             }
                             """
                     ),
@@ -193,8 +200,9 @@ public class LegacyDanhMucController extends BaseController {
                         name = "Move node to new parent",
                         value = """
                             {
-                              "parent_id": "6dc8d538-6f9e-42d7-8e58-30b58c31beff",
-                              "form": "unit"
+                                                            "parent": "So Noi Vu",
+                                                            "parentid": "6dc8d5386f9e42d78e5830b58c31beff",
+                                                            "Form": "unit"
                             }
                             """
                     )

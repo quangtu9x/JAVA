@@ -11,9 +11,9 @@ import java.util.UUID;
 
 public interface OrganizationRepository extends IRepository<Organization> {
 
-    boolean existsByCodeAndDeletedOnIsNull(String code);
+    boolean existsByIdentifierAndDeletedOnIsNull(String identifier);
 
-    boolean existsByCodeAndIdNotAndDeletedOnIsNull(String code, UUID id);
+    boolean existsByIdentifierAndIdNotAndDeletedOnIsNull(String identifier, UUID id);
 
     Optional<Organization> findByIdAndDeletedOnIsNull(UUID id);
 
