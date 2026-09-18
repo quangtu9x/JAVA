@@ -5,6 +5,7 @@ import com.td.domain.sharedcore.AppUser;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,6 +20,27 @@ public interface AppUserRepository extends IRepository<AppUser> {
     Optional<AppUser> findByIdAndDeletedOnIsNull(UUID id);
 
     Optional<AppUser> findByKeycloakSubjectAndDeletedOnIsNull(String keycloakSubject);
+
+    Optional<AppUser> findByUsernameAndDeletedOnIsNull(String username);
+
+    // BL-118: "Kiêm nhiệm" — danh sách chức vụ kiêm nhiệm của 1 người dùng chính, dùng cho
+    // qlvb/profile (user_other_obj) — xem GetUserOrganizationProfileUseCase.
+    List<AppUser> findByParentUserIdAndDeletedOnIsNull(UUID parentUserId);
+
+    // Gap #5 (docs/analysis/18-checklist-port-kiem-nhiem-domino-sang-java.md, 08/09/2026): badge
+    // "có kiêm nhiệm" ĐÚNG TOÀN CỤC (thay cho best-effort trong trang ở ItemsList.jsx trước đây) —
+    // dùng cho GetAppUserUseCase (1 bản ghi: existsBy... rẻ hơn fetch cả list).
+    boolean existsByParentUserIdAndDeletedOnIsNull(UUID parentUserId);
+
+    // Cùng mục đích, cho SearchAppUsersUseCase: nạp 1 lần cho CẢ TRANG (tránh N+1 — cùng convention
+    // với AppUserRoleGroupRepository#findByAppUserIdInAndDeletedOnIsNull).
+    List<AppUser> findByParentUserIdInAndDeletedOnIsNull(List<UUID> parentUserIds);
+
+    // Bo sung 09/09/2026 (GetLegacyOrganizationTreeUseCase#execute includeUsers - node la "user"
+    // cho man "Nhom xem lich tong hop"): nap 1 lan CHO CA CAY, gom theo organizationId - tranh N+1.
+    List<AppUser> findByOrganizationIdInAndDeletedOnIsNull(List<UUID> organizationIds);
+
+    List<AppUser> findAllByDeletedOnIsNullOrderByFullNameAsc();
 
     Page<AppUser> search(SearchAppUsersRequest request, Pageable pageable);
 }

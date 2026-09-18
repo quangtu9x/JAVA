@@ -2,6 +2,7 @@ package com.td.application.documents;
 
 import com.td.application.common.models.Result;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,11 +13,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class UpdateDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
     private final DocumentSearchService documentSearchService;
+    private final DocumentLogService documentLogService;
 
     public Result<UUID> execute(UpdateDocumentRequest request) {
         try {
@@ -88,6 +91,8 @@ public class UpdateDocumentUseCase {
                     DocumentFieldLayout.metadataForPersistence(updatedMetadata, updatedAttributes));
             }
 
+            var before = DocumentDtoMapper.map(document);
+
             document.update(
                 normalize(request.getTitle()),
                 normalize(request.getDocumentType()),
@@ -102,8 +107,10 @@ public class UpdateDocumentUseCase {
             documentSearchService.index(saved);
             documentCacheService.evict(saved.getId());
             documentCacheService.evictAllListCaches();
+            documentLogService.logUpdate(saved.getId(), before, DocumentDtoMapper.map(saved));
             return Result.success(saved.getId());
         } catch (Exception ex) {
+            log.error("Cập nhật tài liệu thất bại", ex);
             return Result.failure("Cập nhật tài liệu thất bại: " + ex.getMessage());
         }
     }

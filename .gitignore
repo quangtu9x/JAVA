@@ -1,0 +1,14 @@
+# Environment variables (real credentials - never commit)
+.env
+
+# Maven build output
+target/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+*.iml
+.vscode/

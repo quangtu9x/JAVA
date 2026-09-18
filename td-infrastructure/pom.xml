@@ -58,6 +58,14 @@
             <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
         </dependency>
 
+        <!-- Servlet API (provided by td-web's embedded container at runtime) - can cho
+             TdTokenAuthenticationFilter (OncePerRequestFilter) va cac Api*Handler dung HttpServletRequest/Response -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
         <!-- Mapping -->
         <dependency>
             <groupId>org.mapstruct</groupId>
@@ -83,6 +91,45 @@
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
             <version>8.5.7</version>
+        </dependency>
+
+        <!-- BL-221 (VBDi Ky so & Gui di): gui email cong vu -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
+        <!-- Yeu cau nguoi dung 04/09/2026 ("hoan thien Gui van ban... publish RabbitMQ/Kafka"):
+             RabbitMQ + Kafka client CHI DE PUBLISH (khong co dependency nao khien app phai chay
+             cung td-woker - dong bo qua wire format/quy uoc dat ten, khong qua code dung chung,
+             giong het cach td-woker/pom.xml da khai bao 2 dependency nay). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+        </dependency>
+
+        <!-- BL-221: xac thuc chu ky so nhung trong file PDF (doc /ByteRange, /Contents cua
+             AcroForm signature dictionary) - dung cach lam giong het Domino that
+             (TDAttachmentSignVerify.java: itextpdf + bouncycastle), thay itextpdf (AGPL) bang
+             Apache PDFBox (Apache-2.0) de tranh rang buoc ban quyen. -->
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>2.0.31</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.81.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.81</version>
         </dependency>
 
         <!-- Test Dependencies -->

@@ -1,0 +1,40 @@
+Tôi đang cần thiết kế phương án NÂNG CẤP (Phát triển thêm / Modulize) dựa trên chức năng "Xử lý văn bản đến" ĐÃ CÓ SẴN của Hệ thống Quản lý Văn bản và Điều hành cơ quan Nhà nước.
+
+[BÀI TOÁN & HIỆN TRẠNG]:
+- Hiện trạng: Hệ thống hiện tại đã vận hành đầy đủ luồng tiếp nhận, phân công và báo cáo, nhưng chỉ hỗ trợ 01 "Hạn xử lý chung" lưu ở cấp văn bản.
+- Vấn đề: Khi Lãnh đạo/Trưởng phòng chuyển tiếp văn bản cho nhiều Đơn vị/Chuyên viên (chủ trì, phối hợp), hệ thống vẫn dùng chung Hạn xử lý chung này. Điều này làm Báo cáo Thống kê bị sai lệch (Đơn vị xử lý chính, phối hợp trễ hạn nội bộ nhưng chưa quá hạn chung thì báo cáo vẫn tính là "Đúng hạn").
+- Mục tiêu: KHÔNG VIẾT MỚI HỆ THỐNG và CHƯA VIẾT CODE. Chỉ tập trung lập KẾ HOẠCH THỰC HIỆN và VIẾT TÀI LIỆU YÊU CẦU CHI TIẾT để mở rộng dựa trên chức năng hiện có, bổ sung "Hạn xử lý riêng" (Sub-deadline) cho từng nút phân công.
+
+[YÊU CẦU ĐẶC BIỆT VỀ UI/UX & TÍNH LINH HOẠT]:
+1. Tối ưu UI/UX cho Lãnh đạo (Tối giản - Thuận tiện - Nhanh chóng):
+   - Không được làm phức tạp hóa form phân công hiện tại.
+   - Mặc định: Khi Lãnh đạo chọn Hạn chung của văn bản, hệ thống TỰ ĐỘNG ĐIỀN (Auto-fill) hạn chung đó vào ô Hạn riêng của tất cả đơn vị/cá nhân được chọn.
+   - Lãnh đạo chỉ thao tác sửa Hạn riêng khi thực sự có nhu cầu đặc thù (click sửa trực tiếp hoặc có lối tắt gợi ý "Hạn phối hợp = Hạn chung - N ngày"). Thao tác phân công thường nhật phải giữ nguyên tốc độ như cũ.
+
+2. Cơ chế Cấu hình Bật/Tắt Tính năng (Feature Toggle / System Configuration):
+   - Phải thiết kế một tham số cấu hình hệ thống (System Parameter/Flag): `ENABLE_SUB_DEADLINE` (True/False).
+   - Khi TẮT (False): Hệ thống ẩn toàn bộ các ô nhập Hạn riêng, sử dụng 100% logic, luồng chạy và báo cáo thống kê theo Hạn chung nguyên bản.
+   - Khi BẬT (True): Hệ thống mở rộng các ô nhập Hạn riêng trên UI và áp dụng logic báo cáo theo Hạn riêng.
+
+[PHẠM VI CÔNG VIỆC DÀNH CHO AI]:
+Hãy đóng vai là Kiến trúc sư Hệ thống / Chuyên gia Phân tích Yêu cầu Nghiệp vụ (Senior BA). Hãy tự hoàn thiện toàn bộ KẾ HOẠCH & TÀI LIỆU NÂNG CẤP dưới đây (KHÔNG phân chia cho vai trò khác và KHÔNG sinh bất kỳ đoạn mã nguồn/code nào):
+
+1. Kế hoạch Triển khai Nâng cấp (Implementation Plan & Roadmap):
+- Lập lộ trình thực hiện từng bước (Step-by-step Plan) từ khâu Phân tích -> Thiết kế Tài liệu -> Review Nghiệp vụ -> Chuẩn bị Data -> Kiểm thử.
+- Đánh giá rủi ro (Risk Analysis) khi nâng cấp trên hệ thống đang chạy và phương án ứng phó.
+
+2. Tài liệu Phân tích Nghiệp vụ & Luồng Xử lý (Business Requirement Document - BRD):
+- Mô tả chi tiết Luồng nghiệp vụ điều chỉnh (Workflow Delta) và Giải pháp UI/UX tối ưu cho Lãnh đạo.
+- Thiết kế cơ chế Bật/Tắt cấu hình (Feature Flag) và tác động của nó tới từng luồng nghiệp vụ.
+- Quy tắc nghiệp vụ (Business Rules): Ràng buộc Hạn riêng <= Hạn chung; Quy tắc điều chỉnh Hạn chung làm ảnh hưởng Hạn riêng; Quy tắc xin gia hạn.
+
+3. Tài liệu Thiết kế Mở rộng Data & Logic Báo cáo (System Specification - SRS):
+- Phương án bổ sung dữ liệu (Database Delta): Chi tiết các trường (Fields/Columns) cần thêm mới vào các bảng hiện có và bảng Cấu hình hệ thống (không xóa/không tạo lại bảng core).
+- Logic tính toán Báo cáo Thống kê mới (có xử lý điều kiện theo cờ Bật/Tắt cấu hình): Công thức so sánh thời gian hoàn thành với Hạn riêng; Logic điều chỉnh các mẫu báo cáo thống kê hiện có.
+- Phương án Chuyển đổi Dữ liệu lịch sử (Data Migration Plan): Quy tắc xử lý/điền dữ liệu Hạn riêng cho các văn bản cũ để không làm sai lệch báo cáo quá khứ.
+
+4. Tài liệu Checklist Kiểm thử (Testing Checklist Document):
+- Checklist Kiểm thử Regression & Cấu hình Bật/Tắt: Đảm bảo khi TẮT tính năng thì hệ thống cũ hoạt động bình thường 100%.
+- Checklist Kiểm thử Chức năng & Báo cáo mới: Kiểm tra các kịch bản đúng, sai, thao tác UI/UX của Lãnh đạo và tính chính xác của báo cáo thống kê khi BẬT tính năng.
+
+Yêu cầu trình bày: Trình bày chuẩn style Tài liệu Kỹ thuật Phần mềm (sử dụng bảng biểu, bullet points, tiêu đề rõ ràng), chi tiết và đầy đủ để có thể đem đi trình duyệt hoặc bàn giao cho đội phát triển thực thi ngay lập tức. KHÔNG VIẾT CODE.

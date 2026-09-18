@@ -13,6 +13,11 @@ public class SearchAppUsersRequest {
     private UUID organizationId;
     private Boolean isActive;
 
+    // BL-112: "Kiêm nhiệm" — lọc danh sách chức vụ kiêm nhiệm của đúng 1 người dùng chính
+    // (AppUser.parentUserId, xem ChiTietModalNguoiDungKiemNhiem.jsx). null = không lọc theo cha
+    // (mặc định danh sách "Người dùng" vẫn trộn chung chính+kiêm nhiệm, đúng hành vi Domino gốc).
+    private UUID parentUserId;
+
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
 

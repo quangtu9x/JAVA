@@ -2,6 +2,7 @@ package com.td.application.sharedcore;
 
 import com.td.application.common.models.Result;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,7 +10,8 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Slf4j
+@Transactional(value = "identityTransactionManager", readOnly = true)
 public class GetAppPermissionUseCase {
 
     private final AppPermissionRepository appPermissionRepository;
@@ -27,6 +29,7 @@ public class GetAppPermissionUseCase {
 
             return Result.success(AppPermissionDtoMapper.map(opt.get()));
         } catch (Exception ex) {
+            log.error("Lấy quyền thất bại", ex);
             return Result.failure("Lấy quyền thất bại: " + ex.getMessage());
         }
     }

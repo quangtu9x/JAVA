@@ -1,0 +1,9 @@
+> **Prompt:**
+> "Hãy thiết kế một isolated React component cho trình chỉnh sửa tài liệu chuẩn **zero side-effects**, đáp ứng các tiêu chí sau:
+> * **Architecture & Security:** Externalize server endpoint qua `env`; nhận signed JWT payload qua props.
+> * **Fault Tolerance:** Bọc `ErrorBoundary` để cô lập runtime exception và xử lý graceful degradation khi xảy ra sự cố kết nối.
+> * **Resource Management:** Xử lý triệt để lifecycle unmount (teardown instance/event listeners) để phòng tránh memory leak.
+> * **UX Seamlessness & Performance:**
+> * Tối ưu rendering performance để đạt trải nghiệm 60fps mượt mà, triệt tiêu hiện tượng layout shift (CLS) hay giật lag ứng dụng chính.
+> * Hiển thị skeleton state liền mạch trong giai đoạn initialization; layout fluid (100% container) tương thích linh hoạt cho cả Full-page lẫn Modal mode."
+>

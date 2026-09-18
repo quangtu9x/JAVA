@@ -1,0 +1,13 @@
+### Extensible Worker Architecture
+
+Thiết kế Worker theo hướng **open/extensible**, không đóng cứng theo VBDI hoặc bất kỳ nghiệp vụ cụ thể nào.
+
+Worker Core chỉ chịu trách nhiệm các chức năng dùng chung như messaging, dispatch, retry, idempotency, checkpoint, tenant, logging, monitoring và lifecycle.
+
+Mỗi nghiệp vụ triển khai qua `TaskHandler`/module độc lập. Có thể thêm task mới mà **không phải sửa Worker Core**.
+
+VBDI chỉ là implementation/reference đầu tiên để kiểm chứng kiến trúc.
+
+Cho phép cùng một codebase chạy các nhóm task khác nhau thông qua configuration, queue/routing và deployment độc lập.
+
+Không over-engineering; ưu tiên thiết kế đơn giản, rõ ràng, dễ mở rộng và dễ bảo trì.

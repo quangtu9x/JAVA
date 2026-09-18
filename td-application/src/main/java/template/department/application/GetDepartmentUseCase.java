@@ -2,6 +2,7 @@ package template.department.application;
 
 import com.td.application.common.models.Result;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -10,6 +11,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class GetDepartmentUseCase {
 
     private final DepartmentRepository departmentRepository;
@@ -35,6 +37,7 @@ public class GetDepartmentUseCase {
             departmentCacheService.put(id, dto);
             return Result.success(dto);
         } catch (Exception ex) {
+            log.error("Lấy phòng ban thất bại", ex);
             return Result.failure("Lấy phòng ban thất bại: " + ex.getMessage());
         }
     }

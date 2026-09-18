@@ -1,0 +1,17 @@
+target/
+logs/
+*.log
+.env
+.idea/
+.vscode/
+
+# Chứng thư Client Authentication (PKCS12) do Cục CTS-BMTT cấp riêng cho từng AP_ID (module simpki,
+# docs/17-checklist-tich-hop-kyso-simpki.md) - chứa PRIVATE KEY, KHÔNG BAO GIỜ commit. Truststore CA
+# công khai (certs/simpki/truststore-bcy.jks) KHÔNG bị loại trừ - không chứa private key.
+certs/simpki/*.p12
+certs/simpki/*.pfx
+
+# Electron Runtime Data
+electron/out/
+app/node_modules/
+node_modules/

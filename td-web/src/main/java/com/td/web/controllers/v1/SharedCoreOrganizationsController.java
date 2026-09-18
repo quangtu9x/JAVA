@@ -1,7 +1,6 @@
 package com.td.web.controllers.v1;
 
-import com.td.application.common.models.PaginationResponse;
-import com.td.application.common.models.Result;
+import com.td.application.common.models.ApiResponse;
 import com.td.application.sharedcore.CreateOrganizationRequest;
 import com.td.application.sharedcore.CreateOrganizationUseCase;
 import com.td.application.sharedcore.DeleteOrganizationUseCase;
@@ -32,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -48,18 +48,24 @@ public class SharedCoreOrganizationsController extends BaseController {
     private final UpdateOrganizationUseCase updateOrganizationUseCase;
     private final DeleteOrganizationUseCase deleteOrganizationUseCase;
 
+    // Bugfix 03/09/2026 (compile - GetLegacyOrganizationTreeUseCase#execute them tham so
+    // includeFullTree, xem javadoc lop do). Endpoint nay KHONG co bang chung FE nao dang goi (grep
+    // ThanhHoaDEV/ - chi /api/v1/danhmuc/CayCoCauToChuc, xem LegacyDanhMucController, duoc dung that
+    // - endpoint nay chi con lai tu API "shared core" tong quat) - giu nguyen hanh vi CU (full tree,
+    // includeFullTree=true), khong ap dung scoping moi o day de tranh doan sai muc dich 1 API chua
+    // xac nhan ai dang dung.
     @GetMapping("/tree")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Cay co cau to chuc theo format legacy")
-    public ResponseEntity<LegacyOrganizationTreeResponse> getOrganizationTree(
+    public ResponseEntity<ApiResponse<LegacyOrganizationTreeResponse>> getOrganizationTree(
             @RequestParam(name = "jedis_key", required = false) String jedisKey) {
-        return ok(getLegacyOrganizationTreeUseCase.execute(jedisKey));
+        return ok(getLegacyOrganizationTreeUseCase.execute(jedisKey, true));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Danh sách tổ chức shared core")
-    public ResponseEntity<PaginationResponse<OrganizationDto>> listOrganizations(
+    public ResponseEntity<ApiResponse<List<OrganizationDto>>> listOrganizations(
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "20") int pageSize,
             @RequestParam(name = "sortBy", defaultValue = "sortOrder") String sortBy,
@@ -85,7 +91,7 @@ public class SharedCoreOrganizationsController extends BaseController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Chi tiết tổ chức shared core")
-    public ResponseEntity<Result<OrganizationDto>> getOrganization(
+    public ResponseEntity<ApiResponse<OrganizationDto>> getOrganization(
             @Parameter(description = "Organization ID", required = true)
             @PathVariable("id") UUID id) {
         return ok(getOrganizationUseCase.execute(id));
@@ -94,14 +100,14 @@ public class SharedCoreOrganizationsController extends BaseController {
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Tạo node tổ chức shared core")
-    public ResponseEntity<Result<UUID>> createOrganization(@Valid @RequestBody CreateOrganizationRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createOrganization(@Valid @RequestBody CreateOrganizationRequest request) {
         return created(createOrganizationUseCase.execute(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Cập nhật node tổ chức shared core")
-    public ResponseEntity<Result<UUID>> updateOrganization(
+    public ResponseEntity<ApiResponse<UUID>> updateOrganization(
             @Parameter(description = "Organization ID", required = true)
             @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateOrganizationRequest request) {
@@ -111,7 +117,7 @@ public class SharedCoreOrganizationsController extends BaseController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Xóa mềm node tổ chức shared core")
-    public ResponseEntity<Result<UUID>> deleteOrganization(
+    public ResponseEntity<ApiResponse<UUID>> deleteOrganization(
             @Parameter(description = "Organization ID", required = true)
             @PathVariable("id") UUID id) {
         return ok(deleteOrganizationUseCase.execute(id));

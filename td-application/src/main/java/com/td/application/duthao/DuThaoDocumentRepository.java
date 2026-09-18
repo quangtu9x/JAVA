@@ -1,0 +1,51 @@
+package com.td.application.duthao;
+
+import com.td.application.common.interfaces.IRepository;
+import com.td.application.documents.VbdenOrgViewFilter;
+import com.td.domain.duthao.DuThaoDocument;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.List;
+
+/**
+ * BL-230 (DuThao Core), yêu cầu người dùng 24/08/2026: port RIÊNG cho bảng vật lý ĐỘC LẬP
+ * {@code duthao_documents} (xem javadoc {@link DuThaoDocument}) — KHÔNG phải
+ * {@code com.td.application.documents.DocumentRepository} (bảng {@code documents} dùng chung cho
+ * mọi module khác: vbden/vbdi/hosocv/...).
+ *
+ * <p>Chỉ khai báo ĐÚNG method thực sự được dùng bởi các use case của cụm dự thảo (Tao/Luu/
+ * GetDetail/XuLy/ChuyenThanhVanBanDi/ThuHoi/XinYKienPhoiHop + 3 case trong {@code ViewQueryService})
+ * — không copy nguyên văn toàn bộ surface của {@code DocumentRepository} (nhiều method ở đó —
+ * {@code findPendingForUser}/{@code findByParentId}/{@code findByFieldValue}/{@code search}/...
+ * — KHÔNG có evidence được cụm dự thảo dùng, thêm vào sẽ là suy diễn không cần thiết).
+ */
+public interface DuThaoDocumentRepository extends IRepository<DuThaoDocument> {
+
+    /**
+     * Cùng ngữ nghĩa {@code DocumentRepository#findByAnyFieldContains} — OR containment (JSON-array
+     * hoặc scalar-equality, xem {@code PostgresDuThaoDocumentRepository}) trên nhiều field cho 1
+     * giá trị (vd. {@code user_creator}).
+     */
+    Page<DuThaoDocument> findByAnyFieldContains(
+            String documentType, List<String> fieldNames, String value, Pageable pageable);
+
+    Page<DuThaoDocument> findByAnyFieldContains(
+            String documentType, List<String> fieldNames, String value,
+            String keyword, List<String> keywordColumns, Pageable pageable);
+
+    /** Cùng ngữ nghĩa {@code DocumentRepository#findByVbdenOrgView}. */
+    Page<DuThaoDocument> findByVbdenOrgView(String documentType, VbdenOrgViewFilter filter, Pageable pageable);
+
+    /**
+     * DT-002 (26/08/2026) — {@code vwUser_Coordinated}: OR-group KHÔNG biểu diễn được bằng
+     * {@link VbdenOrgViewFilter} (1 nhóm AND) — selection thật là {@code (fieldWithoutStatus != "") OR
+     * (fieldWithStatus != "" AND status IN doneStatuses)}, tức 2 field khác nhau với 2 điều kiện
+     * status khác nhau trên CÙNG 1 request. {@code value} khớp theo containment/scalar-equality
+     * (cùng ngữ nghĩa {@code orgFieldNames}, field lưu JSON array — xem {@code XinYKienPhoiHopUseCase}).
+     */
+    Page<DuThaoDocument> findByFieldOrFieldWithStatus(
+            String documentType, String fieldWithoutStatus, String fieldWithStatus,
+            List<String> doneStatuses, String value, String keyword, List<String> keywordColumns,
+            Pageable pageable);
+}

@@ -2,6 +2,7 @@ package com.td.web.config;
 
 import com.td.application.categories.CategoryCacheService;
 import com.td.application.documents.DocumentCacheService;
+import com.td.application.workcalendars.WorkCalendarCacheService;
 import com.td.infrastructure.security.CurrentUserContextResolver;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,6 +59,12 @@ public class RedisCacheConfig {
         cacheConfigurations.put(
             CurrentUserContextResolver.USER_CONTEXT_CACHE,
             defaultConfig.entryTtl(Duration.ofMinutes(5))
+        );
+        // Port lichct (08/09/2026) - lich doi nhanh (Domino ghi/doc "lich_<key>_<thu2>" moi lan
+        // luu), TTL ngan hon cac region khac - xem docs/analysis/09-... muc 7.6.8.
+        cacheConfigurations.put(
+            WorkCalendarCacheService.WORK_CALENDAR_BY_WEEK_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(10))
         );
 
         return RedisCacheManager.builder(connectionFactory)

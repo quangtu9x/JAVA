@@ -2,12 +2,14 @@ package com.td.application.documents;
 
 import com.td.application.common.models.Result;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SyncDocumentSearchByIdUseCase {
 
     private final DocumentRepository documentRepository;
@@ -42,6 +44,7 @@ public class SyncDocumentSearchByIdUseCase {
             documentSearchService.index(document);
             return Result.success("Đồng bộ document lên Elasticsearch thành công");
         } catch (Exception ex) {
+            log.error("Đồng bộ document lên Elasticsearch thất bại", ex);
             return Result.failure("Đồng bộ document lên Elasticsearch thất bại: " + ex.getMessage());
         }
     }

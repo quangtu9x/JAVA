@@ -2,11 +2,15 @@ package com.td.application.categories;
 
 import com.td.domain.categories.Category;
 
+import java.util.Map;
+
 final class CategoryDtoMapper {
 
     private CategoryDtoMapper() {}
 
-    static CategoryDto map(Category c) {
+    // dynamicFields do caller (UseCase, có DynamicDocumentFieldsService) tự parse rồi truyền vào —
+    // giữ mapper này thuần static/không cần Spring DI, cùng convention với OrganizationDtoMapper.
+    static CategoryDto map(Category c, Map<String, Object> dynamicFields) {
         var dto = new CategoryDto();
         dto.setId(c.getId());
         dto.setCode(c.getCode());
@@ -20,6 +24,7 @@ final class CategoryDtoMapper {
         dto.setActive(c.isActive());
         dto.setCreatedOn(c.getCreatedOn());
         dto.setLastModifiedOn(c.getLastModifiedOn());
+        dto.setDynamicFields(dynamicFields == null ? Map.of() : dynamicFields);
         return dto;
     }
 }

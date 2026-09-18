@@ -1,8 +1,8 @@
 package template.department.web;
 
+import com.td.application.common.models.ApiResponse;
 import com.td.application.common.models.CachedPaginationResponse;
 import com.td.application.common.models.CachedResult;
-import com.td.application.common.models.PaginationResponse;
 import com.td.application.common.models.Result;
 import com.td.web.controllers.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +34,7 @@ import template.department.application.SearchDepartmentsUseCase;
 import template.department.application.UpdateDepartmentRequest;
 import template.department.application.UpdateDepartmentUseCase;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -53,7 +54,7 @@ public class DepartmentsController extends BaseController {
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Danh sách phòng ban template")
-    public ResponseEntity<PaginationResponse<DepartmentDto>> listDepartments(
+    public ResponseEntity<ApiResponse<List<DepartmentDto>>> listDepartments(
             @RequestParam(defaultValue = "0") int pageNumber,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "sortOrder") String sortBy,
@@ -79,20 +80,20 @@ public class DepartmentsController extends BaseController {
             if (cached != null) {
                 return ResponseEntity.ok()
                     .header("X-Cache", "HIT")
-                    .body(new CachedPaginationResponse<>(cached,
-                        departmentCacheService.getDepartmentListCacheKey(request)));
+                    .body(toApiResponse(new CachedPaginationResponse<>(cached,
+                        departmentCacheService.getDepartmentListCacheKey(request))));
             }
         }
 
         var response = searchDepartmentsUseCase.execute(request);
         departmentCacheService.putList(request, response);
-        return ResponseEntity.ok().header("X-Cache", "MISS").body(response);
+        return ResponseEntity.ok().header("X-Cache", "MISS").body(toApiResponse(response));
     }
 
     @PostMapping("/search")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Tìm kiếm phòng ban template")
-    public ResponseEntity<PaginationResponse<DepartmentDto>> searchDepartments(
+    public ResponseEntity<ApiResponse<List<DepartmentDto>>> searchDepartments(
             @Valid @RequestBody SearchDepartmentsRequest request,
             @RequestParam(defaultValue = "true") boolean useCache) {
 
@@ -101,20 +102,20 @@ public class DepartmentsController extends BaseController {
             if (cached != null) {
                 return ResponseEntity.ok()
                     .header("X-Cache", "HIT")
-                    .body(new CachedPaginationResponse<>(cached,
-                        departmentCacheService.getDepartmentListCacheKey(request)));
+                    .body(toApiResponse(new CachedPaginationResponse<>(cached,
+                        departmentCacheService.getDepartmentListCacheKey(request))));
             }
         }
 
         var response = searchDepartmentsUseCase.execute(request);
         departmentCacheService.putList(request, response);
-        return ResponseEntity.ok().header("X-Cache", "MISS").body(response);
+        return ResponseEntity.ok().header("X-Cache", "MISS").body(toApiResponse(response));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Chi tiết phòng ban template")
-    public ResponseEntity<Result<DepartmentDto>> getDepartment(
+    public ResponseEntity<ApiResponse<DepartmentDto>> getDepartment(
             @Parameter(description = "Department ID", required = true) @PathVariable UUID id,
             @RequestParam(defaultValue = "true") boolean useCache) {
 
@@ -126,29 +127,29 @@ public class DepartmentsController extends BaseController {
         var result = getDepartmentUseCase.execute(id);
         return ResponseEntity.ok()
             .header("X-Cache", cached ? "HIT" : "MISS")
-            .body(cached
+            .body(toApiResponse(cached
                 ? new CachedResult<>(result, departmentCacheService.getDepartmentByIdCacheKey(id))
-                : result);
+                : result));
     }
 
     @GetMapping("/cache/stats")
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Thống kê cache phòng ban template")
-    public ResponseEntity<Result<DepartmentCacheStatsDto>> getCacheStats() {
+    public ResponseEntity<ApiResponse<DepartmentCacheStatsDto>> getCacheStats() {
         return ok(Result.success(departmentCacheService.getStats()));
     }
 
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Tạo phòng ban template")
-    public ResponseEntity<Result<UUID>> createDepartment(@Valid @RequestBody CreateDepartmentRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createDepartment(@Valid @RequestBody CreateDepartmentRequest request) {
         return created(createDepartmentUseCase.execute(request));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Cập nhật phòng ban template")
-    public ResponseEntity<Result<UUID>> updateDepartment(
+    public ResponseEntity<ApiResponse<UUID>> updateDepartment(
             @Parameter(description = "Department ID", required = true) @PathVariable UUID id,
             @Valid @RequestBody UpdateDepartmentRequest request) {
         return ok(updateDepartmentUseCase.execute(id, request));
@@ -157,7 +158,7 @@ public class DepartmentsController extends BaseController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Xóa mềm phòng ban template")
-    public ResponseEntity<Result<UUID>> deleteDepartment(
+    public ResponseEntity<ApiResponse<UUID>> deleteDepartment(
             @Parameter(description = "Department ID", required = true) @PathVariable UUID id) {
         return ok(deleteDepartmentUseCase.execute(id));
     }

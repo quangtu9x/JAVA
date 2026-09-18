@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.Map;
+
 @Data
 public class UpdateOrganizationRequest {
 
@@ -35,6 +37,10 @@ public class UpdateOrganizationRequest {
 
     private String dbpath;
 
+    // Bổ sung 19/08/2026: liên kết MỀM tới tenants.tenant_id (control-plane, không FK thật) — null =
+    // không đổi, chuỗi rỗng = gỡ liên kết, xem javadoc Organization.linkedTenantId/updateLinkedTenant.
+    private String linked_tenant_id;
+
     @Size(max = 100, message = "Identifier tối đa 100 ký tự")
     @JsonAlias("code")
     private String identifier;
@@ -43,4 +49,15 @@ public class UpdateOrganizationRequest {
     private String form;
 
     private Boolean is_active;
+
+    // Field tự định nghĩa từ FE — null nghĩa là không đổi field động (partial update, cùng
+    // convention với các field khác trong request này); có giá trị thì MERGE vào field động hiện
+    // có (không xoá field cũ không được nhắc tới), xem UpdateOrganizationUseCase.
+    private Map<String, String> dynamicFields;
+
+    private String dateFields;
+
+    private String numberFields;
+
+    private String richtextFields;
 }

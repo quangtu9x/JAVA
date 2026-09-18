@@ -645,6 +645,42 @@ public Result<UUID> execute(Request request) {
 - Set `deletedOn` và `deletedBy`
 - Filter `deletedOn IS NULL` trong queries
 
+### 6. Dynamic fields / JSONB — khi nào dùng, thiết kế thế nào
+
+**LUẬT áp dụng khi tạo bảng mới**: nếu 1 bảng cần chứa dữ liệu **biến thiên về hình dạng hoặc số
+lượng** (số lượng phần tử không cố định, hoặc chỉ vài bản ghi mới cần đến field đó) —
+**DÙNG LẠI ĐÚNG kiến trúc `dynamic_fields` đã có** (BL-101 Dynamic Data Engine), KHÔNG tự chế 1 cột
+JSONB mới với tên riêng cho từng bảng (vd đừng đặt `actions`, `metadata_extra`, ...). Cùng 1 tên cột,
+cùng 1 kiểu, cùng 1 service đọc/ghi cho MỌI bảng — tránh mỗi bảng mới lại phát minh lại 1 biến thể
+JSONB khác nhau (đã xảy ra thật: `file_access_logs` ban đầu tự chế cột `actions` riêng, phải sửa lại
+qua migration `V1.0.58` sau khi bị nhắc — xem [`FileAccessLog`](../td-domain/src/main/java/com/td/domain/documents/FileAccessLog.java)
+làm ví dụ ĐÃ SỬA ĐÚNG chuẩn).
+
+- **Cột**: LUÔN tên `dynamic_fields`, kiểu
+  `@Column(name = "dynamic_fields", columnDefinition = "jsonb", nullable = false) private String dynamicFieldsJson = "{}";`
+  — object (`"{}"`) là mặc định, dùng cho MỌI bảng mới cần field biến thiên, kể cả khi hiện tại chỉ
+  cần đúng 1 khoá bên trong (vd `file_access_logs.dynamic_fields` hiện chỉ có khoá `"actions"`, nhưng
+  vẫn là 1 object `{"actions":[...]}`, KHÔNG phải mảng trần ở cột) — chừa sẵn chỗ cho field khác sau
+  này mà không phải đổi kiểu cột/migration lại. Entity/domain layer CHỈ giữ **raw JSON string**,
+  KHÔNG tự parse (không phụ thuộc Jackson ở tầng domain).
+- **Parse/build ở application layer bằng `DynamicDocumentFieldsService` — DÙNG LẠI service này**,
+  KHÔNG viết `ObjectMapper`/`TypeReference` cục bộ riêng ở use case mới (xem
+  `ListFileAccessLogUseCase#extractActions` gọi `parseDynamicFields()` rồi đọc khoá `"actions"` từ
+  `Map<String,Object>` trả về — không phải tự parse JSON).
+- **Ghi/merge JSONB ngay trong SQL khi có thể**, tránh SELECT-rồi-parse-rồi-ghi lại (thêm round-trip
+  + race condition dưới concurrent access): dùng `jsonb_set()` để ghi đúng 1 khoá bên trong
+  `dynamic_fields` (giữ nguyên các khoá khác), kết hợp operator Postgres `@>` (chứa phần tử?), `||`
+  (nối mảng) trực tiếp trong câu `INSERT ... ON CONFLICT DO UPDATE` (xem
+  `PostgresFileAccessLogRepository#recordAccess`).
+- **Khi nào KHÔNG dùng JSONB**: field đó cần **filter/sort/unique-constraint qua SQL thường xuyên**
+  → dùng cột typed thường (vd `module`, `document_id`, `username` trong `file_access_logs` vẫn là
+  cột riêng vì nằm trong `UNIQUE` constraint và mọi câu đọc đều filter theo chúng — chỉ phần "biến
+  thiên" mới vào `dynamic_fields`).
+- **Vì sao ưu tiên "1 dòng, `dynamic_fields` gộp nhiều giá trị" hơn "nhiều dòng, mỗi dòng 1 giá trị"**
+  cho các bảng log tần suất cao: giữ số dòng bị chặn trên bởi số tổ hợp khoá nghiệp vụ thực tế (vd số
+  tệp × số người dùng), không phình theo số sự kiện/số biến thể — tối ưu cả lưu trữ lẫn hiệu năng đọc
+  (không cần pivot/group ở tầng ứng dụng, FE nhận sẵn 1 dòng/thực thể).
+
 ---
 
 ## Deployment

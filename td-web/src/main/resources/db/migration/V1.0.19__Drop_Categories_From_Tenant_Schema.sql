@@ -1,0 +1,14 @@
+-- BL-115: "Danh mục dùng chung" (bảng categories) chuyển thành bảng GLOBAL, sống trong schema
+-- `shared` riêng (ngoài danh sách tenant, xem TenantProperties.sharedSchema) — không nhân bản theo
+-- từng tenant nữa, để MỌI tenant thực sự dùng chung 1 bản ghi (trước đây mỗi tenant có 1 bản
+-- categories riêng do kiến trúc schema-per-tenant áp dụng đồng loạt cho mọi bảng).
+--
+-- Bảng categories trong schema tenant hiện đang TRỐNG (BL-113/114 — CRUD Java cho "Cơ quan ngoài
+-- tỉnh" + "Danh mục dùng chung" — chưa từng được deploy/dùng thật tính đến thời điểm migration này
+-- được viết, xác nhận qua lịch sử làm việc) nên không có dữ liệu thật bị mất.
+--
+-- Xoá bản ghi ở TỪNG schema tenant là bắt buộc: nếu còn tồn tại, Postgres sẽ ưu tiên bản đó thay vì
+-- fallback qua schema `shared` khi tra cứu tên bảng không định danh schema (search_path liệt kê
+-- schema tenant TRƯỚC schema shared — xem TenantDataSourceConfig.buildTenantDataSource), làm hỏng
+-- mục tiêu "dùng chung" của migration này.
+DROP TABLE IF EXISTS categories;

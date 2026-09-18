@@ -192,7 +192,7 @@
 
       <div class="td-row">
         <label for="token-endpoint">Token endpoint</label>
-        <input id="token-endpoint" value="http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token" />
+        <input id="token-endpoint" placeholder="Tự nạp từ cấu hình server (app.security.keycloak.*)" />
       </div>
 
       <div class="td-row">
@@ -205,12 +205,12 @@
 
       <div class="td-row">
         <label for="client-id">Client ID</label>
-        <input id="client-id" value="td-webapi-client" />
+        <input id="client-id" placeholder="Tự nạp từ cấu hình server (app.security.keycloak.*)" />
       </div>
 
       <div class="td-row">
         <label for="client-secret">Client Secret</label>
-        <input id="client-secret" value="td-webapi-secret-2024" />
+        <input id="client-secret" placeholder="Tự nạp từ cấu hình server (app.security.keycloak.*)" />
       </div>
 
       <div class="td-row">
@@ -416,6 +416,50 @@
         }
       }
 
+      var tokenEndpointInput = document.getElementById("token-endpoint");
+      var clientIdInput = document.getElementById("client-id");
+      var clientSecretInput = document.getElementById("client-secret");
+
+      // Cac gia tri hard-code cu (localhost:8180) — neu cau hinh da luu tu phien truoc
+      // van con gia tri nay thi se duoc thay bang cau hinh that tu server.
+      var STALE_TOKEN_ENDPOINT = "http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token";
+      var STALE_CLIENT_ID = "td-webapi-client";
+      var STALE_CLIENT_SECRET = "td-webapi-secret-2024";
+
+      function isBlank(value) {
+        return value === undefined || value === null || String(value).trim() === "";
+      }
+
+      function applyServerOAuthConfig(cfg) {
+        if (!cfg) return;
+        if (cfg.tokenEndpoint && (isBlank(tokenEndpointInput.value) || tokenEndpointInput.value.trim() === STALE_TOKEN_ENDPOINT)) {
+          tokenEndpointInput.value = cfg.tokenEndpoint;
+        }
+        if (cfg.clientId && (isBlank(clientIdInput.value) || clientIdInput.value.trim() === STALE_CLIENT_ID)) {
+          clientIdInput.value = cfg.clientId;
+        }
+        if (cfg.clientSecret && (isBlank(clientSecretInput.value) || clientSecretInput.value.trim() === STALE_CLIENT_SECRET)) {
+          clientSecretInput.value = cfg.clientSecret;
+        }
+      }
+
+      function loadOAuthConfigFromServer() {
+        fetch(appBasePath + "/swagger-oauth-config", {
+          method: "GET",
+          headers: { "Accept": "application/json" }
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error("HTTP " + response.status);
+            }
+            return response.json();
+          })
+          .then(applyServerOAuthConfig)
+          .catch(function (error) {
+            setStatus("Không nạp được cấu hình OAuth từ server: " + error.message, true);
+          });
+      }
+
       function setStatus(message, isError) {
         if (!statusEl) return;
         statusEl.textContent = message || "";
@@ -534,10 +578,9 @@
 
       loadConfig();
 
-      if (!document.getElementById("token-endpoint").value.trim()) {
-        var defaultEndpoint = window.location.protocol + "//" + window.location.hostname + ":8180/realms/td-webapi-realm/protocol/openid-connect/token";
-        document.getElementById("token-endpoint").value = defaultEndpoint;
-      }
+      // Nap cau hinh Keycloak/OAuth2 tu server (app.security.keycloak.*) — khong hard-code
+      // endpoint localhost:8180 nua, luon khop voi Keycloak that dang dung (vd 10.10.10.116).
+      loadOAuthConfigFromServer();
 
       if (applyBtn) {
         applyBtn.addEventListener("click", function () {

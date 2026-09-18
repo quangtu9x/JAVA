@@ -62,8 +62,11 @@ spring:
     open-in-view: false
   
   # Flyway Configuration
+  # BL-303/BL-117: tat Flyway tu dong cua Boot (chi chay tren 1 DataSource "chinh") - dung
+  # TenantFlywayMigrationService de tu chay migration nay cho TUNG DATABASE tenant (rieng biet hoan
+  # toan, khong con chi la schema khac nhau nhu BL-303 cu) khi khoi dong/khoi tao tenant moi.
   flyway:
-    enabled: true
+    enabled: false
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
@@ -77,6 +80,11 @@ spring:
       write-dates-as-timestamps: false
     deserialization:
       fail-on-unknown-properties: false
+      # Bo sung 09/09/2026 (LayDanhSachDungChung, xem javadoc GetLegacyOrgLookupForDungChungUseCase):
+      # nhieu man FE gui "keys" la 1 CHUOI DON (vd agency_id) thay vi mang - dung Domino goc cung
+      # chap nhan ca 2 dang (LayDanhSachDungChung.java#getKeysFromJson). Khong anh huong payload
+      # dang mang co san (chi coerce khi gap scalar cho field List<String>).
+      accept-single-value-as-array: true
 
   elasticsearch:
     uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
@@ -84,15 +92,86 @@ spring:
     socket-timeout: ${ELASTICSEARCH_SOCKET_TIMEOUT:10s}
     username: ${ELASTICSEARCH_USERNAME:}
     password: ${ELASTICSEARCH_PASSWORD:}
-  
-# Security Configuration with Keycloak
+
+  # BL-221 (VBDi Ky so & Gui di) DoD (3): gui van ban qua email cong vu. Khong co bang chung
+  # SMTP/JavaMail thuc su trong source Domino (chi co co che "mailin" - dinh tuyen noi bo giua
+  # cac database NSF, khac ban chat voi email that) - day la thiet ke moi cho Spring Boot, can
+  # cau hinh SMTP relay that (host/port/username/password) truoc khi dung cho nghiep vu that.
+  mail:
+    host: ${MAIL_SMTP_HOST:localhost}
+    port: ${MAIL_SMTP_PORT:587}
+    username: ${MAIL_SMTP_USERNAME:}
+    password: ${MAIL_SMTP_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:true}
+
+  # Yeu cau nguoi dung 04/09/2026 ("hoan thien Gui van ban... co cau hinh de sau neu can chuyen se
+  # chuyen"): RabbitMQ/Kafka la broker NGOAI (VM/server rieng, khong chay trong docker-compose cua
+  # app nay) - CUNG broker ma td-woker (JAVA/td-woker) dang tro toi, PHAI dat CUNG bien moi truong
+  # o ca 2 noi de message thuc su di toi duoc Worker (xem docs/architecture/11 addendum
+  # 04/09/2026). app.messaging.broker (duoi) quyet dinh publisher nao active - client duoi day
+  # LUON duoc cau hinh du dung hay khong (khong ton kem gi khi khong active).
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      retry:
+        enabled: true
+        max-attempts: 3
+        initial-interval: 500
+        multiplier: 2.0
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+# Multi-tenant Configuration (BL-117) — database-per-tenant THAT (moi tenant 1 database Postgres
+# vat ly rieng biet, co the khac host/port/server hoan toan). Danh sach tenant KHONG con khai bao
+# tinh o day nua (truoc day "tenants" YAML map, BL-303 cu) - chuyen han sang bang "tenants" dong
+# trong database "control-plane" ben duoi, quan ly qua API POST/PUT/{id}/activate/{id}/deactivate
+# /api/v1/platform/tenants (role PLATFORM_ADMIN). Them tenant moi = goi API (hot-add, khong can
+# restart app) - KHONG con sua file cau hinh nay.
 app:
+  multitenancy:
+    default-tenant-id: ${DEFAULT_TENANT_ID:H05}
+    flyway-locations: classpath:db/migration
+    # BL-117: database "control-plane" - CO DINH, KHONG thuoc tenant nao, chua bang "tenants"
+    # (registry) + "categories" (danh muc dung chung moi tenant, truoc day o schema `shared` cung
+    # database voi tenant - xem lich su docs/architecture/05-shared-schema-multi-tenant.md, da
+    # RETIRED). PHAI duoc DBA tao san (nhu database nghiep vu goc) truoc lan khoi dong dau tien -
+    # xem docs/architecture/06-database-per-tenant-multi-tenant.md.
+    control-plane:
+      url: ${CONTROL_PLANE_DATABASE_URL:jdbc:postgresql://localhost:5432/tdwebapi_controlplane}
+      username: ${CONTROL_PLANE_DATABASE_USERNAME:postgres}
+      password: ${CONTROL_PLANE_DATABASE_PASSWORD:postgres}
+      driver-class-name: org.postgresql.Driver
+      flyway-locations: classpath:db/migration-controlplane
+    # Ma hoa 2 CHIEU (KHONG phai hash 1 chieu) mat khau Postgres cua tung tenant luu trong bang
+    # "tenants" - BAT BUOC phai co truoc khi tao tenant dau tien, mat key nay = mat kha nang giai ma
+    # lai MOI mat khau tenant da luu (xem TenantCredentialCipher). salt PHAI la chuoi HEX hop le.
+    credential-encryption-key: ${TENANT_CREDENTIAL_ENCRYPTION_KEY:}
+    credential-encryption-salt: ${TENANT_CREDENTIAL_ENCRYPTION_SALT:}
+  # Security Configuration with Keycloak
   security:
     keycloak:
       server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8180}
       realm: ${KEYCLOAK_REALM:td-webapi-realm}
       client-id: ${KEYCLOAK_CLIENT_ID:td-webapi-client}
       client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+    tdtoken:
+      # BL-004 Authentication Bridge — secret phai trung voi TDKeySettings.JWT_Authen_Secret_KEY
+      # ben Domino. KHONG duoc hard-code trong source, chi truyen qua bien moi truong.
+      enabled: ${TDTOKEN_AUTH_ENABLED:true}
+      secret: ${TDTOKEN_JWT_SECRET:}
+      clock-skew-seconds: ${TDTOKEN_CLOCK_SKEW_SECONDS:60}
     cors:
       allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,https://localhost:*,http://127.0.0.1:*,https://127.0.0.1:*,http://[::1]:*,https://[::1]:*,http://hp.tandan.com.vn,https://hp.tandan.com.vn,https://qlvbjava.tandan.com.vn,https://*.tandan.com.vn}
       allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS,PATCH}
@@ -106,6 +185,78 @@ app:
     bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
   elasticsearch:
     enabled: ${ELASTICSEARCH_ENABLED:true}
+  email:
+    # BL-221: dia chi gui di + cong tac (bat/tat that su gui mail — mac dinh true, chi tat khi
+    # test/staging chua co SMTP relay that de tranh loi khi goi API).
+    from: ${MAIL_FROM_ADDRESS:qlvb@tandan.com.vn}
+    enabled: ${MAIL_SENDING_ENABLED:true}
+  onlyoffice:
+    # Tich hop chinh sua tai lieu truc tuyen OnlyOffice (THU NGHIEM, song song "Sua tep" cu qua
+    # BTEAdapter) - xem JAVA/docs/ONLYOFFICE_FE_INTEGRATION.md va OnlyOfficeController.
+    docserver-url: ${ONLYOFFICE_DOCSERVER_URL:}
+    jwt-enabled: ${ONLYOFFICE_JWT_ENABLED:false}
+    jwt-secret: ${ONLYOFFICE_JWT_SECRET:}
+    jwt-header: ${ONLYOFFICE_JWT_HEADER:Authorization}
+    jwt-in-body: ${ONLYOFFICE_JWT_IN_BODY:true}
+    # Secret RIENG cua Backend (KHONG chia se voi Document Server) - ky token pham vi hep cho
+    # document.url/callbackUrl, xem javadoc OnlyOfficeProperties/OnlyOfficeAccessTokenService.
+    internal-token-secret: ${ONLYOFFICE_INTERNAL_TOKEN_SECRET:}
+    # Dia chi Document Server dung de goi nguoc vao Backend nay - PHAI la IP/host Document Server
+    # thuc su truy cap duoc (khac localhost may dev). De trong se tu suy tu request hien tai.
+    callback-base-url: ${ONLYOFFICE_CALLBACK_BASE_URL:}
+    content-token-ttl-minutes: ${ONLYOFFICE_CONTENT_TOKEN_TTL_MINUTES:240}
+    callback-token-ttl-minutes: ${ONLYOFFICE_CALLBACK_TOKEN_TTL_MINUTES:240}
+  messaging:
+    # Yeu cau nguoi dung 04/09/2026: switch RabbitMQ/Kafka QUA CAU HINH (khong sua code) - chi 1
+    # MessagePublisher bean active theo gia tri nay (xem RabbitMessagePublisher/KafkaMessagePublisher,
+    # @ConditionalOnProperty). exchange/routing-prefix/kafka-topic PHAI khop dung quy uoc td-woker
+    # dang dung (worker.exchange / worker.<taskType> / worker.tasks) - xem docs/architecture/11
+    # addendum 04/09/2026 va JAVA/docs/MESSAGING_OUTBOX_GUIDE.md.
+    broker: ${APP_MESSAGING_BROKER:rabbit}
+    exchange: ${APP_MESSAGING_EXCHANGE:worker.exchange}
+    routing-prefix: ${APP_MESSAGING_ROUTING_PREFIX:worker.}
+    kafka-topic: ${APP_MESSAGING_KAFKA_TOPIC:worker.tasks}
+    source: ${APP_MESSAGING_SOURCE:td-web}
+    outbox:
+      poll-interval-ms: ${APP_MESSAGING_OUTBOX_POLL_INTERVAL_MS:5000}
+      batch-size: ${APP_MESSAGING_OUTBOX_BATCH_SIZE:50}
+      max-attempts: ${APP_MESSAGING_OUTBOX_MAX_ATTEMPTS:8}
+      retry-initial-backoff-ms: ${APP_MESSAGING_OUTBOX_RETRY_INITIAL_MS:5000}
+      retry-max-backoff-ms: ${APP_MESSAGING_OUTBOX_RETRY_MAX_MS:300000}
+  vbden:
+    # N16 (03/09/2026): nut "Chuyen VBQP" (VBDenButtonActionVT.jsx#btn_chuyenVBQP) chi hien khi
+    # cfg_chuyenvbqp="1" - xem QLVBCompatAuthController#getCauHinh. Mac dinh TAT/rong (giu nguyen
+    # hanh vi hien co - nut an) cho den khi operator can hinh that qua bien moi truong; CHUA co man
+    # "Cau hinh he thong" (BL-xxx) de bat qua UI.
+    vbqp:
+      enabled: ${VBDEN_VBQP_ENABLED:false}
+      mailin: ${VBDEN_VBQP_MAILIN:}
+  # Error Tracking tap trung — DB RIENG, tach hoan toan khoi spring.datasource.* (DB nghiep vu) o
+  # tren. Moi exception di qua GlobalExceptionHandler/security handler duoc ghi vao day kem Error ID
+  # tra ve client de tra cuu qua GET /api/v1/error-logs/{errorId} (chi ADMIN).
+  # Neu DB nay chua duoc provision hoac tam thoi khong ket noi duoc: app CHINH van khoi dong va phuc
+  # vu API binh thuong (xem ErrorTrackingDataSourceConfig/ErrorTrackingSchemaMigrator/ErrorTrackingService).
+  error-tracking:
+    enabled: ${ERROR_TRACKING_ENABLED:true}
+    # So ngay giu log - ban ghi cu hon bi ErrorLogCleanupScheduler tu dong xoa (khong de DB phinh to).
+    retention-days: ${ERROR_TRACKING_RETENTION_DAYS:30}
+    # Chay dep log cu luc 3h sang hang ngay (gio thap diem).
+    cleanup-cron: ${ERROR_TRACKING_CLEANUP_CRON:0 0 3 * * *}
+    datasource:
+      url: ${ERROR_TRACKING_DB_URL:jdbc:postgresql://localhost:5432/tderrorlog}
+      username: ${ERROR_TRACKING_DB_USERNAME:postgres}
+      password: ${ERROR_TRACKING_DB_PASSWORD:postgres}
+      driver-class-name: org.postgresql.Driver
+    # Log SYSTEM khi 1 request xu ly cham hon nguong (bat ke thanh cong hay loi) - phat hien som
+    # trieu chung "cham"/"treo" o tang he thong, tach biet loi nghiep vu cu the.
+    slow-request:
+      enabled: ${ERROR_TRACKING_SLOW_REQUEST_ENABLED:true}
+      warn-threshold-ms: ${ERROR_TRACKING_SLOW_REQUEST_WARN_MS:3000}
+      critical-threshold-ms: ${ERROR_TRACKING_SLOW_REQUEST_CRITICAL_MS:10000}
+    # Dinh ky kiem tra JVM deadlock (thread bi "treo" cho nhau vo thoi han) - log SYSTEM/CRITICAL neu phat hien.
+    deadlock-watchdog:
+      enabled: ${ERROR_TRACKING_DEADLOCK_WATCHDOG_ENABLED:true}
+      interval-ms: ${ERROR_TRACKING_DEADLOCK_WATCHDOG_INTERVAL_MS:60000}
 
 # Management Endpoints
 management:

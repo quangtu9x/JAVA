@@ -1,11 +1,19 @@
 package com.td.web.controllers.v1;
 
+import com.td.application.common.models.ApiResponse;
 import com.td.application.common.models.CachedPaginationResponse;
 import com.td.application.common.models.CachedResult;
 import com.td.application.common.models.PaginationResponse;
 import com.td.application.common.models.Result;
+import com.td.application.documents.AddDynamicDocumentRequest;
+import com.td.application.documents.AddDynamicDocumentUseCase;
+import com.td.application.documents.ChuKySoDto;
 import com.td.application.documents.CreateDocumentRequest;
 import com.td.application.documents.CreateDocumentUseCase;
+import com.td.application.documents.GetDocumentLogsUseCase;
+import com.td.application.documents.DocumentLogDto;
+import com.td.application.documents.GetDynamicDocumentRequest;
+import com.td.application.documents.GetDynamicDocumentUseCase;
 import com.td.application.documents.DeleteDocumentUseCase;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentCacheStatsDto;
@@ -31,10 +39,18 @@ import com.td.application.documents.GetFileUseCase;
 import com.td.application.documents.ListDocumentFilesUseCase;
 import com.td.application.documents.DeleteFileUseCase;
 import com.td.application.documents.UpdateDocumentWithFileUseCase;
+import com.td.application.documents.RenameFileRequest;
+import com.td.application.documents.RenameFileUseCase;
+import com.td.application.documents.VerifyFileSignatureRequest;
+import com.td.application.documents.VerifyFileSignatureUseCase;
 import com.td.application.documents.UploadFileRequest;
 import com.td.application.documents.FileDto;
 import com.td.application.documents.DeleteFileRequest;
 import com.td.application.documents.DownloadFileRequest;
+import com.td.application.documents.ListFileAccessLogRequest;
+import com.td.application.documents.ListFileAccessLogUseCase;
+import com.td.application.documents.RecordFileAccessRequest;
+import com.td.application.documents.RecordFileAccessUseCase;
 import com.td.infrastructure.config.MinioService;
 import com.td.web.controllers.BaseController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +67,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -62,7 +79,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -73,6 +92,8 @@ import java.util.UUID;
 public class DocumentsController extends BaseController {
 
     private final CreateDocumentUseCase createDocumentUseCase;
+    private final AddDynamicDocumentUseCase addDynamicDocumentUseCase;
+    private final GetDynamicDocumentUseCase getDynamicDocumentUseCase;
     private final UpdateDocumentUseCase updateDocumentUseCase;
     private final DeleteDocumentUseCase deleteDocumentUseCase;
     private final HardDeleteDocumentUseCase hardDeleteDocumentUseCase;
@@ -83,11 +104,16 @@ public class DocumentsController extends BaseController {
     private final ReindexDocumentSearchUseCase reindexDocumentSearchUseCase;
     private final SyncDocumentSearchByIdUseCase syncDocumentSearchByIdUseCase;
     private final GetDeletedDocumentsUseCase getDeletedDocumentsUseCase;
+    private final GetDocumentLogsUseCase getDocumentLogsUseCase;
     private final UploadFileUseCase uploadFileUseCase;
     private final GetFileUseCase getFileUseCase;
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final DeleteFileUseCase deleteFileUseCase;
+    private final RenameFileUseCase renameFileUseCase;
     private final UpdateDocumentWithFileUseCase updateDocumentWithFileUseCase;
+    private final VerifyFileSignatureUseCase verifyFileSignatureUseCase;
+    private final RecordFileAccessUseCase recordFileAccessUseCase;
+    private final ListFileAccessLogUseCase listFileAccessLogUseCase;
     private final MinioService minioService;
     private final DocumentCacheService documentCacheService;
 
@@ -95,7 +121,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Danh sách tài liệu",
         description = "Lấy danh sách tài liệu, mỗi tài liệu có thêm trường files để mở/tải lại file")
-    public ResponseEntity<PaginationResponse<DocumentDto>> listDocuments(
+    public ResponseEntity<ApiResponse<List<DocumentDto>>> listDocuments(
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "10") int pageSize,
             @RequestParam(name = "sortBy", defaultValue = "lastModifiedOn") String sortBy,
@@ -119,7 +145,7 @@ public class DocumentsController extends BaseController {
             if (cachedResponse != null) {
                 return ResponseEntity.ok()
                     .header("X-Cache", "HIT")
-                    .body(new CachedPaginationResponse<>(cachedResponse, documentCacheService.getListCacheKey(request)));
+                    .body(toApiResponse(new CachedPaginationResponse<>(cachedResponse, documentCacheService.getListCacheKey(request))));
             }
         }
 
@@ -127,21 +153,21 @@ public class DocumentsController extends BaseController {
         documentCacheService.putList(request, response);
         return ResponseEntity.ok()
             .header("X-Cache", "MISS")
-            .body(response);
+            .body(toApiResponse(response));
     }
 
     @GetMapping("/cache/stats")
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Thống kê cache document",
         description = "Theo dõi hit, miss, put và evict của cache document chi tiết và danh sách")
-    public ResponseEntity<Result<DocumentCacheStatsDto>> getDocumentCacheStats() {
+    public ResponseEntity<ApiResponse<DocumentCacheStatsDto>> getDocumentCacheStats() {
         return ok(Result.success(documentCacheService.getStats()));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Xem chi tiết tài liệu")
-        public ResponseEntity<Result<DocumentDto>> getDocument(
+        public ResponseEntity<ApiResponse<DocumentDto>> getDocument(
                 @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
                 @Parameter(description = "Bật/tắt cache. Khi false, luôn lấy dữ liệu mới từ DB và cập nhật lại cache")
                 @RequestParam(name = "useCache", defaultValue = "true") boolean useCache) {
@@ -152,14 +178,14 @@ public class DocumentsController extends BaseController {
         var result = getDocumentUseCase.execute(new GetDocumentRequest(id));
         return ResponseEntity.ok()
             .header("X-Cache", cached ? "HIT" : "MISS")
-            .body(cached ? new CachedResult<>(result, documentCacheService.getDocumentCacheKey(id)) : result);
+            .body(toApiResponse(cached ? new CachedResult<>(result, documentCacheService.getDocumentCacheKey(id)) : result));
     }
 
             @GetMapping("/{id}/with-files")
             @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
             @Operation(summary = "Xem chi tiết tài liệu kèm danh sách tệp tin",
                 description = "Lấy chi tiết một tài liệu và toàn bộ tệp tin gắn với tài liệu đó trong một API")
-            public ResponseEntity<Result<DocumentDetailWithFilesDto>> getDocumentWithFiles(
+            public ResponseEntity<ApiResponse<DocumentDetailWithFilesDto>> getDocumentWithFiles(
                 @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
             var documentResult = getDocumentUseCase.execute(new GetDocumentRequest(id));
             if (!documentResult.isSuccess() || documentResult.getData() == null) {
@@ -183,7 +209,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Xem chi tiết tài liệu kèm danh sách tệp tin (dạng đơn giản)",
         description = "Lấy chi tiết tài liệu và danh sách tệp tin để hiển thị nhanh và mở/tải lại file")
-    public ResponseEntity<Result<DocumentXemChiTietDto>> getDocumentXemChiTiet(
+    public ResponseEntity<ApiResponse<DocumentXemChiTietDto>> getDocumentXemChiTiet(
             @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var documentResult = getDocumentUseCase.execute(new GetDocumentRequest(id));
         if (!documentResult.isSuccess() || documentResult.getData() == null) {
@@ -201,6 +227,17 @@ public class DocumentsController extends BaseController {
             .build();
 
         return ok(Result.success(payload));
+    }
+
+    @GetMapping("/{id}/logs")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Tra cứu audit log của tài liệu (BL-103)",
+        description = "Danh sách log append-only (create/update/delete/hard_delete) theo documentId, mới nhất trước")
+    public ResponseEntity<ApiResponse<List<DocumentLogDto>>> getDocumentLogs(
+            @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
+            @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
+            @RequestParam(name = "pageSize", defaultValue = "20") int pageSize) {
+        return ok(getDocumentLogsUseCase.execute(id, pageNumber, pageSize));
     }
 
     private String extractFileExtension(String fileName) {
@@ -221,7 +258,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Tìm kiếm tài liệu theo bộ lọc",
         description = "Trả về danh sách tài liệu theo bộ lọc, mỗi tài liệu có thêm trường files")
-    public ResponseEntity<PaginationResponse<DocumentDto>> searchDocuments(
+    public ResponseEntity<ApiResponse<List<DocumentDto>>> searchDocuments(
             @Valid @RequestBody SearchDocumentsRequest request,
             @Parameter(description = "Bật/tắt cache. Khi false, luôn lấy dữ liệu mới từ DB và cập nhật lại cache")
             @RequestParam(name = "useCache", defaultValue = "true") boolean useCache) {
@@ -230,7 +267,7 @@ public class DocumentsController extends BaseController {
             if (cachedResponse != null) {
                 return ResponseEntity.ok()
                     .header("X-Cache", "HIT")
-                    .body(new CachedPaginationResponse<>(cachedResponse, documentCacheService.getListCacheKey(request)));
+                    .body(toApiResponse(new CachedPaginationResponse<>(cachedResponse, documentCacheService.getListCacheKey(request))));
             }
         }
 
@@ -238,27 +275,27 @@ public class DocumentsController extends BaseController {
         documentCacheService.putList(request, response);
         return ResponseEntity.ok()
             .header("X-Cache", "MISS")
-            .body(response);
+            .body(toApiResponse(response));
     }
 
     @PostMapping("/search/elastic")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Tìm kiếm tài liệu bằng Elasticsearch",
         description = "Ưu tiên Elasticsearch cho full-text search. Nếu request có attributeFilters hoặc Elasticsearch chưa sẵn sàng, API sẽ fallback về database search")
-    public ResponseEntity<PaginationResponse<DocumentDto>> searchDocumentsElastic(
+    public ResponseEntity<ApiResponse<List<DocumentDto>>> searchDocumentsElastic(
             @Valid @RequestBody SearchDocumentsRequest request) {
         var searchResult = searchDocumentsElasticUseCase.execute(request);
         var response = enrichDocumentsWithFiles(searchResult.getPage());
         return ResponseEntity.ok()
             .header("X-Search-Backend", searchResult.getBackend())
-            .body(response);
+            .body(toApiResponse(response));
     }
 
     @GetMapping("/search/admin/status")
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Trạng thái Elasticsearch cho documents",
         description = "Kiểm tra Elasticsearch đã bật, đã tạo index và có bao nhiêu bản ghi được index")
-    public ResponseEntity<Result<DocumentSearchStatusDto>> getDocumentSearchStatus() {
+    public ResponseEntity<ApiResponse<DocumentSearchStatusDto>> getDocumentSearchStatus() {
         return ok(getDocumentSearchStatusUseCase.execute());
     }
 
@@ -266,7 +303,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Reindex documents lên Elasticsearch",
         description = "Xóa và tạo lại index documents-search, sau đó đồng bộ toàn bộ documents chưa bị xóa từ PostgreSQL sang Elasticsearch")
-    public ResponseEntity<Result<Long>> reindexDocumentSearch() {
+    public ResponseEntity<ApiResponse<Long>> reindexDocumentSearch() {
         return ok(reindexDocumentSearchUseCase.execute());
     }
 
@@ -274,7 +311,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Đồng bộ một document lên Elasticsearch theo ID",
         description = "Dùng để debug index data cho một document cụ thể. Nếu document đã deleted hoặc không tồn tại, API sẽ xóa bản ghi tương ứng khỏi index")
-    public ResponseEntity<Result<String>> syncDocumentSearchById(
+    public ResponseEntity<ApiResponse<String>> syncDocumentSearchById(
             @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         return ok(syncDocumentSearchByIdUseCase.execute(id));
     }
@@ -339,15 +376,55 @@ public class DocumentsController extends BaseController {
     @PostMapping
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Tạo tài liệu mới")
-    public ResponseEntity<Result<UUID>> createDocument(@Valid @RequestBody CreateDocumentRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createDocument(@Valid @RequestBody CreateDocumentRequest request) {
         var result = createDocumentUseCase.execute(request);
         return created(result);
+    }
+
+    @PostMapping("/add")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Tạo tài liệu với field động (BL-101)",
+        description = "Tương thích API legacy qlvb/add: form-data field động + meta date_fields/number_fields/richtext_fields "
+            + "quyết định kiểu lưu vào cột dynamic_fields (JSONB)")
+    public ResponseEntity<ApiResponse<UUID>> addDynamicDocument(@RequestParam Map<String, String> params) {
+        return created(addDynamicDocumentUseCase.execute(buildAddDynamicDocumentRequest(params)));
+    }
+
+    private AddDynamicDocumentRequest buildAddDynamicDocumentRequest(Map<String, String> params) {
+        var request = new AddDynamicDocumentRequest();
+        request.setTitle(params.get("title"));
+        request.setDocumentType(params.getOrDefault("documentType", params.get("document_type")));
+        request.setStatus(params.get("status"));
+        request.setDateFields(params.get("date_fields"));
+        request.setNumberFields(params.get("number_fields"));
+        request.setRichtextFields(params.get("richtext_fields"));
+
+        Map<String, String> dynamicFields = new LinkedHashMap<>(params);
+        for (String metaKey : List.of(
+                "title", "documentType", "document_type", "status", "date_fields", "number_fields", "richtext_fields")) {
+            dynamicFields.remove(metaKey);
+        }
+        request.setFields(dynamicFields);
+        return request;
+    }
+
+    @PostMapping("/{id}/get")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Lấy tài liệu theo field động (BL-101)",
+        description = "Tương thích API legacy qlvb/get: items=\"getall\" trả về tất cả field "
+            + "(tĩnh + động), hoặc items=\"field1;field2\" lọc theo danh sách field")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getDynamicDocument(
+            @Parameter(description = "Document ID", required = true) @PathVariable UUID id,
+            @RequestBody(required = false) GetDynamicDocumentRequest request) {
+        var effectiveRequest = request != null ? request : new GetDynamicDocumentRequest();
+        effectiveRequest.setId(id);
+        return ok(getDynamicDocumentUseCase.execute(effectiveRequest));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Cập nhật tài liệu")
-    public ResponseEntity<Result<UUID>> updateDocument(
+    public ResponseEntity<ApiResponse<UUID>> updateDocument(
                 @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateDocumentRequest request) {
         if (request.getId() != null && !id.equals(request.getId())) {
@@ -363,7 +440,7 @@ public class DocumentsController extends BaseController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Xóa tài liệu (soft delete)")
-    public ResponseEntity<Result<UUID>> deleteDocument(
+    public ResponseEntity<ApiResponse<UUID>> deleteDocument(
             @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = deleteDocumentUseCase.execute(id);
         return ok(result);
@@ -373,7 +450,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Xóa vĩnh viễn tài liệu",
                description = "Xóa hoàn toàn tài liệu khỏi database, không thể khôi phục. Chỉ dành cho Admin")
-    public ResponseEntity<Result<UUID>> hardDeleteDocument(
+    public ResponseEntity<ApiResponse<UUID>> hardDeleteDocument(
             @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
         var result = hardDeleteDocumentUseCase.execute(id);
         return ok(result);
@@ -383,7 +460,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Danh sách tài liệu đã xóa",
                description = "Lấy danh sách tài liệu đã bị soft delete (chưa hoạt động)")
-    public ResponseEntity<PaginationResponse<DocumentDto>> searchDeletedDocuments(
+    public ResponseEntity<ApiResponse<List<DocumentDto>>> searchDeletedDocuments(
             @Valid @RequestBody SearchDocumentsRequest request) {
         var response = getDeletedDocumentsUseCase.execute(request);
         return ok(response);
@@ -395,13 +472,19 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER', 'DOC_EDITOR')")
     @Operation(summary = "Tải lên tệp tin cho tài liệu",
             description = "Tải lên một tệp tin mới cho tài liệu, hỗ trợ đánh dấu tệp chính")
-    public ResponseEntity<Result<UUID>> uploadFile(
+    public ResponseEntity<ApiResponse<UUID>> uploadFile(
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @Parameter(description = "Tệp tin cần tải lên", required = true,
                     content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE))
             @RequestParam("file") MultipartFile file,
             @Parameter(description = "Đánh dấu là tệp chính") @RequestParam(value = "isPrimary", defaultValue = "false") Boolean isPrimary,
-            @Parameter(description = "Mô tả tệp tin") @RequestParam(value = "description", required = false) String description) {
+            @Parameter(description = "Mô tả tệp tin") @RequestParam(value = "description", required = false) String description,
+            @Parameter(description = "Tên module sở hữu tài liệu (vd duthao/vbden/vbdi) — tuỳ chọn, "
+                + "dùng để tách đường dẫn lưu trữ MinIO theo module, không đổi hành vi nếu bỏ trống")
+            @RequestParam(value = "module", required = false) String module,
+            @Parameter(description = "Id vết xử lý (DT-007, tuỳ chọn — vd draft_process_documents.id) "
+                + "nếu tệp được đính kèm cùng lúc với 1 lần xử lý cụ thể")
+            @RequestParam(value = "processId", required = false) UUID processId) {
         try {
             var request = UploadFileRequest.builder()
                     .documentId(documentId)
@@ -411,6 +494,8 @@ public class DocumentsController extends BaseController {
                     .fileSize(file.getSize())
                     .isPrimary(isPrimary)
                     .description(description)
+                    .module(module)
+                    .processId(processId)
                     .build();
             var result = uploadFileUseCase.execute(request);
             return created(result);
@@ -423,7 +508,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Danh sách tệp tin của tài liệu",
             description = "Lấy danh sách tất cả tệp tin được tải lên cho tài liệu")
-    public ResponseEntity<PaginationResponse<FileDto>> listDocumentFiles(
+    public ResponseEntity<ApiResponse<List<FileDto>>> listDocumentFiles(
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "20") int pageSize) {
@@ -435,7 +520,7 @@ public class DocumentsController extends BaseController {
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Chi tiết tệp tin",
             description = "Lấy thông tin chi tiết của một tệp tin")
-    public ResponseEntity<Result<FileDto>> getFile(
+    public ResponseEntity<ApiResponse<FileDto>> getFile(
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @Parameter(description = "File ID", required = true) @PathVariable UUID fileId) {
         var request = DownloadFileRequest.builder()
@@ -446,11 +531,29 @@ public class DocumentsController extends BaseController {
         return ok(result);
     }
 
+    @PostMapping("/{documentId}/files/{fileId}/verify-signature")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Xác thực chữ ký số trong file (BL-221 DoD 2)",
+            description = "Đọc chữ ký số PKCS#7 nhúng trong file PDF (signature dictionary "
+                + "/ByteRange, /Contents) và kiểm tra toàn vẹn dữ liệu — tương đương "
+                + "TDAttachmentSignVerify.java thật, tổng quát cho mọi documentType (vbden, vbdi, "
+                + "vbcddh, ...), đúng thiết kế databasetype-agnostic của TDAttachment thật. KHÔNG "
+                + "kiểm tra certificate người ký có do CA tỉnh/LGSP cấp hay không (cần tích hợp "
+                + "CA trust store thật — xem Rủi ro BL-221)")
+    public ResponseEntity<ApiResponse<List<ChuKySoDto>>> verifySignature(
+            @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
+            @Parameter(description = "File ID", required = true) @PathVariable UUID fileId) {
+        var request = new VerifyFileSignatureRequest();
+        request.setDocumentId(documentId);
+        request.setFileId(fileId);
+        return ok(verifyFileSignatureUseCase.execute(request));
+    }
+
     @DeleteMapping("/{documentId}/files/{fileId}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER', 'DOC_EDITOR')")
     @Operation(summary = "Xóa tệp tin",
             description = "Xóa một tệp tin khỏi tài liệu")
-    public ResponseEntity<Result<UUID>> deleteFile(
+    public ResponseEntity<ApiResponse<UUID>> deleteFile(
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @Parameter(description = "File ID", required = true) @PathVariable UUID fileId,
             @Parameter(description = "Lý do xóa") @RequestParam(value = "reason", required = false) String reason) {
@@ -463,11 +566,30 @@ public class DocumentsController extends BaseController {
         return ok(result);
     }
 
+    // Gap "đính kèm" 28/08/2026 ("port luôn gap còn lại đi" — xem javadoc RenameFileUseCase): đổi
+    // tên tệp tải lên qua Java/MinIO. documentId/fileId lấy từ path (nguồn tin cậy, khớp quy ước
+    // deleteFile ở trên), body CHỈ mang tên mới.
+    @PatchMapping("/{documentId}/files/{fileId}/rename")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER', 'DOC_EDITOR')")
+    @Operation(summary = "Đổi tên tệp tin",
+            description = "Đổi tên hiển thị của một tệp tin đã tải lên qua Java/MinIO")
+    public ResponseEntity<ApiResponse<UUID>> renameFile(
+            @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
+            @Parameter(description = "File ID", required = true) @PathVariable UUID fileId,
+            @Valid @RequestBody RenameFileRequest body) {
+        var request = RenameFileRequest.builder()
+                .documentId(documentId)
+                .fileId(fileId)
+                .newFileName(body.getNewFileName())
+                .build();
+        return ok(renameFileUseCase.execute(request));
+    }
+
     @PutMapping(value = "/{documentId}/with-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER', 'DOC_EDITOR')")
     @Operation(summary = "Cập nhật tài liệu với tệp tin",
             description = "Cập nhật thông tin tài liệu đồng thời tải lên tệp tin mới qua Form Data")
-    public ResponseEntity<Result<UUID>> updateDocumentWithFile(
+    public ResponseEntity<ApiResponse<UUID>> updateDocumentWithFile(
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @Parameter(description = "Tiêu đề tài liệu") @RequestParam(value = "title", required = false) String title,
             @Parameter(description = "Loại tài liệu") @RequestParam(value = "documentType", required = false) String documentType,
@@ -543,5 +665,45 @@ public class DocumentsController extends BaseController {
         } catch (Exception e) {
             return badRequest(Result.failure("Lỗi tải tệp tin: " + e.getMessage()));
         }
+    }
+
+    @PostMapping("/{documentId}/files/{fileId}/access-log")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Ghi log xem/tải tệp đính kèm (09/09/2026)",
+            description = "GENERIC cho mọi module (vbdi/vbden/duthao/hosocv/...) gọi chung — xem "
+                + "javadoc RecordFileAccessUseCase. UPSERT theo (module,documentId,fileId,username,"
+                + "action): lần đầu tạo dòng mới, các lần sau CHỈ cập nhật lastAccessedOn/accessCount "
+                + "(không phình bảng theo số lượt xem). fileName/fullname/unit tự tra server-side, "
+                + "KHÔNG tin client. body: {module, action:\"view\"|\"download\"}")
+    public ResponseEntity<ApiResponse<UUID>> recordFileAccess(
+            @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
+            @Parameter(description = "File ID", required = true) @PathVariable UUID fileId,
+            @RequestBody RecordFileAccessRequest body) {
+        var request = new RecordFileAccessRequest();
+        request.setDocumentId(documentId);
+        request.setFileId(fileId);
+        request.setModule(body.getModule());
+        request.setAction(body.getAction());
+        return created(recordFileAccessUseCase.execute(request));
+    }
+
+    @GetMapping("/{documentId}/access-log")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Đọc Lịch sử xem/tải tệp đính kèm theo văn bản (09/09/2026)",
+            description = "GENERIC cho mọi module — xem javadoc ListFileAccessLogUseCase. Trả mảng "
+                + "PHẲNG, mỗi phần tử là 1 tổ hợp (tệp, người dùng, thao tác) DUY NHẤT (không phải "
+                + "1 dòng/1 lượt xem) — kèm firstAccessedOn/lastAccessedOn/accessCount")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getFileAccessLog(
+            @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
+            @Parameter(description = "Module sở hữu document (vbdi/vbden/duthao/...)", required = true)
+            @RequestParam String module,
+            @RequestParam(name = "pageNumber", defaultValue = "1") int pageNumber,
+            @RequestParam(name = "pageSize", defaultValue = "200") int pageSize) {
+        var request = new ListFileAccessLogRequest();
+        request.setDocumentId(documentId);
+        request.setModule(module);
+        request.setPageNumber(pageNumber);
+        request.setPageSize(pageSize);
+        return ok(listFileAccessLogUseCase.execute(request));
     }
 }

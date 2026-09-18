@@ -22,6 +22,13 @@ public class FileMetadataEntity {
     @Column(name = "document_id")
     private UUID documentId;
 
+    // DT-007 (27/08/2026, "quan ly tep dinh kem theo id cha, draft_process van the hien dung lan
+    // gan kem"): id vet xu ly (vd draft_process_documents.id) ma tep duoc dinh kem CUNG LUC -
+    // NULL neu tep khong gan voi 1 lan xu ly cu the (moi module khac ngoai duthao). Van dung
+    // document_id lam khoa storage/list chinh, khong thay the.
+    @Column(name = "process_id")
+    private UUID processId;
+
     @Column(name = "original_filename", nullable = false)
     private String originalFilename;
 
@@ -57,4 +64,31 @@ public class FileMetadataEntity {
 
     @Column(name = "description")
     private String description;
+
+    // Yeu cau nguoi dung 08/09/2026 ("van ban nhan duoc bang chuc nang 'chuyen xu ly' thi khong cho
+    // xoa dinh kem goc") - xem migration V1.0.50 + javadoc DeleteFileUseCaseImpl: TRUE = dong nay CHI
+    // tham chieu (khong so huu) object MinIO tai file_path/bucket_name (vd ban sao
+    // vbden.forward_unit "doc chung" voi van ban goc o tenant khac) - PHAI chan xoa.
+    //
+    // Bugfix 09/09/2026 (bao loi nguoi dung: upload dinh kem vbdi 500 "null value in column
+    // is_shared violates not-null constraint"): cot DB la NOT NULL DEFAULT FALSE (migration
+    // V1.0.50), nhung field Java truoc day KHONG co gia tri mac dinh (null) - Hibernate LUON liet ke
+    // du moi cot trong cau INSERT (ke ca gia tri null tuong minh) nen cot DEFAULT cua DB KHONG BAO
+    // GIO duoc ap dung cho insert qua JPA (chi ap dung khi cau INSERT thuc su BO QUA ten cot) - moi
+    // noi tao FileMetadataEntity qua builder() ma quen goi .isShared(...) (UploadFileUseCaseImpl,
+    // CopyDocumentFilesUseCaseImpl, PrepareVbdiDeliveryFilesUseCaseImpl - da sua tuong minh them cho
+    // ro y, xem cac file do) deu vi pham NOT NULL. @Builder.Default lam luoi an toan cho BAT KY noi
+    // nao (ke ca sau nay) quen goi .isShared(...) qua builder.
+    @Builder.Default
+    @Column(name = "is_shared")
+    private Boolean isShared = Boolean.FALSE;
+
+    // Yeu cau nguoi dung 15/09/2026 (port ky so vbdi/vbden - "giu file goc, tep ky luu moi, thay
+    // the tep chinh thuc"): tep CHINH THUC/hien hanh cua document_id nay (vd tep da ky so) - chi 1
+    // tep is_primary=true tai 1 thoi diem cho cung document_id (xem UploadFileUseCaseImpl#
+    // demoteExistingPrimary). @Builder.Default bat buoc - cung ly do @isShared o tren (Hibernate
+    // luon INSERT du moi cot, DB DEFAULT khong ap dung qua JPA).
+    @Builder.Default
+    @Column(name = "is_primary")
+    private Boolean isPrimary = Boolean.FALSE;
 }

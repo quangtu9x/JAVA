@@ -12,11 +12,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -43,12 +45,28 @@ public class CurrentUserContextResolver {
             return Optional.empty();
         }
 
+        if (authentication instanceof TdTokenAuthenticationToken tdTokenAuthentication) {
+            return Optional.of(resolveTdTokenContext(tdTokenAuthentication));
+        }
+
         Jwt jwt = extractJwt(authentication);
         String cacheKey = buildCacheKey(authentication, jwt);
+        // Bugfix 03/09/2026 (báo lỗi người dùng, xác nhận qua token thật + log: đăng nhập snnmt
+        // nhưng server resolve ra skhcn, "tự đúng lại" sau ~5-6 phút — đúng bằng TTL cache dưới đây):
+        // KHÔNG dùng authentication.getName() làm requestUsername — với JwtAuthenticationToken,
+        // getName() đọc claim "sub", mà access token Keycloak THẬT của hệ thống này KHÔNG có claim
+        // "sub" (chỉ có "preferred_username") — getName() luôn trả null cho MỌI user, khiến
+        // isSameUser(null, cached) luôn coi là "khớp" (không bao giờ phát hiện lệch), và buildCacheKey
+        // (cùng lỗi, xem bên dưới) sinh ra CÙNG 1 KEY cho MỌI user. Dùng resolveJwtUsername() (ưu
+        // tiên "preferred_username", đã xác nhận LUÔN có trên token thật).
+        String requestUsername = resolveJwtUsername(authentication, jwt);
 
         CurrentUserContext local = localCache.getIfPresent(cacheKey);
         if (local != null) {
-            return Optional.of(local);
+            if (isSameUser(requestUsername, local)) {
+                return Optional.of(local);
+            }
+            evictMismatch("local", cacheKey, requestUsername, local);
         }
 
         org.springframework.cache.Cache redisCache = resolveRedisCache();
@@ -56,8 +74,12 @@ public class CurrentUserContextResolver {
             try {
                 CurrentUserContext cached = redisCache.get(cacheKey, CurrentUserContext.class);
                 if (cached != null) {
-                    localCache.put(cacheKey, cached);
-                    return Optional.of(cached);
+                    if (isSameUser(requestUsername, cached)) {
+                        localCache.put(cacheKey, cached);
+                        return Optional.of(cached);
+                    }
+                    evictMismatch("redis", cacheKey, requestUsername, cached);
+                    redisCache.evict(cacheKey);
                 }
             } catch (Exception ex) {
                 log.debug("Read user context from Redis failed for key {}: {}", cacheKey, ex.getMessage());
@@ -83,6 +105,128 @@ public class CurrentUserContextResolver {
             .map(CurrentUserContext::getUserUuid);
     }
 
+    /**
+     * Build {@link CurrentUserContext} cho request xác thực qua {@code Tdtoken} (BL-004), không
+     * cần {@link Jwt} Keycloak. userUuid được suy ra tất định từ username (không đổi giữa các
+     * lần gọi) để {@code AuditorAware} (createdBy/updatedBy) vẫn hoạt động cho user Tdtoken.
+     */
+    private CurrentUserContext resolveTdTokenContext(TdTokenAuthenticationToken authentication) {
+        String requestUsername = authentication.getName();
+        String cacheKey = "ctx:tdtoken:" + safe(requestUsername);
+
+        // Bugfix 03/09/2026 (báo lỗi người dùng: đăng nhập lại 1 tenant/tài khoản — kể cả tab ẩn
+        // danh, đã stop/start lại BE nhưng KHÔNG hết — vẫn thấy dữ liệu của đơn vị khác ở 1 số API,
+        // 1 số khác lại đúng; tự khỏi "1 lúc sau"): restart BE không dọn được cache này vì
+        // `security:user-context` sống ở REDIS (external, sống lâu hơn JVM) — khớp CHÍNH XÁC lý do
+        // restart BE không giải quyết được. Đối chiếu: các API bị lỗi (GetSoVanBanDenUseCase,
+        // GetCapBanHanhOptionsUseCase) ĐỀU đi qua CurrentUserProvider.currentUsername() (tức HÀM
+        // NÀY) để suy ra identifier lọc dữ liệu; API không lỗi (danh sách sổ văn bản, dự thảo toàn
+        // bộ) KHÔNG phụ thuộc identifier theo user hiện tại — khớp đúng "lỗi theo API". Không chỉ
+        // LOG khi cache trả về username KHÁC username của request hiện tại — LOẠI BỎ NGAY entry sai
+        // đó và tính lại tươi từ token, tự phục hồi ngay trong CÙNG request thay vì phải đợi TTL hết
+        // hạn (đây là dữ liệu định danh/phân quyền — không chấp nhận phục vụ nhầm dù chỉ 1 request).
+        CurrentUserContext local = localCache.getIfPresent(cacheKey);
+        if (local != null) {
+            if (isSameUser(requestUsername, local)) {
+                return local;
+            }
+            evictMismatch("local", cacheKey, requestUsername, local);
+        }
+
+        org.springframework.cache.Cache redisCache = resolveRedisCache();
+        if (redisCache != null) {
+            try {
+                CurrentUserContext cached = redisCache.get(cacheKey, CurrentUserContext.class);
+                if (cached != null) {
+                    if (isSameUser(requestUsername, cached)) {
+                        localCache.put(cacheKey, cached);
+                        return cached;
+                    }
+                    evictMismatch("redis", cacheKey, requestUsername, cached);
+                    redisCache.evict(cacheKey);
+                }
+            } catch (Exception ex) {
+                log.debug("Read tdtoken user context from Redis failed for key {}: {}", cacheKey, ex.getMessage());
+            }
+        }
+
+        CurrentUserContext resolved = buildTdTokenContext(authentication);
+        localCache.put(cacheKey, resolved);
+
+        if (redisCache != null) {
+            try {
+                redisCache.put(cacheKey, resolved);
+            } catch (Exception ex) {
+                log.debug("Write tdtoken user context to Redis failed for key {}: {}", cacheKey, ex.getMessage());
+            }
+        }
+
+        return resolved;
+    }
+
+    // Xem chu thich o resolveTdTokenContext/resolveCurrentUserContext - dung chung cho ca 2 nhanh
+    // Tdtoken va Keycloak JWT.
+    private boolean isSameUser(String requestUsername, CurrentUserContext cached) {
+        return requestUsername == null || cached == null
+            || requestUsername.equalsIgnoreCase(cached.getUsername());
+    }
+
+    // Loai bo NGAY entry cache lech user khoi L1 (Redis duoc goi evict rieng o noi goi, vi co the
+    // can try/catch khac nhau giua 2 nhanh) - khong de request SAU tiep tuc doc trung entry sai nay.
+    private void evictMismatch(String source, String cacheKey, String requestUsername, CurrentUserContext cached) {
+        log.warn(
+            "MISMATCH cache user-context ({}): request username='{}' (key={}) nhung gia tri cache "
+                + "tra ve username='{}', activeOrgId='{}' - da LOAI BO entry nay va tinh lai tuoi tu "
+                + "token (khong phuc vu nham du lieu nguoi dung khac).",
+            source, requestUsername, cacheKey, cached.getUsername(), cached.getActiveOrgId());
+        localCache.invalidate(cacheKey);
+    }
+
+    private CurrentUserContext buildTdTokenContext(TdTokenAuthenticationToken authentication) {
+        AuthenticatedUser user = (AuthenticatedUser) authentication.getPrincipal();
+        Map<String, Object> claims = user.getClaims();
+
+        String activeOrgId = firstNonBlank(
+            claimAsString(claims, "unit_id"),
+            claimAsString(claims, "agency_id"),
+            claimAsString(claims, "identifier")
+        );
+
+        return CurrentUserContext.builder()
+            .subject(user.getUsername())
+            .userUuid(deterministicUuid(user.getUsername()))
+            .userId(user.getUsername())
+            .username(user.getUsername())
+            .issuer("tdtoken")
+            .activeOrgId(activeOrgId)
+            .agencyId(claimAsString(claims, "agency_id"))
+            .roles(user.getRoles())
+            .permissions(user.getRoles())
+            .profileVersion(0L)
+            .resolvedAt(Instant.now())
+            .build();
+    }
+
+    private UUID deterministicUuid(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        return UUID.nameUUIDFromBytes(("tdtoken:" + username.trim().toLowerCase(Locale.ROOT))
+            .getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String claimAsString(Map<String, Object> claims, String claimName) {
+        if (claims == null || claimName == null) {
+            return null;
+        }
+        Object value = claims.get(claimName);
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
     private org.springframework.cache.Cache resolveRedisCache() {
         return cacheManager.getCache(USER_CONTEXT_CACHE);
     }
@@ -94,9 +238,22 @@ public class CurrentUserContextResolver {
         return null;
     }
 
+    // Bugfix 03/09/2026 (xem chú thích ở resolveCurrentUserContext): access token Keycloak THẬT của
+    // hệ thống này KHÔNG có claim "sub" — chỉ dùng "sub" để định danh user (như code cũ) khiến MỌI
+    // user rơi vào CÙNG 1 nhánh fallback rỗng. "preferred_username" LUÔN có (đã xác nhận qua token
+    // thật) và cũng CHÍNH LÀ field buildContext() đã dùng để set CurrentUserContext.username — dùng
+    // thống nhất 1 nguồn duy nhất cho cả cache key lẫn so khớp mismatch.
+    private String resolveJwtUsername(Authentication authentication, Jwt jwt) {
+        return firstNonBlank(
+            claimAsString(jwt, "preferred_username"),
+            claimAsString(jwt, "username"),
+            claimAsString(jwt, "sub"),
+            authentication == null ? null : authentication.getName()
+        );
+    }
+
     private String buildCacheKey(Authentication authentication, Jwt jwt) {
         String issuer = claimAsString(jwt, "iss");
-        String subject = claimAsString(jwt, "sub");
         String activeOrgId = firstNonBlank(
             claimAsString(jwt, "active_org_id"),
             claimAsString(jwt, "unit_id"),
@@ -111,7 +268,7 @@ public class CurrentUserContextResolver {
             0L
         );
 
-        String principal = firstNonBlank(subject, authentication.getName());
+        String principal = resolveJwtUsername(authentication, jwt);
         return "ctx:"
             + safe(issuer) + ':'
             + safe(principal) + ':'

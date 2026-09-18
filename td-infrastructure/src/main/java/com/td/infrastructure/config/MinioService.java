@@ -1,11 +1,13 @@
 package com.td.infrastructure.config;
 
 import io.minio.*;
+import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -44,6 +46,27 @@ public class MinioService {
         }
     }
 
+    // 27/08/2026 (port "Chuyển văn thư" — DraftToDocumentOut.CopyDraftToDocumentOut() copy tệp
+    // duthao_file -> vbdi_file thật): copy server-side qua MinIO (source/dest CÙNG bucket, khác
+    // object path) — không tải byte về rồi tải lên lại như copy thủ công qua InputStream.
+    public void copyObject(String sourceObjectName, String destObjectName) {
+        try {
+            ensureBucketExists();
+            minioClient.copyObject(
+                    CopyObjectArgs.builder()
+                            .bucket(minioProperties.getBucketName())
+                            .object(destObjectName)
+                            .source(CopySource.builder()
+                                    .bucket(minioProperties.getBucketName())
+                                    .object(sourceObjectName)
+                                    .build())
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to copy file in MinIO: " + e.getMessage(), e);
+        }
+    }
+
     public InputStream getObject(String objectName) {
         try {
             return minioClient.getObject(
@@ -72,5 +95,24 @@ public class MinioService {
 
     public String getBucketName() {
         return minioProperties.getBucketName();
+    }
+
+    public String getPresignedUrl(String objectName) {
+        try {
+            return minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(minioProperties.getBucketName())
+                            .object(objectName)
+                            .expiry(minioProperties.getPresignedUrlExpiry(), TimeUnit.SECONDS)
+                            .build()
+            );
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate presigned URL: " + e.getMessage(), e);
+        }
+    }
+
+    public int getPresignedUrlExpiry() {
+        return minioProperties.getPresignedUrlExpiry();
     }
 }

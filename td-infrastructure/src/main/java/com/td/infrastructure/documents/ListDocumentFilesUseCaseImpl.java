@@ -31,7 +31,7 @@ public class ListDocumentFilesUseCaseImpl implements ListDocumentFilesUseCase {
                 .uploadDate(e.getUploadedAt())
                 .uploadedBy(e.getUploadedBy() != null ? e.getUploadedBy().toString() : null)
                 .storagePath(e.getFilePath())
-                .isPrimary(false)
+                .isPrimary(Boolean.TRUE.equals(e.getIsPrimary()))
                 .version(1)
                 .build()
         ).collect(Collectors.toList());

@@ -1,7 +1,6 @@
 package com.td.web.controllers.v1;
 
-import com.td.application.common.models.PaginationResponse;
-import com.td.application.common.models.Result;
+import com.td.application.common.models.ApiResponse;
 import com.td.application.sharedcore.GetUserDataScopeUseCase;
 import com.td.application.sharedcore.SearchUserDataScopesRequest;
 import com.td.application.sharedcore.SearchUserDataScopesUseCase;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -35,7 +35,7 @@ public class SharedCoreDataScopesController extends BaseController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Danh sách data scope shared core")
-    public ResponseEntity<PaginationResponse<UserDataScopeDto>> listDataScopes(
+    public ResponseEntity<ApiResponse<List<UserDataScopeDto>>> listDataScopes(
             @RequestParam(defaultValue = "0") int pageNumber,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(defaultValue = "scopeModule") String sortBy,
@@ -63,7 +63,7 @@ public class SharedCoreDataScopesController extends BaseController {
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Chi tiết data scope shared core")
-    public ResponseEntity<Result<UserDataScopeDto>> getDataScope(
+    public ResponseEntity<ApiResponse<UserDataScopeDto>> getDataScope(
             @Parameter(description = "Data Scope ID", required = true)
             @PathVariable UUID id) {
         return ok(getUserDataScopeUseCase.execute(id));

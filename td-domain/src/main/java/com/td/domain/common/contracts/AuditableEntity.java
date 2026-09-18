@@ -2,7 +2,12 @@ package com.td.domain.common.contracts;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -28,11 +33,22 @@ import lombok.Setter;
  * Example: public class Product extends AuditableEntity<UUID>
  */
 @MappedSuperclass
+@EntityListeners(AuditableEntityListener.class)
 @Getter
 @Setter
 public abstract class AuditableEntity<T> extends AbstractEntity<T> implements IAuditableEntity, ISoftDelete {
 
     // ID người tạo (User UUID)
+    //
+    // Bugfix 26/08/2026 — LẦN 2 (người dùng build lại + test: "chưa thấy lưu giá trị cho 2 trường
+    // thông tin này"): lần đầu wire theo chuẩn Spring Data JPA (@CreatedBy/@LastModifiedBy +
+    // AuditingEntityListener) nhưng KHÔNG có hiệu lực vì listener đó cần Hibernate tạo instance qua
+    // SpringBeanContainer để được tiêm AuditingHandler — project dùng 3 persistence unit dựng tay
+    // trong MultiPersistenceUnitJpaConfig nên Hibernate new listener bằng reflection thường → no-op
+    // im lặng. Đã thay bằng listener thuần JPA {@link AuditableEntityListener} + nguồn người dùng
+    // qua {@link AuditCurrentUserHolder} (infrastructure tự đăng ký lúc startup trong AuditingConfig,
+    // resolve được cả luồng Keycloak lẫn Tdtoken). createdOn/lastModifiedOn giữ nguyên cơ chế
+    // @PrePersist/@PreUpdate bên dưới.
     @Column(name = "created_by")
     private UUID createdBy;
 
@@ -40,7 +56,7 @@ public abstract class AuditableEntity<T> extends AbstractEntity<T> implements IA
     @Column(name = "created_on", nullable = false, updatable = false)
     private LocalDateTime createdOn;
 
-    // ID người sửa cuối cùng (User UUID)
+    // ID người sửa cuối cùng (User UUID) - tự động refresh bởi AuditableEntityListener khi UPDATE.
     @Column(name = "last_modified_by")
     private UUID lastModifiedBy;
 
@@ -97,6 +113,19 @@ public abstract class AuditableEntity<T> extends AbstractEntity<T> implements IA
         this.deletedOn = LocalDateTime.now();
         this.deletedBy = deletedBy;
         this.lastModifiedBy = deletedBy;
+        this.lastModifiedOn = LocalDateTime.now();
+    }
+
+    /**
+     * 11/09/2026 (yêu cầu người dùng "port vbdi/thungrac/thungrac" — nút "Khôi phục"): đảo ngược
+     * {@link #markAsDeleted} — set deletedOn/deletedBy = null. KHÔNG tự cập nhật lastModifiedBy ở đây
+     * (khác markAsDeleted) vì "ai khôi phục" không có cột riêng lưu — use case gọi nơi này tự
+     * markUpdatedBy nếu cần qua field khác, giữ method này THUẦN đúng 1 việc (đảo ngược cờ xoá).
+     */
+    @Override
+    public void restore() {
+        this.deletedOn = null;
+        this.deletedBy = null;
         this.lastModifiedOn = LocalDateTime.now();
     }
 

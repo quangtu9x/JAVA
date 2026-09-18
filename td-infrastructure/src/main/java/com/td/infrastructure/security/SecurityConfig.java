@@ -10,10 +10,12 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import com.td.infrastructure.tenant.TenantFilter;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -37,21 +39,57 @@ public class SecurityConfig {
     private final KeycloakJwtConverter keycloakJwtConverter;
     private final KeycloakProperties keycloakProperties;
     private final CorsProperties corsProperties;
+    private final TdTokenAuthenticationFilter tdTokenAuthenticationFilter;
+    private final ApiResponseAuthenticationEntryPoint apiResponseAuthenticationEntryPoint;
+    private final ApiResponseAccessDeniedHandler apiResponseAccessDeniedHandler;
+    private final TenantFilter tenantFilter;
+
+    /**
+     * Chain RIÊNG, thứ tự cao hơn (chạy trước) cho đúng 2 route Document Server OnlyOffice gọi
+     * thẳng (thử nghiệm — xem {@code OnlyOfficeController}). BẮT BUỘC tách chain thay vì chỉ thêm
+     * {@code permitAll()} vào chain chính bên dưới: {@code permitAll()} chỉ bỏ qua bước ỦY QUYỀN,
+     * nhưng {@code BearerTokenAuthenticationFilter} (Keycloak) trong chain chính vẫn chạy TRƯỚC bước
+     * đó — nếu Document Server gửi kèm header {@code Authorization: Bearer <jwt do chinh no ky>}
+     * (JWT OnlyOffice, KHÔNG phải JWT Keycloak — xem {@code app.onlyoffice.jwt-header}, mặc định
+     * cũng tên "Authorization"), filter đó sẽ cố verify như JWT Keycloak, thất bại, và trả 401 NGAY,
+     * request không bao giờ tới được Controller dù route đã {@code permitAll()}. Dùng
+     * {@code securityMatcher(...)} tách hẳn 2 route này sang 1 {@link SecurityFilterChain} không có
+     * {@code oauth2ResourceServer}/Tdtoken/{@link TenantFilter} — matcher không khớp thì Spring tự
+     * chuyển sang chain còn lại (order thấp hơn) như cũ, KHÔNG ảnh hưởng route nào khác.
+     */
+    @Bean
+    @org.springframework.core.annotation.Order(1)
+    public SecurityFilterChain onlyOfficeExternalFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher("/api/v1/onlyoffice/content", "/api/v1/onlyoffice/callback")
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
 
     @Bean
+    @org.springframework.core.annotation.Order(2)
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(exceptionHandling -> exceptionHandling
+                .authenticationEntryPoint(apiResponseAuthenticationEntryPoint)
+                .accessDeniedHandler(apiResponseAccessDeniedHandler)
+            )
             .authorizeHttpRequests(auth -> auth
                 // Public endpoints
                 .requestMatchers("/api/health/**").permitAll()
                 .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/swagger-native.html", "/swagger-custom/**", "/v3/api-docs/**", "/v3/api-docs").permitAll()
+                // Cau hinh OAuth cho trang Swagger tu tuy chinh (khong nam trong thu muc static).
+                .requestMatchers("/swagger-oauth-config").permitAll()
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                
+
                 // Protected endpoints with role-based access
                 .requestMatchers(HttpMethod.GET, "/api/v1/documents/**").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
                 .requestMatchers(HttpMethod.POST, "/api/v1/documents/search").hasAnyRole("USER", "ADMIN", "PRODUCT_MANAGER", "BRAND_MANAGER")
@@ -62,11 +100,18 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
+                .authenticationEntryPoint(apiResponseAuthenticationEntryPoint)
                 .jwt(jwt -> jwt
                     .jwkSetUri(keycloakProperties.getJwkSetUri())
                     .jwtAuthenticationConverter(jwtAuthenticationConverter())
                 )
-            );
+            )
+            // Tdtoken (BL-004): xử lý truoc BearerTokenAuthenticationFilter, chỉ can thiệp khi có
+            // header Tdtoken và không có Authorization — nếu không sẽ nhường luồng Keycloak.
+            .addFilterBefore(tdTokenAuthenticationFilter, BearerTokenAuthenticationFilter.class)
+            // Tenant routing (BL-303): chạy SAU cả 2 filter xác thực — Authentication đã sẵn sàng
+            // (dù qua Tdtoken hay Keycloak) để suy ra tenant_id trước khi vào Controller.
+            .addFilterAfter(tenantFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }

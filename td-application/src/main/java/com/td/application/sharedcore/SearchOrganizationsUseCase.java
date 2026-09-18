@@ -1,6 +1,7 @@
 package com.td.application.sharedcore;
 
 import com.td.application.common.models.PaginationResponse;
+import com.td.application.documents.DynamicDocumentFieldsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -12,10 +13,11 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(value = "identityTransactionManager", readOnly = true)
 public class SearchOrganizationsUseCase {
 
     private final OrganizationRepository organizationRepository;
+    private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
 
     public PaginationResponse<OrganizationDto> execute(SearchOrganizationsRequest request) {
         try {
@@ -23,7 +25,8 @@ public class SearchOrganizationsUseCase {
             var page = organizationRepository.search(request, pageable);
 
             List<OrganizationDto> items = page.getContent().stream()
-                .map(OrganizationDtoMapper::map)
+                .map(entity -> OrganizationDtoMapper.map(
+                    entity, dynamicDocumentFieldsService.parseDynamicFields(entity.getDynamicFieldsJson())))
                 .toList();
 
             return new PaginationResponse<>(

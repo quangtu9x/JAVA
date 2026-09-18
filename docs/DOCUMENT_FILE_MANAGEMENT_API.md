@@ -23,8 +23,25 @@ API quản lý tệp tin tài liệu cung cấp các endpoint cho phép:
 - `file` (form): Tệp tin cần tải lên (bắt buộc)
 - `isPrimary` (form, optional): Đánh dấu là tệp chính (true|false, mặc định: false)
 - `description` (form, optional): Mô tả tệp tin
+- `module` (form, optional, bổ sung 27/08/2026): tên module sở hữu tài liệu (vd `duthao`/`vbden`/
+  `vbdi`) — dùng để tách đường dẫn lưu trữ MinIO theo module (xem "Lưu trữ MinIO" bên dưới). Bỏ
+  trống = giữ nguyên hành vi cũ (segment `documents`), KHÔNG BẮT BUỘC với call site hiện có.
+- `processId` (form, optional, bổ sung 27/08/2026, DT-007): id vết xử lý (vd
+  `draft_process_documents.id`) nếu tệp được đính kèm CÙNG LÚC với 1 lần xử lý cụ thể trong module
+  `duthao` — lưu vào cột `file_metadata.process_id`, dùng để LỌC LẠI file theo từng lần xử lý (xem
+  endpoint `GET /{documentId}/files` bên dưới) mà KHÔNG đổi khoá lưu trữ chính (`documentId` vẫn là
+  id tài liệu cha, không phải id vết).
 
 **Required Roles**: USER, ADMIN, PRODUCT_MANAGER, BRAND_MANAGER, DOC_EDITOR
+
+**Lưu trữ MinIO (bổ sung 27/08/2026)**: nhiều module dùng CHUNG 1 bucket MinIO — đường dẫn object
+được tách theo `{tenantId}/{module}/{documentId}/{storedFileName}` (`tenantId` tự lấy từ
+`TenantContext` của request đang xử lý, `module` lấy từ tham số `module` ở trên hoặc mặc định
+`"documents"` nếu bỏ trống) để tránh lẫn/nhầm giữa các module hoặc tenant khi thao tác trực tiếp
+trên storage. Đây là hardening Ở TẦNG LƯU TRỮ — các endpoint GET/DELETE/LIST vẫn xác định file bằng
+`fileId`/`documentId` đã lưu trong `file_metadata` (không đổi contract), KHÔNG kèm theo kiểm tra
+quyền sở hữu tổ chức/người dùng đối với `documentId` (ngoài phạm vi đợt này, xem ghi chú trong
+`docs/analysis/04-phan-tich-nghiep-vu-duthao-fe-domino-sang-java.md`).
 
 **Response**:
 ```json

@@ -181,6 +181,15 @@ Lưu ý rất quan trọng:
 
 - Nếu dùng derived query kiểu `existsByCodeAndIdNot...` trên repository generic, Spring Data có thể suy luận sai kiểu `id` và nổ lỗi kiểu `Cannot compare left expression of type 'java.lang.Object' with right expression of type 'java.util.UUID'`.
 - Trường hợp đó nên chuyển sang `@Query` viết tường minh như feature `categories` đang làm.
+- **BL-117**: nếu entity mới thuộc database "control-plane" (dùng chung MỌI tenant, hiện chỉ có
+  `Category`/`Tenant`) — KHÔNG được để lọt vào `@EnableJpaRepositories` mặc định
+  (`PrimaryJpaRepositoriesConfig`). Phải: (1) thêm `<Feature>JpaRepository` vào `basePackageClasses`
+  của `ControlPlaneJpaRepositoriesConfig` + `excludeFilters` của `PrimaryJpaRepositoriesConfig`; (2)
+  thêm entity vào danh sách loại trừ trong `MultiPersistenceUnitJpaConfig.scanPrimaryDomainEntities()`
+  VÀ vào `.packages(...)` của `controlPlaneEntityManagerFactory`. Quên bất kỳ bước nào ở trên sẽ làm
+  Hibernate `ddl-auto: validate` báo "missing table" (entity bị validate nhầm với database tenant,
+  không phải control-plane) — xem chi tiết đầy đủ + lý do kỹ thuật (bytecode Spring Boot) tại
+  `docs/architecture/06-database-per-tenant-multi-tenant.md`.
 
 ### Bước 6. Tạo Web controller
 

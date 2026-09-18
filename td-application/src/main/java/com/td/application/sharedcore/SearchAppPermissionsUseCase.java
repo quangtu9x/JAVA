@@ -12,7 +12,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Transactional(value = "identityTransactionManager", readOnly = true)
 public class SearchAppPermissionsUseCase {
 
     private final AppPermissionRepository appPermissionRepository;

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Data
@@ -30,6 +31,17 @@ public class UpdateCategoryRequest {
 
     private Integer sortOrder;
     private Boolean isActive;
+
+    // Field tự định nghĩa từ FE — null nghĩa là không đổi field động (partial update); có giá trị
+    // thì MERGE vào field động hiện có (không xoá field cũ không được nhắc tới), xem
+    // UpdateCategoryUseCase. Cùng convention với UpdateOrganizationRequest (BL-109).
+    private Map<String, String> dynamicFields;
+
+    private String dateFields;
+
+    private String numberFields;
+
+    private String richtextFields;
 
     @JsonSetter("parentId")
     public void setParentIdFromJson(UUID parentId) {

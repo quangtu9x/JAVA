@@ -1,0 +1,33 @@
+# Cấu hình test context (H2, tắt broker) — dùng riêng cho src/test
+spring:
+  main:
+    web-application-type: none
+  flyway:
+    enabled: false
+  rabbitmq:
+    host: localhost
+    port: 5672
+    dynamic: false
+  kafka:
+    bootstrap-servers: localhost:9092
+
+worker:
+  control-plane:
+    enabled: false
+  db:
+    url: jdbc:h2:mem:workerctx;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+    schema-management: script
+  rabbit:
+    enabled: false
+  kafka:
+    enabled: false
+  minio:
+    enabled: false
+  http:
+    enabled: true
+  tasks:
+    vbdi:
+      enabled: true

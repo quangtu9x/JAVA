@@ -76,7 +76,7 @@ public class CategoryCacheService {
         Cache cache = resolve(CATEGORY_BY_ID_CACHE);
         if (cache == null) return false;
         try { return cache.get(idKey(id)) != null; }
-        catch (Exception ex) { return false; }
+        catch (Exception ex) { log.debug("Category by-id cache check failed for {}: {}", id, ex.getMessage()); return false; }
     }
 
     public String getCategoryByIdCacheKey(UUID id) {
@@ -121,7 +121,7 @@ public class CategoryCacheService {
         Cache cache = resolve(CATEGORY_LIST_CACHE);
         if (cache == null) return false;
         try { return cache.get(listKey(request)) != null; }
-        catch (Exception ex) { return false; }
+        catch (Exception ex) { log.debug("Category list cache check failed: {}", ex.getMessage()); return false; }
     }
 
     public String getCategoryListCacheKey(SearchCategoriesRequest request) {

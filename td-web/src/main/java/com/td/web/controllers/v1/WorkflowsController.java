@@ -1,7 +1,6 @@
 package com.td.web.controllers.v1;
 
-import com.td.application.common.models.PaginationResponse;
-import com.td.application.common.models.Result;
+import com.td.application.common.models.ApiResponse;
 import com.td.application.workflows.CreateWorkflowDefinitionRequest;
 import com.td.application.workflows.CreateWorkflowInstanceRequest;
 import com.td.application.workflows.DelegateWorkflowTaskRequest;
@@ -34,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -49,14 +49,14 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/definitions")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN')")
     @Operation(summary = "Tạo định nghĩa workflow")
-    public ResponseEntity<Result<UUID>> createDefinition(@Valid @RequestBody CreateWorkflowDefinitionRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createDefinition(@Valid @RequestBody CreateWorkflowDefinitionRequest request) {
         return created(workflowDefinitionFacade.createDefinition(request));
     }
 
     @PutMapping("/definitions/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN')")
     @Operation(summary = "Cập nhật định nghĩa workflow")
-    public ResponseEntity<Result<UUID>> updateDefinition(
+    public ResponseEntity<ApiResponse<UUID>> updateDefinition(
             @Parameter(description = "ID định nghĩa workflow", required = true) @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateWorkflowDefinitionRequest request) {
         return ok(workflowDefinitionFacade.updateDefinition(id, request));
@@ -65,7 +65,7 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/definitions/{id}/publish")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN')")
     @Operation(summary = "Phát hành định nghĩa workflow")
-    public ResponseEntity<Result<UUID>> publishDefinition(
+    public ResponseEntity<ApiResponse<UUID>> publishDefinition(
             @Parameter(description = "ID định nghĩa workflow", required = true) @PathVariable("id") UUID id) {
         return ok(workflowDefinitionFacade.publishDefinition(id));
     }
@@ -73,7 +73,7 @@ public class WorkflowsController extends BaseController {
     @GetMapping("/definitions")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN', 'USER')")
     @Operation(summary = "Danh sách định nghĩa workflow")
-    public ResponseEntity<PaginationResponse<WorkflowDefinitionSummaryDto>> listDefinitions(
+    public ResponseEntity<ApiResponse<List<WorkflowDefinitionSummaryDto>>> listDefinitions(
             @RequestParam(name = "workflowCode", required = false) String workflowCode,
             @RequestParam(name = "active", required = false) Boolean active,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
@@ -95,7 +95,7 @@ public class WorkflowsController extends BaseController {
     @GetMapping("/definitions/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN', 'USER')")
     @Operation(summary = "Chi tiết định nghĩa workflow")
-    public ResponseEntity<Result<WorkflowDefinitionDetailDto>> getDefinition(
+    public ResponseEntity<ApiResponse<WorkflowDefinitionDetailDto>> getDefinition(
             @Parameter(description = "ID định nghĩa workflow", required = true) @PathVariable("id") UUID id) {
         return ok(workflowDefinitionFacade.getDefinition(id));
     }
@@ -103,14 +103,14 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/instances")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'WORKFLOW_ADMIN', 'DOC_EDITOR', 'DOC_APPROVER')")
     @Operation(summary = "Tạo phiên chạy workflow")
-    public ResponseEntity<Result<UUID>> createInstance(@Valid @RequestBody CreateWorkflowInstanceRequest request) {
+    public ResponseEntity<ApiResponse<UUID>> createInstance(@Valid @RequestBody CreateWorkflowInstanceRequest request) {
         return created(workflowRuntimeFacade.createInstance(request));
     }
 
     @GetMapping("/instances/{id}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'WORKFLOW_ADMIN', 'DOC_EDITOR', 'DOC_APPROVER')")
     @Operation(summary = "Chi tiết phiên chạy workflow")
-    public ResponseEntity<Result<WorkflowInstanceDto>> getInstance(
+    public ResponseEntity<ApiResponse<WorkflowInstanceDto>> getInstance(
             @Parameter(description = "ID phiên chạy workflow", required = true) @PathVariable("id") UUID id) {
         return ok(workflowRuntimeFacade.getInstance(id));
     }
@@ -118,7 +118,7 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/instances/{id}/actions/{actionCode}")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'WORKFLOW_ADMIN', 'DOC_EDITOR', 'DOC_APPROVER')")
     @Operation(summary = "Thực thi hành động workflow")
-    public ResponseEntity<Result<UUID>> executeAction(
+    public ResponseEntity<ApiResponse<UUID>> executeAction(
             @Parameter(description = "ID phiên chạy workflow", required = true) @PathVariable("id") UUID id,
             @Parameter(description = "Mã hành động", required = true) @PathVariable("actionCode") String actionCode,
             @Valid @RequestBody WorkflowActionRequest request) {
@@ -128,7 +128,7 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/instances/{id}/cancel")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN')")
     @Operation(summary = "Hủy phiên chạy workflow")
-    public ResponseEntity<Result<UUID>> cancelInstance(
+    public ResponseEntity<ApiResponse<UUID>> cancelInstance(
             @Parameter(description = "ID phiên chạy workflow", required = true) @PathVariable("id") UUID id,
             @Valid @RequestBody WorkflowCancelRequest request) {
         return ok(workflowRuntimeFacade.cancelInstance(id, request));
@@ -137,7 +137,7 @@ public class WorkflowsController extends BaseController {
     @GetMapping("/instances/{id}/history")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'WORKFLOW_ADMIN', 'DOC_EDITOR', 'DOC_APPROVER')")
     @Operation(summary = "Lịch sử workflow")
-    public ResponseEntity<PaginationResponse<WorkflowHistoryDto>> getHistory(
+    public ResponseEntity<ApiResponse<List<WorkflowHistoryDto>>> getHistory(
             @Parameter(description = "ID phiên chạy workflow", required = true) @PathVariable("id") UUID id,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "20") int pageSize) {
@@ -147,7 +147,7 @@ public class WorkflowsController extends BaseController {
     @GetMapping("/tasks/my")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'WORKFLOW_ADMIN', 'DOC_EDITOR', 'DOC_APPROVER')")
     @Operation(summary = "Danh sách công việc workflow của tôi")
-    public ResponseEntity<PaginationResponse<WorkflowTaskDto>> getMyTasks(
+    public ResponseEntity<ApiResponse<List<WorkflowTaskDto>>> getMyTasks(
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
             @RequestParam(name = "pageSize", defaultValue = "20") int pageSize) {
@@ -157,7 +157,7 @@ public class WorkflowsController extends BaseController {
     @GetMapping("/tasks/group/{groupCode}")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN', 'DOC_APPROVER')")
     @Operation(summary = "Danh sách công việc workflow theo nhóm")
-    public ResponseEntity<PaginationResponse<WorkflowTaskDto>> getGroupTasks(
+    public ResponseEntity<ApiResponse<List<WorkflowTaskDto>>> getGroupTasks(
             @Parameter(description = "Mã nhóm", required = true) @PathVariable("groupCode") String groupCode,
             @RequestParam(name = "status", required = false) String status,
             @RequestParam(name = "pageNumber", defaultValue = "0") int pageNumber,
@@ -168,7 +168,7 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/tasks/{taskId}/claim")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'WORKFLOW_ADMIN', 'DOC_APPROVER')")
     @Operation(summary = "Nhận xử lý công việc workflow")
-    public ResponseEntity<Result<UUID>> claimTask(
+    public ResponseEntity<ApiResponse<UUID>> claimTask(
             @Parameter(description = "ID công việc", required = true) @PathVariable("taskId") UUID taskId) {
         return ok(workflowRuntimeFacade.claimTask(taskId));
     }
@@ -176,7 +176,7 @@ public class WorkflowsController extends BaseController {
     @PostMapping("/tasks/{taskId}/delegate")
     @PreAuthorize("hasAnyRole('ADMIN', 'WORKFLOW_ADMIN', 'DOC_APPROVER')")
     @Operation(summary = "Ủy quyền công việc workflow")
-    public ResponseEntity<Result<UUID>> delegateTask(
+    public ResponseEntity<ApiResponse<UUID>> delegateTask(
             @Parameter(description = "ID công việc", required = true) @PathVariable("taskId") UUID taskId,
             @Valid @RequestBody DelegateWorkflowTaskRequest request) {
         return ok(workflowRuntimeFacade.delegateTask(taskId, request));

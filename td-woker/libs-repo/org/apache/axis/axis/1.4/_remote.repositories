@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Tue Sep 15 22:01:27 ICT 2026
+axis-1.4.jar>=
+axis-1.4.pom>=

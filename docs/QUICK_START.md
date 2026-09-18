@@ -118,6 +118,25 @@ GRANT ALL PRIVILEGES ON DATABASE tdwebapi TO tduser;
 
 **Hoặc nhờ admin PostgreSQL tạo giúp.**
 
+### PostgreSQL — database "control-plane" (BL-117, bắt buộc từ nay)
+Từ BL-117, ứng dụng multi-tenant thật (mỗi đơn vị = 1 database Postgres riêng) — cần THÊM 1 database
+Postgres RỖNG nữa (KHÁC `tdwebapi`) chỉ để chứa "control-plane" (registry tenant + danh mục dùng
+chung mọi tenant):
+```bash
+psql -h <POSTGRES_HOST> -U postgres
+CREATE DATABASE tdwebapi_controlplane;
+\q
+```
+Có thể dùng chung `tduser`/quyền như trên. Khai báo qua biến môi trường (xem mục 6):
+`CONTROL_PLANE_DATABASE_URL`/`_USERNAME`/`_PASSWORD`. App **tự tạo bảng** (`categories`/`tenants`)
+trong database này lúc khởi động (Flyway) — bạn chỉ cần tạo database rỗng, không cần tạo bảng tay.
+
+Sau khi app khởi động lần đầu, bảng `tenants` sẽ RỖNG — app sẽ **từ chối khởi động** cho tới khi có
+ít nhất 1 tenant active. Đăng ký tenant đầu tiên (trỏ vào chính database `tdwebapi` vừa tạo ở trên)
+qua API `POST /api/v1/platform/tenants` (`mode: "REGISTER_EXISTING"`, role `PLATFORM_ADMIN`) — xem
+chi tiết đầy đủ (bao gồm cách mã hoá mật khẩu tenant, role Keycloak mới) tại
+`docs/architecture/06-database-per-tenant-multi-tenant.md`.
+
 ### MongoDB
 Không cần setup gì - collections sẽ tự động tạo khi app chạy lần đầu.
 
@@ -217,6 +236,15 @@ Tạo file `set-env.ps1` trong thư mục gốc của project:
 $env:DATABASE_URL = "jdbc:postgresql://<POSTGRES_HOST>:5432/tdwebapi"
 $env:DATABASE_USERNAME = "<YOUR_USERNAME>"
 $env:DATABASE_PASSWORD = "<YOUR_PASSWORD>"
+
+# PostgreSQL - database "control-plane" (BL-117, bắt buộc - xem mục 3)
+$env:CONTROL_PLANE_DATABASE_URL = "jdbc:postgresql://<POSTGRES_HOST>:5432/tdwebapi_controlplane"
+$env:CONTROL_PLANE_DATABASE_USERNAME = "<YOUR_USERNAME>"
+$env:CONTROL_PLANE_DATABASE_PASSWORD = "<YOUR_PASSWORD>"
+# Mã hoá 2 chiều mật khẩu Postgres của từng tenant lưu trong bảng "tenants" - BẮT BUỘC, mất key này
+# sau khi đã có tenant thật = mất khả năng giải mã lại mọi mật khẩu đã lưu. salt PHẢI là chuỗi HEX.
+$env:TENANT_CREDENTIAL_ENCRYPTION_KEY = "<CHUOI_BI_MAT_TUY_Y>"
+$env:TENANT_CREDENTIAL_ENCRYPTION_SALT = "deadbeefdeadbeef"
 
 # MongoDB
 $env:MONGODB_HOST = "<MONGODB_HOST>"

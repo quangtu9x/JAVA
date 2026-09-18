@@ -34,8 +34,14 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
     @Column(name = "form", nullable = false, length = 30)
     private String nodeType = "agency_level";
 
+    // Bugfix 03/09/2026 (báo lỗi người dùng: "level = 0, không có cấp 0, bắt đầu tính từ 1"): root
+    // (agency_level không có cha) phải là CẤP 1, không phải 0 — khớp đúng quy ước đã ngầm định sẵn ở
+    // OrganizationHierarchyRules.resolveNodeType (level<=1 -> agency_level, level==2 -> agency,
+    // level==3 -> unit...) và FE (getIdentifier_by_level global.jsx đếm level bắt đầu từ 1). Xem
+    // Create/UpdateOrganizationUseCase (nơi thực sự gán level cho node gốc) — default ở đây chỉ áp
+    // dụng khi không ai gán tường minh, giữ nhất quán.
     @Column(name = "level", nullable = false)
-    private int level = 0;
+    private int level = 1;
 
     @Column(name = "full_path", nullable = false, columnDefinition = "TEXT")
     private String fullPath;
@@ -73,8 +79,22 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
     @Column(name = "dbpath", length = 100)
     private String dbpath;
 
+    // Bổ sung 19/08/2026: tham chiếu MỀM (không FK thật — KHÔNG THỂ có FK quan hệ, vì Organization
+    // sống trong database RIÊNG của từng tenant còn Tenant sống ở database "control-plane" khác hẳn,
+    // xem docs/architecture/06-database-per-tenant-multi-tenant.md mục 7) tới `tenants.tenant_id`
+    // (control-plane) — cho phép admin liên kết 1 Cơ quan với 1 đơn vị (tenant) đã/mới tạo, HOÀN TOÀN
+    // độc lập với trang "Quản lý đơn vị" (cả 2 nơi đều quản lý được, không có ràng buộc 2 chiều nào).
+    @Column(name = "linked_tenant_id", length = 100)
+    private String linkedTenantId;
+
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
+
+    // Field động (JSONB) tự định nghĩa từ FE — tái dùng đúng cơ chế Dynamic Data Engine (BL-101)
+    // đã xây cho `documents`, cho phép lưu field kiểu Domino cũ (mailin, clerical,
+    // identifier_other, cfg_*...) chưa có cột tường minh mà không cần thêm migration mỗi lần.
+    @Column(name = "dynamic_fields", columnDefinition = "jsonb", nullable = false)
+    private String dynamicFieldsJson = "{}";
 
     public Organization(String identifier, String name, String description, UUID parentId,
                         String nodeType, int level, String fullPath, int sortOrder,
@@ -164,6 +184,22 @@ public class Organization extends AuditableEntity<UUID> implements IAggregateRoo
         if (dbpath != null) {
             this.dbpath = dbpath;
         }
+        return this;
+    }
+
+    // Bổ sung 19/08/2026: cập nhật/gỡ liên kết đơn vị (tenant) — tách riêng khỏi updateLegacyData(...)
+    // (không liên quan tới dữ liệu Domino cũ). null = không đổi (partial update); chuỗi rỗng = gỡ
+    // liên kết hiện có.
+    public void updateLinkedTenant(String linkedTenantId) {
+        this.linkedTenantId = linkedTenantId;
+    }
+
+    // Thay toàn bộ field động (JSONB) — gọi với kết quả đã merge (xem UpdateOrganizationUseCase),
+    // cùng convention với BusinessDocument.replaceDynamicFields (BL-101).
+    public Organization replaceDynamicFields(String dynamicFieldsJson) {
+        this.dynamicFieldsJson = (dynamicFieldsJson == null || dynamicFieldsJson.isBlank())
+            ? "{}"
+            : dynamicFieldsJson;
         return this;
     }
 }

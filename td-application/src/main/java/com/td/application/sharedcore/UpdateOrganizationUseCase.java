@@ -1,5 +1,7 @@
 package com.td.application.sharedcore;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.TextNormalizer;
 import com.td.application.common.models.Result;
 import com.td.domain.sharedcore.Organization;
@@ -7,13 +9,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional("identityTransactionManager")
 public class UpdateOrganizationUseCase {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final OrganizationRepository organizationRepository;
 
@@ -58,7 +64,9 @@ public class UpdateOrganizationUseCase {
             }
 
             String effectiveName = name != null ? name : current.getName();
-            int newLevel = 0;
+            // Bugfix 03/09/2026 (báo lỗi người dùng: "level = 0, không có cấp 0, bắt đầu tính từ 1"):
+            // node gốc (không có cha) là CẤP 1 — xem javadoc Organization.level.
+            int newLevel = 1;
             String newFullPath = effectiveName;
 
             if (effectiveParentId == null) {
@@ -126,12 +134,61 @@ public class UpdateOrganizationUseCase {
                 TextNormalizer.normalize(request.getDbpath())
             );
 
+            // Bugfix 03/09/2026 (báo lỗi người dùng, tự test bằng payload {"linked_tenant_id":
+            // "H05_02"} sau khi khởi tạo 1 đơn vị mới — giá trị không lưu): CÙNG DẠNG lỗi với
+            // dynamicFields ở dưới — Organization.updateLinkedTenant() đã có sẵn (kèm javadoc đúng
+            // ngữ nghĩa: null = không đổi, chuỗi rỗng = gỡ liên kết) nhưng use case này CHƯA BAO GIỜ
+            // gọi tới, dù UpdateOrganizationRequest.linked_tenant_id đã có sẵn field từ 19/08/2026.
+            if (request.getLinked_tenant_id() != null) {
+                current.updateLinkedTenant(request.getLinked_tenant_id());
+            }
+
+            // Bugfix 03/09/2026 (báo lỗi người dùng, tự test bằng payload {"dynamicFields":
+            // {"clerical":"0"}} — xem chi tiết vẫn không đổi VÀ trong CSDL cũng không có): use case
+            // này CHƯA BAO GIỜ đọc request.getDynamicFields() — dù UpdateOrganizationRequest.dynamicFields
+            // đã có sẵn field + javadoc mô tả đúng ngữ nghĩa MERGE (null = không đổi, có giá trị thì
+            // merge vào field động hiện có), và FE (organizationApi.js#updateOrganizationNode) đã tách
+            // đúng payload gửi field này cho MỌI field kiểu Domino cũ không có cột tường minh
+            // (mailin, clerical, identifier_other, short_name, roles, cfg_*...) — nghĩa là TOÀN BỘ
+            // các field đó chưa từng lưu được từ khi port sang Java, dù BE trả 200/thành công thật (
+            // Organization.replaceDynamicFields() đã có sẵn, chỉ là không có chỗ nào gọi tới). Merge
+            // (không ghi đè field không được nhắc tới) rồi mới gọi.
+            if (request.getDynamicFields() != null) {
+                Map<String, Object> mergedDynamicFields = parseDynamicFields(current.getDynamicFieldsJson());
+                mergedDynamicFields.putAll(request.getDynamicFields());
+                current.replaceDynamicFields(toJson(mergedDynamicFields));
+            }
+
             var saved = organizationRepository.save(current);
             refreshDescendants(saved);
 
             return Result.success(saved.getId());
         } catch (Exception ex) {
             return Result.failure("Cập nhật tổ chức thất bại: " + ex.getMessage());
+        }
+    }
+
+    // Cùng convention parse/serialize JSON "{}" fallback đã dùng ở ProcessDiagramService/
+    // DynamicDocumentFieldsService — dynamicFields của Organization đơn giản hơn (không cần suy luận
+    // kiểu ngày/số như BusinessDocument) nên tự xử lý tại chỗ, không kéo thêm phụ thuộc chéo.
+    private Map<String, Object> parseDynamicFields(String dynamicFieldsJson) {
+        if (dynamicFieldsJson == null || dynamicFieldsJson.isBlank()) {
+            return new LinkedHashMap<>();
+        }
+        try {
+            Map<String, Object> parsed = OBJECT_MAPPER.readValue(
+                dynamicFieldsJson, new TypeReference<LinkedHashMap<String, Object>>() { });
+            return parsed == null ? new LinkedHashMap<>() : parsed;
+        } catch (Exception ignored) {
+            return new LinkedHashMap<>();
+        }
+    }
+
+    private String toJson(Map<String, Object> dynamicFields) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(dynamicFields);
+        } catch (Exception ex) {
+            return "{}";
         }
     }
 

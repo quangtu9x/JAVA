@@ -1,5 +1,6 @@
 package com.td.application.sharedcore;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.TextNormalizer;
 import com.td.application.common.models.Result;
 import com.td.domain.sharedcore.Organization;
@@ -11,8 +12,10 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional("identityTransactionManager")
 public class CreateOrganizationUseCase {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final OrganizationRepository organizationRepository;
 
@@ -40,7 +43,9 @@ public class CreateOrganizationUseCase {
                 return Result.failure("Identifier '" + identifier + "' đã tồn tại");
             }
 
-            int level = 0;
+            // Bugfix 03/09/2026 (báo lỗi người dùng: "level = 0, không có cấp 0, bắt đầu tính từ 1"):
+            // node gốc (agency_level không có cha) là CẤP 1 — xem javadoc Organization.level.
+            int level = 1;
             String fullPath = name;
 
             if (parentId == null) {
@@ -96,10 +101,33 @@ public class CreateOrganizationUseCase {
                 organization.update(null, null, null, parentId, nodeType, level, fullPath, null, false);
             }
 
+            // Bugfix 03/09/2026 (cùng lỗi phát hiện ở UpdateOrganizationUseCase — xem javadoc ở đó):
+            // use case này cũng CHƯA BAO GIỜ gọi organization.updateLinkedTenant() dù
+            // CreateOrganizationRequest.linked_tenant_id đã có sẵn field từ 19/08/2026.
+            if (request.getLinked_tenant_id() != null) {
+                organization.updateLinkedTenant(request.getLinked_tenant_id());
+            }
+
+            // Bugfix 03/09/2026 (cùng lỗi phát hiện ở UpdateOrganizationUseCase — xem javadoc ở đó):
+            // use case này cũng CHƯA BAO GIỜ đọc request.getDynamicFields() dù CreateOrganizationRequest
+            // đã có field này (mặc định "{}" rỗng, FE luôn gửi kèm — xem organizationApi.js#createOrganizationNode).
+            // Node MỚI tạo nên ghi thẳng (không cần merge như Update).
+            if (request.getDynamicFields() != null && !request.getDynamicFields().isEmpty()) {
+                organization.replaceDynamicFields(toJson(request.getDynamicFields()));
+            }
+
             var saved = organizationRepository.save(organization);
             return Result.success(saved.getId());
         } catch (Exception ex) {
             return Result.failure("Tạo node tổ chức thất bại: " + ex.getMessage());
+        }
+    }
+
+    private String toJson(java.util.Map<String, String> dynamicFields) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(dynamicFields);
+        } catch (Exception ex) {
+            return "{}";
         }
     }
 

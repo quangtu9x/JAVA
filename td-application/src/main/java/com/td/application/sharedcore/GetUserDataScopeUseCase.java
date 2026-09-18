@@ -2,6 +2,7 @@ package com.td.application.sharedcore;
 
 import com.td.application.common.models.Result;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,7 +10,8 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Slf4j
+@Transactional(value = "identityTransactionManager", readOnly = true)
 public class GetUserDataScopeUseCase {
 
     private final UserDataScopeRepository userDataScopeRepository;
@@ -27,6 +29,7 @@ public class GetUserDataScopeUseCase {
 
             return Result.success(UserDataScopeDtoMapper.map(opt.get()));
         } catch (Exception ex) {
+            log.error("Lấy phạm vi dữ liệu thất bại", ex);
             return Result.failure("Lấy phạm vi dữ liệu thất bại: " + ex.getMessage());
         }
     }

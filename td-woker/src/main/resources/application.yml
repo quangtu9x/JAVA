@@ -1,0 +1,209 @@
+# =====================================================================
+# TD WORKER - Cấu hình nền tảng Worker độc lập (generic worker platform)
+# Mọi giá trị nhạy cảm đều nạp qua biến môi trường - KHÔNG hard-code.
+# =====================================================================
+server:
+  # Worker KHÔNG có controller nghiệp vụ - cổng này chỉ phục vụ actuator/health/prometheus
+  # (đúng khuyến nghị docs/architecture/11 §13.6: cổng RIÊNG khác td-web, khuyến nghị 8090).
+  port: ${WORKER_MANAGEMENT_PORT:8090}
+
+spring:
+  # Spring Boot đọc .env như một file .properties. File là optional để CI/production
+  # vẫn dùng biến môi trường của hệ điều hành; các biến đó có độ ưu tiên cao hơn .env.
+  config:
+    import: "optional:file:.env[.properties]"
+  application:
+    name: td-worker
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+  # RabbitMQ - cấu hình kết nối broker (queue/topology ở worker.rabbit)
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    connection-timeout: ${RABBITMQ_CONNECTION_TIMEOUT:30s}
+    publisher-confirm-type: correlated
+
+  # Kafka - cấu hình kết nối broker (consumer group/topic ở worker.kafka)
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+  # Worker tự chạy migration cho database RIÊNG của mình (WorkerSchemaMigrator)
+  # qua Flyway - tắt auto-config của Boot (đúng pattern project tham khảo).
+  flyway:
+    enabled: false
+
+# =====================================================================
+# QUAN TRỌNG: Worker KHÔNG đụng database business của td-web. Worker dùng:
+#  1. 1 database RIÊNG (worker.db) chứa checkpoint/idempotency của Worker.
+#  2. Database control-plane (worker.control-plane) CHỈ ĐỌC bảng tenants của td-web
+#     để biết danh sách tenant + credential - CÙNG key mã hoá với td-web là bắt buộc.
+# =====================================================================
+worker:
+  # Định danh instance - nhiều instance phải khác nhau (dùng cho claim lease).
+  instance-id: ${WORKER_INSTANCE_ID:}
+
+  core:
+    # Số unit tối đa xử lý song song trên 1 instance (backpressure admission control).
+    max-inflight-units: ${WORKER_MAX_INFLIGHT:200}
+    # Timeout tối đa cho 1 unit.
+    unit-timeout: ${WORKER_UNIT_TIMEOUT:60s}
+    # Timeout tối đa cho 1 message (tổng).
+    message-timeout: ${WORKER_MESSAGE_TIMEOUT:10m}
+    # Số lần retry mặc định cho 1 unit (quá số này -> FAILED).
+    retries-per-unit: ${WORKER_RETRIES_PER_UNIT:5}
+    # Backoff ban đầu cho retry theo unit (exponential).
+    retry-initial-backoff: ${WORKER_RETRY_INITIAL_BACKOFF:5s}
+    retry-max-backoff: ${WORKER_RETRY_MAX_BACKOFF:5m}
+    retry-backoff-multiplier: ${WORKER_RETRY_BACKOFF_MULTIPLIER:2}
+    # Chu kỳ poller retry + sweep lease hết hạn.
+    retry-poll-interval: ${WORKER_RETRY_POLL_INTERVAL:5s}
+    retry-poll-batch-size: ${WORKER_RETRY_POLL_BATCH_SIZE:100}
+    # Thời gian lease 1 claim (quá hạn -> worker khác được claim lại - crash recovery).
+    claim-lease-seconds: ${WORKER_CLAIM_LEASE_SECONDS:120}
+    # Unit PENDING quá lâu (do crash trước khi dispatch) sẽ được RETRY.
+    pending-stale-timeout: ${WORKER_PENDING_STALE_TIMEOUT:5m}
+    # Lỗi thiếu handler/phụ thuộc: không mất task, kiểm tra lại sau khi deploy/khôi phục.
+    dependency-retry-interval: ${WORKER_DEPENDENCY_RETRY_INTERVAL:5m}
+    # Chính sách ACK: ALL_ACCOUNTED (mặc định) hay ALL_TERMINAL.
+    ack-policy: ${WORKER_ACK_POLICY:ALL_ACCOUNTED}
+    # Grace period khi graceful shutdown (drain executor).
+    shutdown-grace: ${WORKER_SHUTDOWN_GRACE:30s}
+    scheduler-pool-size: ${WORKER_SCHEDULER_POOL_SIZE:2}
+
+  # Database RIÊNG của Worker (checkpoint store) - DO DBA TẠO TRƯỚC.
+  db:
+    url: ${WORKER_DB_URL:jdbc:postgresql://localhost:5432/tdworker}
+    username: ${WORKER_DB_USERNAME:postgres}
+    password: ${WORKER_DB_PASSWORD:postgres}
+    # Bổ sung placeholder (docs/18-trien-khai-test-simpki.md mục "H2 file cục bộ") — mặc định KHÔNG
+    # đổi (vẫn "org.postgresql.Driver") — cho phép đổi sang "org.h2.Driver" qua WORKER_DB_DRIVER_CLASS_NAME
+    # khi máy chủ test chưa có Postgres. Trước đây là literal cứng (không placeholder) nên biến môi
+    # trường KHÔNG ghi đè được — đã tự phát hiện bằng thực nghiệm (smoke test thật, không suy đoán).
+    driver-class-name: ${WORKER_DB_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    schema-management: ${WORKER_DB_SCHEMA_MANAGEMENT:flyway}
+    # batch gửi ngay các unit của MỘT message; không chờ gom message khác. single = từng INSERT.
+    unit-insert-mode: ${WORKER_DB_UNIT_INSERT_MODE:batch}
+    unit-insert-batch-size: ${WORKER_DB_UNIT_INSERT_BATCH_SIZE:100}
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      connection-timeout-ms: 30000
+      validation-timeout-ms: ${WORKER_DB_VALIDATION_TIMEOUT_MS:5000}
+      idle-timeout-ms: 600000
+      max-lifetime-ms: 1800000
+      auto-commit: true
+
+  # Control-plane: registry tenant (đọc bảng tenants) - CÙNG key/salt mã hoá với td-web.
+  control-plane:
+    enabled: ${CONTROL_PLANE_ENABLED:true}
+    url: ${CONTROL_PLANE_DATABASE_URL:jdbc:postgresql://localhost:5432/tdwebapi_controlplane}
+    username: ${CONTROL_PLANE_DATABASE_USERNAME:postgres}
+    password: ${CONTROL_PLANE_DATABASE_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    credential-encryption-key: ${TENANT_CREDENTIAL_ENCRYPTION_KEY:}
+    credential-encryption-salt: ${TENANT_CREDENTIAL_ENCRYPTION_SALT:}
+    refresh-interval: ${CONTROL_PLANE_REFRESH_INTERVAL:30s}
+    hikari:
+      maximum-pool-size: 5
+
+  # Connection pool mỗi tenant (database-per-tenant, tạo lười).
+  tenant:
+    max-pools: ${WORKER_TENANT_MAX_POOLS:50}
+    pool-minimum-idle: 1
+    pool-maximum-size: ${WORKER_TENANT_POOL_MAX_SIZE:5}
+    pool-connection-timeout-ms: 30000
+    pool-validation-timeout-ms: ${WORKER_TENANT_DB_VALIDATION_TIMEOUT_MS:5000}
+    pool-idle-timeout-ms: 600000
+    pool-max-lifetime-ms: 1800000
+    pool-auto-commit: false
+
+  # HTTP client pool cho handler.
+  http:
+    enabled: ${WORKER_HTTP_ENABLED:true}
+    max-connections: ${WORKER_HTTP_MAX_CONNECTIONS:100}
+    max-connections-per-route: ${WORKER_HTTP_MAX_CONNECTIONS_PER_ROUTE:20}
+    connect-timeout: ${WORKER_HTTP_CONNECT_TIMEOUT:10s}
+    socket-timeout: ${WORKER_HTTP_SOCKET_TIMEOUT:120s}
+    connection-ttl: ${WORKER_HTTP_CONNECTION_TTL:5m}
+
+  # MinIO - chỉ dùng khi handler cần kiểm tra tệp tham chiếu (optional).
+  minio:
+    enabled: ${MINIO_ENABLED:false}
+    url: ${MINIO_URL:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:}
+    secret-key: ${MINIO_SECRET_KEY:}
+    bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
+
+  # RabbitMQ topology (bật bằng set enabled=true và khai báo queue).
+  rabbit:
+    enabled: ${WORKER_RABBIT_ENABLED:false}
+    # Exchange chung dạng topic; routing key worker.<taskType>
+    exchange: ${WORKER_RABBIT_EXCHANGE:worker.exchange}
+    dlx-suffix: .dlx
+    dlq-suffix: .dlq
+    retry-suffix: .retry
+    # TTL chỉ ở retry queue; main queue không TTL.
+    retry-delay-ms: ${WORKER_RABBIT_RETRY_DELAY_MS:5000}
+    max-redeliveries: ${WORKER_RABBIT_MAX_REDELIVERIES:8}
+    queues:
+      - name: ${WORKER_RABBIT_QUEUE:worker.tasks}
+        # taskType rỗng = consume mọi worker.<type> (generic queue)
+        task-type: ""
+        concurrency: ${WORKER_RABBIT_CONCURRENCY:4}
+        max-concurrency: ${WORKER_RABBIT_MAX_CONCURRENCY:8}
+        prefetch: ${WORKER_RABBIT_PREFETCH:5}
+        rate-limit-per-second: ${WORKER_RABBIT_RATE_LIMIT_PER_SECOND:0}
+
+  # Kafka (bật bằng set enabled=true và khai báo topic).
+  kafka:
+    enabled: ${WORKER_KAFKA_ENABLED:false}
+    group-id-prefix: ${WORKER_KAFKA_GROUP_ID_PREFIX:td-worker-}
+    auto-offset-reset: ${WORKER_KAFKA_AUTO_OFFSET_RESET:earliest}
+    concurrency: ${WORKER_KAFKA_CONCURRENCY:1}
+    poll-timeout-ms: ${WORKER_KAFKA_POLL_TIMEOUT_MS:1000}
+    dlq-topic-suffix: ${WORKER_KAFKA_DLQ_SUFFIX:.dlq}
+    topics:
+      - name: ${WORKER_KAFKA_TOPIC:worker.tasks}
+        task-type: ""
+
+  # Task/VBDI reference implementation
+  tasks:
+    vbdi:
+      enabled: ${WORKER_VBDI_ENABLED:true}
+      # Chỉ kiểm tra tệp tồn tại trên MinIO nếu bật (mặc định tắt để chạy standalone).
+      verify-object-exists: ${WORKER_VBDI_VERIFY_OBJECT_EXISTS:false}
+      # Topic/exchange đích để worker nhận-send publish phản hồi (reply).
+      reply-topic: ${WORKER_VBDI_REPLY_TOPIC:vbdi.reply}
+      # Bảng dedup phía đơn vị NHẬN - Worker tự quản (CHỈ trong database tenant, không đụng td-web).
+      received-table: ${WORKER_VBDI_RECEIVED_TABLE:worker_vbdi_delivery_received}
+      # Tạo THẬT bản ghi "văn bản đến chờ vào sổ" (bảng documents) cho recipientGroup=contact_unit.
+      # Tắt để rollback vận hành về hành vi cũ (chỉ ghi dedup) mà không cần đổi code.
+      create-incoming-document: ${WORKER_VBDI_CREATE_INCOMING_DOCUMENT:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+    com.td.worker: ${LOG_LEVEL_COM_TD_WORKER:INFO}
+    org.springframework.kafka: WARN
+    org.springframework.amqp: INFO
+  file:
+    name: ${LOG_FILE:logs/td-worker.log}

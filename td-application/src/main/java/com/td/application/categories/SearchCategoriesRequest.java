@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.Data;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -13,6 +14,12 @@ public class SearchCategoriesRequest {
     private UUID parentId;
     private Integer level;
     private Boolean isActive;
+
+    // BL-113: lọc theo 1 hoặc nhiều "form" cùng lúc (vd lấy chung cả `external_unit_level` lẫn
+    // `external_unit` để dựng cây "Cơ quan ngoài tỉnh" trong 1 lần gọi) — Category dùng chung 1 bảng
+    // cho nhiều loại danh mục phân biệt bằng `form`, khác Organization (bảng riêng, không cần lọc
+    // form vì toàn bộ bảng đã là 1 loại cây).
+    private List<String> forms;
 
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;

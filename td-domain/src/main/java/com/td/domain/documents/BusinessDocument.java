@@ -40,6 +40,9 @@ public class BusinessDocument extends AuditableEntity<UUID> implements IAggregat
     @Column(name = "metadata_json", columnDefinition = "TEXT", nullable = false)
     private String metadataJson = "{}";
 
+    @Column(name = "dynamic_fields", columnDefinition = "jsonb", nullable = false)
+    private String dynamicFieldsJson = "{}";
+
     @Column(name = "version_no", nullable = false)
     private long versionNo = 1L;
 
@@ -92,6 +95,12 @@ public class BusinessDocument extends AuditableEntity<UUID> implements IAggregat
         }
 
         this.versionNo += 1L;
+        return this;
+    }
+
+    // Thay toàn bộ field động (JSONB) — tương đương ShowItems/CreateOrUpdateDocument phía Domino
+    public BusinessDocument replaceDynamicFields(String dynamicFieldsJson) {
+        this.dynamicFieldsJson = normalizeObject(dynamicFieldsJson);
         return this;
     }
 

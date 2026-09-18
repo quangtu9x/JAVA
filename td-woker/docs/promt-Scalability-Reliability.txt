@@ -1,0 +1,17 @@
+### Scalability & Reliability
+
+Thiết kế Worker có khả năng đáp ứng khoảng **1 triệu transaction/ngày**, đồng thời chịu được peak traffic cao hơn nhiều lần mức trung bình.
+
+Không tối ưu theo TPS trung bình; phải thiết kế theo peak, burst và failure scenario.
+
+Worker phải scale ngang bằng nhiều instance/máy, có giới hạn concurrency và connection pool để không gây quá tải DB/HTTP/RabbitMQ/Kafka.
+
+Một message có nhiều unit phải xử lý độc lập; hỗ trợ partial success, checkpoint, retry từng unit và resume sau crash/restart mà không duplicate.
+
+Persistent state/idempotency phải đủ tin cậy cho production; không chỉ dựa vào memory/cache.
+
+Thiết kế và kiểm tra các tình huống redelivery, concurrent workers, timeout, mất kết nối, crash giữa transaction và checkpoint, retry và DLQ.
+
+Đưa ra cấu hình/concurrency mặc định hợp lý nhưng không hard-code theo một môi trường cụ thể; mọi giới hạn phải externalized và có thể tuning bằng configuration.
+
+Sau khi code xong phải build/test và kiểm tra khả năng scale, concurrency, duplicate processing và partial failure.

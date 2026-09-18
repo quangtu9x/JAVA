@@ -1,0 +1,138 @@
+## Xây dựng Worker Service độc lập
+
+Đọc các tài liệu kiến trúc và source code của project Spring Boot hiện tại để **hiểu và kế thừa các quyết định kiến trúc**, đặc biệt về:
+
+* Cách tổ chức project/module.
+* Cách cấu hình application.
+* Kết nối PostgreSQL/database.
+* Kết nối MinIO.
+* RabbitMQ/Kafka.
+* Connection pool, thread pool, HTTP client.
+* Multi-tenant.
+* Logging, monitoring, health check.
+* Các cơ chế retry, transaction, security và xử lý lỗi đang có.
+
+### Phạm vi quan trọng
+
+**KHÔNG ĐƯỢC SỬA, REFACTOR HOẶC THAY ĐỔI CODE CỦA PROJECT SPRING BOOT HIỆN TẠI.**
+
+Project Spring Boot chỉ dùng để **đọc và tham khảo kiến trúc/implementation**.
+
+Worker phải được xây dựng **riêng, độc lập**, có source/config/module riêng trong project của Worker.
+
+Nếu có cấu hình hoặc tài nguyên từ Spring Boot có thể tái sử dụng thì:
+
+* Chỉ copy/adapt sang Worker khi phù hợp.
+* Worker phải sở hữu cấu hình riêng.
+* Không tạo dependency khiến Worker phải chạy cùng Spring Boot.
+* Không sửa file/config của Spring Boot để phục vụ Worker.
+
+### Worker Core
+
+Xây dựng Worker theo hướng **generic Worker Platform**, không thiết kế riêng cho VBDI.
+
+VBDI chỉ là **module/use case tham khảo đầu tiên** để kiểm chứng Worker.
+
+Core phải cho phép bổ sung các task khác trong tương lai như:
+
+* VBDI.
+* OCR/AI.
+* Elasticsearch indexing.
+* File processing.
+* Đồng bộ dữ liệu.
+* Notification.
+* Các background job nghiệp vụ khác.
+
+Mỗi loại task nên được triển khai qua handler/module riêng, không hard-code nghiệp vụ vào Worker Core.
+
+### Distributed Worker
+
+Hỗ trợ:
+
+* Nhiều Worker instance.
+* Nhiều máy chủ.
+* Nhiều process/thread.
+* Horizontal scaling.
+* Multi-tenant.
+* Competing consumers.
+
+RabbitMQ:
+
+* Các Worker cùng xử lý một loại job dùng chung queue.
+* Hỗ trợ ACK, retry, backoff, DLQ.
+* Xử lý được redelivery khi Worker crash.
+
+Kafka:
+
+* Các Worker cùng xử lý một loại event dùng cùng consumer group khi cần load balancing.
+* Hỗ trợ partition/rebalance và xử lý lại an toàn.
+
+### Message gồm nhiều Unit
+
+Một message có thể chứa nhiều unit độc lập; mỗi unit có thể tương ứng với một tenant, database, đơn vị hoặc resource khác nhau.
+
+Worker phải:
+
+* Xử lý độc lập từng unit.
+* Lưu persistent status/checkpoint theo từng unit.
+* Nếu Worker A xử lý được một phần rồi crash/timeout/mất kết nối, Worker B có thể tiếp tục.
+* Không xử lý lại unit đã thành công.
+* Retry theo từng unit thay vì retry mù toàn bộ message.
+* Có trạng thái `PENDING`, `PROCESSING`, `DONE`, `FAILED`, `RETRY` hoặc tương đương.
+* Có idempotency persistent, không chỉ dựa vào memory/cache.
+* Có unique key phù hợp, ví dụ `tenantId + messageId + unitId`.
+* Xử lý được race condition khi nhiều Worker đồng thời nhận cùng unit.
+* Đảm bảo crash/restart/redelivery không tạo dữ liệu nhân bản.
+* Chỉ ACK message theo chính sách hoàn tất được thiết kế; không ACK đơn giản chỉ vì một phần unit đã xử lý thành công.
+
+### Production Requirements
+
+Thiết kế và tối ưu:
+
+* PostgreSQL connection pool.
+* RabbitMQ connection/channel pool phù hợp.
+* Kafka consumer/producer.
+* HTTP connection pool.
+* Thread/executor pool.
+* Concurrency và backpressure.
+* Timeout.
+* Retry/DLQ.
+* Graceful shutdown.
+* Structured logging.
+* `tenantId`, `messageId`, `unitId`, `correlationId`.
+* Metrics.
+* Health/readiness.
+* Externalized configuration.
+* Không hard-code connection string, credential hoặc environment-specific configuration.
+
+### Tài liệu
+
+**Không sửa các tài liệu thiết kế hiện tại nếu không được yêu cầu.**
+
+Tạo **bộ tài liệu riêng cho Worker**, mô tả:
+
+* Worker architecture.
+* Worker Core.
+* Task/Handler model.
+* RabbitMQ/Kafka flow.
+* Multi-tenant.
+* Multi-instance/multi-machine.
+* Multi-unit processing.
+* Idempotency/checkpoint.
+* Retry/DLQ.
+* Database/MinIO/HTTP connection.
+* Configuration.
+* Deployment độc lập.
+* VBDI reference implementation.
+
+### Nguyên tắc thực hiện
+
+1. Đọc tài liệu và source Spring Boot trước để hiểu kiến trúc.
+2. Không sửa bất kỳ code/config/document nào của Spring Boot.
+3. Xác định những thành phần có thể tái sử dụng.
+4. Tạo Worker độc lập với cấu hình và tài liệu riêng.
+5. Giữ Worker Core generic, không phụ thuộc VBDI.
+6. Dùng VBDI làm implementation/reference để kiểm chứng.
+7. Tự kiểm tra các tình huống crash, timeout, retry, redelivery, duplicate, concurrent Worker và partial failure.
+8. Build/test Worker sau khi hoàn thành và tự sửa lỗi phát sinh.
+9. Không thay đổi các quyết định kiến trúc hiện tại nếu chưa có lý do rõ ràng.

@@ -1,7 +1,10 @@
 package com.td.application.sharedcore;
 
 import com.td.application.common.models.Result;
+import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.domain.sharedcore.AppUserRoleGroup;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,10 +12,13 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
+@Slf4j
+@Transactional(value = "identityTransactionManager", readOnly = true)
 public class GetAppUserUseCase {
 
     private final AppUserRepository appUserRepository;
+    private final AppUserRoleGroupRepository appUserRoleGroupRepository;
+    private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
 
     public Result<AppUserDto> execute(UUID id) {
         try {
@@ -25,8 +31,17 @@ public class GetAppUserUseCase {
                 return Result.failure("Không tìm thấy người dùng với ID: " + id);
             }
 
-            return Result.success(AppUserDtoMapper.map(opt.get()));
+            var entity = opt.get();
+            var dynamicFields = dynamicDocumentFieldsService.parseDynamicFields(entity.getDynamicFieldsJson());
+            var roleGroupIds = appUserRoleGroupRepository.findByAppUserIdAndDeletedOnIsNull(entity.getId()).stream()
+                .map(AppUserRoleGroup::getRoleGroupId)
+                .toList();
+            // Gap #5 (docs/analysis/18-checklist-port-kiem-nhiem-domino-sang-java.md): badge "có
+            // kiêm nhiệm" đúng toàn cục.
+            boolean hasKiemNhiem = appUserRepository.existsByParentUserIdAndDeletedOnIsNull(entity.getId());
+            return Result.success(AppUserDtoMapper.map(entity, dynamicFields, roleGroupIds, hasKiemNhiem));
         } catch (Exception ex) {
+            log.error("Lấy người dùng thất bại", ex);
             return Result.failure("Lấy người dùng thất bại: " + ex.getMessage());
         }
     }

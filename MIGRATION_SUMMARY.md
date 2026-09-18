@@ -1,5 +1,11 @@
 # Tổng kết Migration TD.WebAPI - Java Spring Boot
 
+> ⚠️ **Ghi chú nguồn gốc**: Dự án này là kết quả của quá trình migration từ hệ thống **HCL Domino/XPages** (Quản lý văn bản tỉnh Thanh Hoá) sang Java Spring Boot. 
+> 
+> Trong quá trình phát triển, có tồn tại một bản trung gian **TD.WebAPI (.NET)** làm cầu nối, nhưng nguồn gốc thực tế và mục tiêu cuối cùng là thay thế **Domino**. 
+> 
+> Xem thêm: `docs/migration/01-tong-quan-kien-truc.md` và `docs/gap-analysis/01-gap-analysis-tong-hop.md` (mục DOC-CONFLICT-01).
+
 ## ✅ Đã hoàn thành
 
 ### 1. Cấu trúc dự án (Clean Architecture)

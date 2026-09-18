@@ -3,6 +3,7 @@ package template.department.application;
 import com.td.application.common.TextNormalizer;
 import com.td.application.common.models.Result;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import template.department.domain.Department;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class CreateDepartmentUseCase {
 
     private final DepartmentRepository departmentRepository;
@@ -50,6 +52,7 @@ public class CreateDepartmentUseCase {
 
             return Result.success(saved.getId());
         } catch (Exception ex) {
+            log.error("Tạo phòng ban thất bại", ex);
             return Result.failure("Tạo phòng ban thất bại: " + ex.getMessage());
         }
     }

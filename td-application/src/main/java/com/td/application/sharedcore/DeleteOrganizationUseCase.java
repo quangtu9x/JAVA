@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
+@Transactional("identityTransactionManager")
 public class DeleteOrganizationUseCase {
 
     private final OrganizationRepository organizationRepository;

@@ -116,6 +116,7 @@ public class DocumentCacheService {
         try {
             return cache.get(buildDocumentKey(documentId)) != null;
         } catch (Exception ex) {
+            log.debug("Failed to check document {} in Redis cache: {}", documentId, ex.getMessage());
             return false;
         }
     }
@@ -137,6 +138,7 @@ public class DocumentCacheService {
         try {
             return cache.get(buildListKey(request)) != null;
         } catch (Exception ex) {
+            log.debug("Failed to check document list in Redis cache: {}", ex.getMessage());
             return false;
         }
     }

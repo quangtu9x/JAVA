@@ -32,6 +32,10 @@
       {
         "name": "BRAND_MANAGER",
         "description": "Role for managing brands"
+      },
+      {
+        "name": "PLATFORM_ADMIN",
+        "description": "BL-117: quan ly/khoi tao don vi (tenant) o cap nen tang - KHONG cap tu dong cho ADMIN thuong (ADMIN chi la quyen cao nhat TRONG 1 tenant, khong nen tu dong thay/tao duoc credential database cua MOI tenant khac)"
       }
     ]
   },
@@ -50,7 +54,7 @@
           "temporary": false
         }
       ],
-      "realmRoles": ["ADMIN", "USER"],
+      "realmRoles": ["ADMIN", "PLATFORM_ADMIN", "USER"],
       "attributes": {}
     },
     {
@@ -124,13 +128,21 @@
         "http://localhost:8080/*",
         "https://localhost:8080/*",
         "http://localhost:3000/*",
-        "https://localhost:3000/*"
+        "https://localhost:3000/*",
+        "http://localhost:3355/*",
+        "https://localhost:3355/*",
+        "http://127.0.0.1:3355/*",
+        "https://127.0.0.1:3355/*"
       ],
       "webOrigins": [
         "http://localhost:8080",
         "https://localhost:8080",
         "http://localhost:3000",
-        "https://localhost:3000"
+        "https://localhost:3000",
+        "http://localhost:3355",
+        "https://localhost:3355",
+        "http://127.0.0.1:3355",
+        "https://127.0.0.1:3355"
       ],
       "attributes": {
         "access.token.lifespan": "3600",

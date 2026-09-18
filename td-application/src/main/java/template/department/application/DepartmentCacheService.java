@@ -105,6 +105,7 @@ public class DepartmentCacheService {
         try {
             return cache.get(idKey(id)) != null;
         } catch (Exception ex) {
+            log.debug("Department by-id cache check failed for {}: {}", id, ex.getMessage());
             return false;
         }
     }
@@ -176,6 +177,7 @@ public class DepartmentCacheService {
         try {
             return cache.get(listKey(request)) != null;
         } catch (Exception ex) {
+            log.debug("Department list cache check failed: {}", ex.getMessage());
             return false;
         }
     }

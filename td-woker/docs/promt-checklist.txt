@@ -1,0 +1,27 @@
+======================================================================
+CHECKLIST TỰ KIỂM TRA: CHỐNG QUÁ TẢI & TỐI ƯU HỆ THỐNG SPRING BOOT + RABBITMQ
+======================================================================
+
+[PHẦN 1: QUẢN LÝ TẢI VÀ KẾT NỐI DATABASE NHẬN (DATABASE CONNECTION & LOAD)]
+[ ] 1.1 Maximum Pool Size: HikariCP (DB Nhận) được cấu hình `maximum-pool-size` là bao nhiêu?
+    -> Quy tắc: `maximum-pool-size` phải >= `max-concurrent-consumers` của RabbitListener để không luồng nào bị thiếu connection.
+[ ] 1.2 Database Limit Check: Tổng số connection tối đa từ TẤT CẢ các Worker có vượt quá `max_connections` cho phép của DB Nhận không?
+[ ] 1.3 Connection Timeout: Đã cài đặt `connection-timeout` (ví dụ: 30000ms) và `validation-timeout` để tránh ứng dụng bị treo vô thời hạn khi DB Nhận không phản hồi?
+[ ] 1.4 Batch Insert: Nếu lượng văn bản lớn, đã dùng `saveAll()` chuẩn của Spring Data (đã bật batching) hoặc `JdbcTemplate.batchUpdate()` chưa?
+
+[PHẦN 2: ĐIỀU TIẾT LUỒNG RABBITMQ (BACKPRESSURE & CONCURRENCY)]
+[ ] 2.1 Prefetch Count: Đã set `spring.rabbitmq.listener.simple.prefetch` chưa?
+    -> Quy tắc: Nên đặt từ 1 đến 10. Tuyệt đối KHÔNG để mặc định (nếu không RabbitMQ sẽ đẩy hàng loạt message làm ngợp bộ nhớ Worker).
+[ ] 2.2 Concurrency: Đã set `concurrent-consumers` và `max-concurrent-consumers` phù hợp với năng lực xử lý của DB Nhận chưa?
+[ ] 2.3 Rate Limiting: Nếu DB Nhận yếu, đã cài đặt giới hạn tốc độ tiêu thụ message chưa?
+
+[PHẦN 3: TÍNH TIN CẬY DỮ LIỆU & CHỐNG TRÙNG LẶP (IDEMPOTENCY & ACK)]
+[ ] 3.1 Idempotent Mechanism: Tại DB Nhận, làm sao để đảm bảo nếu 1 message bị gửi 2 lần thì không bị duplicate dữ liệu?
+    -> Đã có Khóa chính (Primary Key) trùng với ID văn bản gửi, hoặc UNIQUE Index trên cột `document_id` chưa?
+[ ] 3.2 Acknowledgment Mode: Đã dùng `acknowledge-mode: manual` hoặc cấu hình `containerFactory` quản lý Transaction chuẩn chưa?
+    -> Chỉ Ack message lên RabbitMQ SAU KHI Transaction ghi vào DB Nhận đã COMMIT thành công.
+
+[PHẦN 4: CƠ CHẾ CHỊU LỖI & THỦ CÔNG XỬ LÝ (RETRY & DLQ)]
+[ ] 4.1 Retry Policy: Đã cài đặt Retry với Backoff (ví dụ: thử lại sau 2s, 4s, 8s, tối đa 3-5 lần) khi DB Nhận bị ngắt kết nối tạm thời chưa?
+[ ] 4.2 Dead Letter Queue (DLQ): Khi retry thất bại hết số lần quy định, message có được tự động chuyển sang DLQ (hoặc bảng `Failed_Messages`) để kiểm tra lại sau không?
+[ ] 4.3 Monitoring/Alert: Đã có cảnh báo (Alert) khi số lượng message trong Queue hoặc DLQ tăng đột biến chưa?

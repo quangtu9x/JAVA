@@ -24,4 +24,12 @@ public interface ISoftDelete {
      * Marks the entity as soft deleted
      */
     void markAsDeleted(UUID deletedBy);
+
+    /**
+     * 11/09/2026 (yêu cầu người dùng "port vbdi/thungrac/thungrac" — nút "Khôi phục"): đảo ngược
+     * {@link #markAsDeleted}, đưa entity về trạng thái CHƯA xoá ({@code deletedOn}/{@code deletedBy}
+     * = null). Cùng LUẬT "delete luôn soft-delete" (xem MEMORY.md) — mọi module port chức năng
+     * "Khôi phục"/"Restore" từ Domino sang Java nên tái dùng method này thay vì tự set field thô.
+     */
+    void restore();
 }

@@ -2,12 +2,15 @@
 
 Muc tieu: chuyen doi an toan tu he thong Domino (data + servlet API) sang kien truc moi ma khong gian doan nghiep vu.
 
+> **Cap nhat pham vi (BL-001, 04/08/2026)**: Nghiep vu da xac nhan **Big-bang cutover** (khong dual-stack keo dai theo module) va **multi-tenant**, nhung van **can tuong thich nguoc API** voi FE hien tai. Xem bien ban day du tai `docs/migration-backlog/03-quyet-dinh-pham-vi-migration.md`. Nguyen tac #1 duoi day ("Khong big-bang") va cac Phase 2-3 (dual write/canary) trong tai lieu nay duoc xay dung truoc quyet dinh nay va can duoc thiet ke lai cho khop big-bang (thuoc pham vi BL-002) — noi dung Phase ben duoi hien con giu nguyen chi de tham khao ky thuat (dual write, doi soat, rollback van la ky thuat huu ich ke ca voi big-bang), khong con la chu truong chinh thuc ve *thoi diem cutover*.
+
 ## 1) Nguyen tac migration
 
-- Khong big-bang. Di theo pha, co canary va rollback.
-- Uu tien tuong thich API trong giai doan dau.
-- Song song ghi log va doi soat so lieu giua 2 he thong.
+- **[Da thay doi theo BL-001]** Cutover la **Big-bang**: toan bo he thong chuyen sang Spring Boot trong 1 dot, khong chay dual-stack keo dai theo tung module. Van giu co che canary/rollback o muc ky thuat (feature flag, backup) de giam rui ro cho dot cutover duy nhat.
+- Uu tien tuong thich API trong giai doan dau (**van giu nguyen** — FE hien tai khong duoc viet lai dong thoi voi cutover, xem quyet dinh BL-001 muc 2).
+- Song song ghi log va doi soat so lieu giua 2 he thong trong giai doan kiem thu truoc cutover (khong con la giai đoan production dual-stack keo dai).
 - Workflow la nguon status chinh sau khi cutover.
+- He thong multi-tenant (schema-per-tenant) da duoc xac nhan — xem BL-303.
 
 ## 2) Mo hinh target
 

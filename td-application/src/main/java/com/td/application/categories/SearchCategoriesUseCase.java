@@ -1,6 +1,7 @@
 package com.td.application.categories;
 
 import com.td.application.common.models.PaginationResponse;
+import com.td.application.documents.DynamicDocumentFieldsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +17,7 @@ import java.util.List;
 public class SearchCategoriesUseCase {
 
     private final CategoryRepository categoryRepository;
+    private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
 
     public PaginationResponse<CategoryDto> execute(SearchCategoriesRequest request) {
         try {
@@ -23,7 +25,8 @@ public class SearchCategoriesUseCase {
             var page = categoryRepository.search(request, pageable);
 
             List<CategoryDto> items = page.getContent().stream()
-                .map(CategoryDtoMapper::map)
+                .map(entity -> CategoryDtoMapper.map(
+                    entity, dynamicDocumentFieldsService.parseDynamicFields(entity.getDynamicFieldsJson())))
                 .toList();
 
             return new PaginationResponse<>(

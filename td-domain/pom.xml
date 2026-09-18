@@ -29,6 +29,19 @@
             <artifactId>jakarta.persistence-api</artifactId>
         </dependency>
 
+        <!--
+            Bugfix 26/08/2026 (lan 2): KHONG dua spring-data-commons/spring-data-jpa/spring-aspects
+            vao domain nua. Lan dau da thu wire auditing chuan (@CreatedBy/@LastModifiedBy +
+            AuditingEntityListener) nhung vo hieu trong runtime nay: listener do bi weave AspectJ va
+            can duoc tiem AuditingHandler qua SpringBeanContainer cua Hibernate, trong khi ca 3
+            persistence unit deu dung tay trong MultiPersistenceUnitJpaConfig (khong di duong
+            auto-configure cua Boot) -> Hibernate new listener bang reflection thuong -> callback
+            thanh no-op IM LANG, created_by/last_modified_by van NULL. Thay bang listener JPA thuan
+            AuditableEntityListener + AuditCurrentUserHolder (cung package contracts); nguoi dung
+            hien tai do AuditingConfig dang ky luc startup. Domain giu nguyen chi phu thuoc
+            jakarta.persistence.
+        -->
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

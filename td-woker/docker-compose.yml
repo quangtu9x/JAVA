@@ -1,0 +1,70 @@
+# =====================================================================
+# TD WORKER - Docker Compose (PHÁT TRIỂN / smoke test)
+# Gồm: 1 Worker instance + PostgreSQL (database riêng của Worker) + RabbitMQ.
+# Kafka có thể thêm sau theo hướng dẫn docs/10-deployment.md.
+# =====================================================================
+version: '3.8'
+
+services:
+  worker-db:
+    image: postgres:15-alpine
+    container_name: td-worker-db
+    environment:
+      POSTGRES_DB: tdworker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - worker_postgres_data:/var/lib/postgresql/data
+    networks:
+      - worker-network
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: td-worker-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "15672:15672"   # management UI
+    networks:
+      - worker-network
+
+  worker:
+    build:
+      context: .
+    container_name: td-worker
+    depends_on:
+      - worker-db
+      - rabbitmq
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      WORKER_MANAGEMENT_PORT: 8090
+      WORKER_DB_URL: jdbc:postgresql://worker-db:5432/tdworker
+      WORKER_DB_USERNAME: postgres
+      WORKER_DB_PASSWORD: postgres
+      WORKER_DB_SCHEMA_MANAGEMENT: flyway
+      # Control-plane: trỏ tới DB control-plane của td-web (cùng key/salt)
+      CONTROL_PLANE_ENABLED: "false"   # bật + cấu hình khi có td-web control-plane thật
+      # RabbitMQ
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      WORKER_RABBIT_ENABLED: "true"
+      WORKER_RABBIT_QUEUE: worker.tasks
+      # Instance id
+      WORKER_INSTANCE_ID: worker-1
+    ports:
+      - "8090:8090"
+    networks:
+      - worker-network
+
+volumes:
+  worker_postgres_data:
+    driver: local
+
+networks:
+  worker-network:
+    driver: bridge
