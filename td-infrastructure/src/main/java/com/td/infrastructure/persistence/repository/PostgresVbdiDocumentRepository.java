@@ -29,6 +29,34 @@ import java.util.UUID;
 @Repository
 public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
+    // Yeu cau nguoi dung 28/09/2026 ("So van ban di co quan/don vi/phong ban... sap xep uu tien ngay
+    // ban hanh va so lon nhat len tren, fix tong the cac danh sach van ban di"): thay ORDER BY
+    // last_modified_on cho MOI danh sach (tru thung rac - giu theo deleted_on).
+    // - promulgation_date luu chuoi "dd/MM/yyyy" (da doi chieu du lieu that) - guard regex truoc TO_DATE.
+    // - document_number co 2 dang that: so JSON ("12.0") va chuoi ("12/2026-VBD") - lay phan so DAU
+    //   chuoi de so sanh theo gia tri (tranh "9" > "10" khi so sanh chuoi).
+    // - Van ban chua vao so (chua co ngay/so) xuong cuoi (NULLS LAST), hoa vao nhau theo last_modified_on.
+    private static final String ISSUED_ORDER_BY = " ORDER BY"
+        + " (CASE WHEN NULLIF(d.dynamic_fields->>'promulgation_date', '') ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'"
+        + " THEN TO_DATE(LEFT(d.dynamic_fields->>'promulgation_date', 10), 'DD/MM/YYYY') ELSE NULL END) DESC NULLS LAST,"
+        + " (CASE WHEN TRIM(COALESCE(d.dynamic_fields->>'document_number', '')) ~ '^[0-9]{1,18}'"
+        + " THEN CAST(SUBSTRING(TRIM(d.dynamic_fields->>'document_number') FROM '^[0-9]{1,18}') AS bigint)"
+        + " ELSE NULL END) DESC NULLS LAST,"
+        + " d.last_modified_on DESC NULLS LAST";
+
+    // 01/10/2026 (yêu cầu người dùng "vbdi/xuly/chocapkyso sắp xếp theo ngày tạo vì danh sách này chưa
+    // vào sổ"): văn bản CHƯA vào sổ (DRAFT) chưa có ngày ban hành/số → ISSUED_ORDER_BY vô nghĩa, xếp
+    // theo ngày tạo mới nhất trước. Áp cho chocapkyso/chobanhanh (findWaitingForRegistrationByIdentifier)
+    // và chocapkysomc (findByAnyFieldEqualsIdentifier status DRAFT).
+    private static final String CREATED_ORDER_BY =
+        " ORDER BY d.created_on DESC NULLS LAST, d.last_modified_on DESC NULLS LAST";
+
+    static String orderByForStatus(String status) {
+        return status != null && com.td.application.vbdi.VbdiStatus.DRAFT.equalsIgnoreCase(status.trim())
+            ? CREATED_ORDER_BY
+            : ISSUED_ORDER_BY;
+    }
+
     private final VbdiDocumentJpaRepository jpaRepository;
 
     @PersistenceContext
@@ -57,7 +85,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
     }
 
     @Override
-    public Page<VbdiDocument> findByStatus(String documentType, String status, Pageable pageable) {
+    public Page<VbdiDocument> findByStatus(String documentType, String status, VbdiDocumentOutFilter filter, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM vbdi_documents d
@@ -73,9 +101,11 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
             parameters.put("documentType", documentType.trim().toLowerCase());
         }
 
+        appendFilterPredicates(sql, parameters, filter);
+
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(orderByForStatus(status)).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -88,7 +118,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
     @Override
     public Page<VbdiDocument> findWaitingForRegistrationByIdentifier(
-            String documentType, String status, String identifier, Pageable pageable) {
+            String documentType, String status, String identifier, VbdiDocumentOutFilter filter, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM vbdi_documents d
@@ -108,9 +138,11 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
             parameters.put("documentType", documentType.trim().toLowerCase());
         }
 
+        appendFilterPredicates(sql, parameters, filter);
+
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(orderByForStatus(status)).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -150,7 +182,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -191,7 +223,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -331,7 +363,11 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
                 sql.append("(d.dynamic_fields->'").append(fieldName).append("' @> jsonb_build_array(CAST(:")
                     .append(containsParam).append(" AS text))")
                     .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-                    .append(scalarParam).append(")");
+                    .append(scalarParam);
+                // 27/09/2026: + khop thanh vien chuoi "a;b" - xem javadoc DelimitedMemberSql.
+                DelimitedMemberSql.appendOrMember(
+                    sql, parameters, fieldName, value, "anyValMember" + fieldIndex + "_" + valueIndex);
+                sql.append(")");
                 parameters.put(containsParam, value);
                 parameters.put(scalarParam, value);
             }
@@ -353,6 +389,10 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
      * {@code dynamic_fields} không có — các cột khác giữ nguyên chỉ tìm trên {@code dynamic_fields}.
      */
     private String keywordColumnExpression(String columnName) {
+        // 01/10/2026: ten cot den tu client va bi noi thang vao SQL - chan dinh danh khong an toan.
+        if (!KeywordSql.isSafeFieldName(columnName)) {
+            return "''";
+        }
         if ("subject".equals(columnName)) {
             return "COALESCE(NULLIF(d.dynamic_fields->>'subject', ''), d.title, '')";
         }
@@ -395,7 +435,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -440,7 +480,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(orderByForStatus(status)).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -488,7 +528,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -528,7 +568,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -571,7 +611,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());

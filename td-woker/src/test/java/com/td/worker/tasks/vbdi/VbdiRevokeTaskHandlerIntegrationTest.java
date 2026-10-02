@@ -188,6 +188,39 @@ class VbdiRevokeTaskHandlerIntegrationTest {
         return id;
     }
 
+    /**
+     * Bổ sung 21/09/2026 (bugfix "Lấy lại văn bản" cho ĐƠN VỊ NỘI BỘ — xem javadoc
+     * {@link VbdiRevokeTaskHandler#revokeIncomingDocuments}): mô phỏng văn bản đến CHỜ VÀO SỔ tạo cho
+     * 1 đơn vị nội bộ CỤ THỂ ({@code unit_process} = mảng 1 phần tử, KHÔNG phải {@code contact_unit_identifier}).
+     */
+    private UUID insertInternalUnitIncomingDocument(String parentidSend, String unitIdentifier) {
+        UUID id = UUID.randomUUID();
+        String dynamicFields = """
+            {"parentid_send": "%s", "internal": "1", "unit_process": ["%s"], "document_internet": "1"}
+            """.formatted(parentidSend, unitIdentifier);
+        new JdbcTemplate(adminDataSource).update("""
+                INSERT INTO documents (id, title, document_type, status, dynamic_fields)
+                VALUES (?, 'Van ban den noi bo cho vao so', 'vbden', '0', ?::jsonb)
+                """, id, dynamicFields);
+        return id;
+    }
+
+    /**
+     * Bổ sung 21/09/2026: mô phỏng văn bản đến nội bộ ĐÃ "vào sổ" ({@code LuuVanBanDenUseCase} R4) —
+     * {@code unit_process} đã bị xoá rỗng, identifier chuyển sang {@code unit_process_registered}.
+     */
+    private UUID insertRegisteredInternalUnitIncomingDocument(String parentidSend, String unitIdentifier) {
+        UUID id = UUID.randomUUID();
+        String dynamicFields = """
+            {"parentid_send": "%s", "internal": "1", "unit_process": [], "unit_process_registered": ["%s"], "document_internet": "1"}
+            """.formatted(parentidSend, unitIdentifier);
+        new JdbcTemplate(adminDataSource).update("""
+                INSERT INTO documents (id, title, document_type, status, dynamic_fields)
+                VALUES (?, 'Van ban den noi bo da vao so', 'vbden', '0', ?::jsonb)
+                """, id, dynamicFields);
+        return id;
+    }
+
     /** Mô phỏng bản ghi {@code vbden_so} ({@code TiepNhanVbdenUseCase#REGISTER_ENTRY_DOCUMENT_TYPE}) liên kết. */
     private UUID insertSoVanBanEntry(UUID parentId) {
         UUID id = UUID.randomUUID();
@@ -238,7 +271,10 @@ class VbdiRevokeTaskHandlerIntegrationTest {
         assertThat(reply).isEqualTo("1");
     }
 
-    /** Không khớp {@code parentid_send} nào (vd internal_unit/coordinator — chưa từng tạo văn bản đến thật). */
+    /**
+     * Không khớp {@code parentid_send} nào (vd coordinator — chưa từng tạo văn bản đến thật; hoặc
+     * internal_unit nhưng KHÔNG có văn bản nào được tạo trước đó cho recipientIdentifier này).
+     */
     @Test
     void noMatchingIncomingDocumentIsNoOpAndDoesNotPublishReply() throws Exception {
         // KHONG insert van ban den nao truoc.
@@ -374,6 +410,56 @@ class VbdiRevokeTaskHandlerIntegrationTest {
         assertThat(jdbc.queryForObject(
             "SELECT dynamic_fields->>'reply' FROM documents WHERE id = ?", String.class, unrelatedSoId))
             .isNull();
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (bugfix người dùng: "kiểm tra Lấy lại văn bản đã hoàn thiện cho ĐƠN VỊ NỘI
+     * BỘ chưa" — xem javadoc {@link VbdiRevokeTaskHandler#revokeIncomingDocuments}): văn bản gửi tới
+     * CẢ "Phòng A" lẫn "Phòng B" (2 đơn vị nội bộ CHIA SẺ 1 tenant — tenant của chính cơ quan gửi,
+     * KHÁC contact_unit) — "Lấy lại" chỉ chọn Phòng A KHÔNG được đụng tới văn bản đến của Phòng B.
+     * Trước bản vá, điều kiện CHỈ {@code parentid_send} sẽ khớp CẢ 2 (lấy lại nhầm Phòng B).
+     */
+    @Test
+    void layLaiInternalUnit_onlyRevokesTheSelectedUnitNotOtherUnitsInSameTenant() throws Exception {
+        UUID phongADoc = insertInternalUnitIncomingDocument("doc-1", "H05.01.01");
+        UUID phongBDoc = insertInternalUnitIncomingDocument("doc-1", "H05.01.02");
+        ObjectNode payload = basePayload("laylaivanban");
+        payload.put("recipientGroup", VbdiTaskConstants.GROUP_INTERNAL_UNIT);
+        payload.put("recipientIdentifier", "H05.01.01");
+
+        assertThat(handler.execute(context("H05_01"), payload).isSuccess()).isTrue();
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        String phongAReply = jdbc.queryForObject(
+            "SELECT dynamic_fields->>'reply' FROM documents WHERE id = ?", String.class, phongADoc);
+        String phongBReply = jdbc.queryForObject(
+            "SELECT dynamic_fields->>'reply' FROM documents WHERE id = ?", String.class, phongBDoc);
+        assertThat(phongAReply).as("Phong A duoc chon lay lai").isEqualTo("1");
+        assertThat(phongBReply).as("Phong B KHONG duoc chon - khong duoc dung vao").isNull();
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (đối chứng test trên): văn bản đến nội bộ ĐÃ "vào sổ" ({@code unit_process}
+     * rỗng, identifier chuyển sang {@code unit_process_registered}) VẪN phải lấy lại được — cùng lý
+     * do đã áp dụng cho {@code contact_unit_identifier} (điểm 2 javadoc lớp).
+     */
+    @Test
+    void layLaiInternalUnit_alreadyRegisteredDocument_stillGetsRevoked() throws Exception {
+        UUID phongADoc = insertRegisteredInternalUnitIncomingDocument("doc-1", "H05.01.01");
+        UUID phongBDoc = insertInternalUnitIncomingDocument("doc-1", "H05.01.02");
+        ObjectNode payload = basePayload("laylaivanban");
+        payload.put("recipientGroup", VbdiTaskConstants.GROUP_INTERNAL_UNIT);
+        payload.put("recipientIdentifier", "H05.01.01");
+
+        assertThat(handler.execute(context("H05_01"), payload).isSuccess()).isTrue();
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        assertThat(jdbc.queryForObject(
+            "SELECT dynamic_fields->>'reply' FROM documents WHERE id = ?", String.class, phongADoc))
+            .isEqualTo("1");
+        assertThat(jdbc.queryForObject(
+            "SELECT dynamic_fields->>'reply' FROM documents WHERE id = ?", String.class, phongBDoc))
+            .as("Phong B KHONG duoc chon - khong duoc dung vao").isNull();
     }
 
     @Test

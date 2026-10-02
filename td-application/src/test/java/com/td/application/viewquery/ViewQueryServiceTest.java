@@ -365,6 +365,33 @@ class ViewQueryServiceTest {
         assertThat(result.getItems().get(0)).containsEntry("title", "Buoc xu ly 1");
     }
 
+    // 30/09/2026: dòng cũ (vd "Trả lại") ghi creator = tài khoản -> đọc ra TÊN ĐẦY ĐỦ; dòng đã có tên giữ nguyên.
+    @Test
+    void execute_qtxlByParentId_shouldShowFullNameWhenCreatorIsUsername() {
+        UUID parentId = UUID.randomUUID();
+        var legacy = newVbdenResDocument("tralai",
+            "{\"parentid\":\"" + parentId + "\",\"action\":\"tralai\",\"nguoi_thuc_hien\":\"alice\",\"creator\":\"alice\"}");
+        var named = newVbdenResDocument("chuyenxuly",
+            "{\"parentid\":\"" + parentId + "\",\"nguoi_thuc_hien\":\"bob\",\"creator\":\"Ten Da Luu\"}");
+        var page = new PageImpl<>(List.of(legacy, named), PageRequest.of(0, 20), 2);
+        when(vbdenResDocumentRepository.findByParentId(eq(parentId.toString()), any())).thenReturn(page);
+        AppUser alice = newUser("alice", "Alice Nguyen", "alice@example.com");
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("alice")).thenReturn(Optional.of(alice));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("QTXL_by_parentid");
+        request.setKeys(List.of(parentId.toString()));
+        request.setItems("getall");
+
+        var result = service.execute("vbden_res", request);
+
+        assertThat(result.getItems().get(0))
+            .containsEntry("creator", "Alice Nguyen")
+            .containsEntry("nguoi_thuc_hien", "alice");
+        assertThat(result.getItems().get(1)).containsEntry("creator", "Ten Da Luu");
+        verify(appUserRepository, never()).findByUsernameAndDeletedOnIsNull("bob");
+    }
+
     @Test
     void execute_qtxlByParentId_withBlankKey_shouldReturnEmptyPageWithoutQuerying() {
         ViewQueryRequest request = new ViewQueryRequest();
@@ -554,7 +581,7 @@ class ViewQueryServiceTest {
         VbdiDocument document = new VbdiDocument("Van ban da trinh ky", "vbdi", "PENDING_SIGNATURE", null, null, null, null);
         document.replaceDynamicFields("{}");
         Page<VbdiDocument> page = new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1);
-        when(vbdiDocumentRepository.findByStatus(eq("vbdi"), eq("PENDING_SIGNATURE"), any())).thenReturn(page);
+        when(vbdiDocumentRepository.findByStatus(eq("vbdi"), eq("PENDING_SIGNATURE"), any(), any())).thenReturn(page);
 
         ViewQueryRequest request = new ViewQueryRequest();
         request.setViewname("vwvandi_chobanhanh");
@@ -571,7 +598,7 @@ class ViewQueryServiceTest {
         VbdiDocument document = new VbdiDocument("Van ban da ban hanh", "vbdi", "ISSUED", null, null, null, null);
         document.replaceDynamicFields("{\"document_number\":\"5/2026-VBD\"}");
         Page<VbdiDocument> page = new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1);
-        when(vbdiDocumentRepository.findByStatus(eq("vbdi"), eq("ISSUED"), any())).thenReturn(page);
+        when(vbdiDocumentRepository.findByStatus(eq("vbdi"), eq("ISSUED"), any(), any())).thenReturn(page);
 
         ViewQueryRequest request = new ViewQueryRequest();
         request.setViewname("vwvandi_dabanhanh");
@@ -640,6 +667,9 @@ class ViewQueryServiceTest {
         search.put("title", "Ho so xu ly don thu");
         search.put("first_topic", "De muc lon A");
         search.put("second_topic", "De muc nho B");
+        search.put("leader_in_charge", "Le Phu Ha");
+        search.put("key_type", "2");
+        search.put("coordinator", "Pham Van D");
         search.put("create_date", List.of("01/08/2026", "31/08/2026"));
         search.put("end_date", List.of("05/08/2026", "20/08/2026"));
         search.put("storaged_date", List.of("01/09/2026", "10/09/2026"));
@@ -656,12 +686,15 @@ class ViewQueryServiceTest {
             .containsEntry("status", List.of("1"))
             .containsEntry("trinhlanhdaoduyet", List.of("2"))
             .containsEntry("storaged", List.of("0"))
-            .containsEntry("category", List.of("Danh muc A"));
+            .containsEntry("category", List.of("Danh muc A"))
+            .containsEntry("leader_in_charge", List.of("Le Phu Ha"))
+            .containsEntry("key_type", List.of("2"));
         assertThat(filter.getContainsAnyFieldValues())
             .containsEntry("name", List.of("HS-2026-001"))
             .containsEntry("title", List.of("Ho so xu ly don thu"))
             .containsEntry("first_topic", List.of("De muc lon A"))
-            .containsEntry("second_topic", List.of("De muc nho B"));
+            .containsEntry("second_topic", List.of("De muc nho B"))
+            .containsEntry("coordinator", List.of("Pham Van D"));
         assertThat(filter.getMinCreatedOn()).isEqualTo(LocalDate.of(2026, 8, 1));
         assertThat(filter.getMaxCreatedOn()).isEqualTo(LocalDate.of(2026, 8, 31));
         assertThat(filter.getMinEndDate()).isEqualTo(LocalDate.of(2026, 8, 5));
@@ -669,6 +702,32 @@ class ViewQueryServiceTest {
         assertThat(filter.getMinStoragedDate()).isEqualTo(LocalDate.of(2026, 9, 1));
         assertThat(filter.getMaxStoragedDate()).isEqualTo(LocalDate.of(2026, 9, 10));
         verify(hoSoCVDocumentRepository, never()).findByAnyFieldContains(anyString(), any(), anyString(), any());
+    }
+
+    // 01/10/2026: "Trang thai phoi hop" - da phoi hop (user_coordinated chua) / chua phoi hop
+    // (fieldnot_user_coordinated -> excludeMemberFieldValues).
+    @Test
+    void execute_hosocvToanBo_withCoordinatedStatus_shouldMapIncludeAndExcludeMember() {
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(hoSoCVDocumentRepository.findByVbdenOrgView(eq("hosocv"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest daPhoiHop = new ViewQueryRequest();
+        daPhoiHop.setViewname("vwUser_All");
+        daPhoiHop.setSearch(new java.util.HashMap<>(Map.of("coordinator", "Pham Van D", "user_coordinated", "phamvand")));
+        service.execute("hosocv", daPhoiHop);
+        assertThat(filterCaptor.getValue().getContainsAnyFieldValues())
+            .containsEntry("user_coordinated", List.of("phamvand"));
+        assertThat(filterCaptor.getValue().getExcludeMemberFieldValues()).isNull();
+
+        ViewQueryRequest chuaPhoiHop = new ViewQueryRequest();
+        chuaPhoiHop.setViewname("vwUser_All");
+        chuaPhoiHop.setSearch(new java.util.HashMap<>(Map.of("coordinator", "Pham Van D", "fieldnot_user_coordinated", "phamvand")));
+        service.execute("hosocv", chuaPhoiHop);
+        assertThat(filterCaptor.getValue().getExcludeMemberFieldValues())
+            .containsEntry("user_coordinated", List.of("phamvand"));
+        assertThat(filterCaptor.getValue().getContainsAnyFieldValues()).doesNotContainKey("user_coordinated");
     }
 
     @Test
@@ -712,6 +771,25 @@ class ViewQueryServiceTest {
         verify(hoSoCVDocumentRepository).findByAnyFieldContains(eq("hosocv"), eq(List.of("user_creator")), eq("nguyenvana"), any());
     }
 
+    // Bugfix 01/10/2026: modal "Them vao ho so" (tim kiem nang cao) gui KHONG co keys + search chi co
+    // form/keyword/author (khong field loc nao nhan dien) -> phai mac dinh nguoi dang nhap, khong rong.
+    @Test
+    void execute_hosocvToanBo_withoutKeys_shouldDefaultToCurrentUser() {
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("lpha"));
+        var document = newHoSoCVDocument("Ho so cua lpha", "{\"user_creator\":\"lpha\"}");
+        when(hoSoCVDocumentRepository.findByAnyFieldContains(eq("hosocv"), eq(List.of("user_creator")), eq("lpha"), any()))
+            .thenReturn(new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwUser_All");
+        request.setItems("getall");
+        request.setSearch(new java.util.HashMap<>(Map.of("form", "document_profiles", "keyword", "", "author", "lpha")));
+
+        var result = service.execute("hosocv", request);
+
+        assertThat(result.getTotalItems()).isEqualTo(1L);
+    }
+
     @Test
     void execute_hosocvChuTriDangXuLy_withUsernameTokenMacro_shouldResolveViaCurrentUserProvider() {
         when(currentUserProvider.currentUsername()).thenReturn(Optional.of("chuyenvien01"));
@@ -726,6 +804,48 @@ class ViewQueryServiceTest {
         service.execute("hosocv", request);
 
         assertThat(filterCaptor.getValue().getOrgValue()).isEqualTo("chuyenvien01");
+    }
+
+    // 01/10/2026: "tim trong danh sach" ho so - FE chi gui keyword (khong columns) -> truyen keyword +
+    // bo cot mac dinh; truoc day moi case hosocv bo qua keyword.
+    @Test
+    void execute_hosocvList_withKeywordOnly_shouldPassKeywordWithDefaultColumns() {
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("chuyenvien01"));
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(hoSoCVDocumentRepository.findByVbdenOrgView(eq("hosocv"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("hoso_chutri_dangxuly");
+        request.setKeys(List.of("$username$"));
+        request.setKeyword("don thu");
+
+        service.execute("hosocv", request);
+
+        assertThat(filterCaptor.getValue().getKeyword()).isEqualTo("don thu");
+        assertThat(filterCaptor.getValue().getKeywordColumns()).containsExactly("name", "title", "process_handler");
+    }
+
+    // Co keyword o view ca nhan don (vwUser_Process_Handler) -> di qua findByVbdenOrgView de loc keyword.
+    @Test
+    void execute_hosocvPersonalQueue_withKeyword_shouldUseOrgViewWithKeyword() {
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("chuyenvien01"));
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(hoSoCVDocumentRepository.findByVbdenOrgView(eq("hosocv"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwUser_Process_Handler");
+        request.setKeys(List.of("$username$"));
+        request.setKeyword("HS-01");
+        request.setColumns(List.of("name"));
+
+        service.execute("hosocv", request);
+
+        assertThat(filterCaptor.getValue().getOrgFieldNames()).containsExactly("user_process_handler");
+        assertThat(filterCaptor.getValue().getKeyword()).isEqualTo("HS-01");
+        assertThat(filterCaptor.getValue().getKeywordColumns()).containsExactly("name");
+        verify(hoSoCVDocumentRepository, never()).findByAnyFieldContains(anyString(), any(), anyString(), any());
     }
 
     // Mo rong BL-240 - vai view moi tieu bieu (khong lap lai het ~26 view, chi khoa hanh vi predicate
@@ -1132,6 +1252,26 @@ class ViewQueryServiceTest {
         assertThat(filter.getOrgFieldNames()).containsExactly("contact_unit_identifier");
         assertThat(filter.getExcludeFieldValues()).containsEntry("reply", List.of("1"));
         assertThat(filter.getIncludeFieldValues()).containsEntry("document_internet", List.of("1"));
+        // 01/10/2026: man "Cho vao so" sap moi den nhat len tren.
+        assertThat(filter.isNewestCreatedFirst()).isTrue();
+    }
+
+    // 01/10/2026: ca 5 view man "Cho vao so" deu sap created_on DESC (dong nhat).
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"captrengiao", "dennoibo", "quamangnoibo", "lienthong", "dendientu"})
+    void execute_choVaoSoViews_shouldSortNewestCreatedFirst(String viewname) {
+        when(resolveIdentifierByLevelUseCase.resolveForCurrentUser()).thenReturn(Optional.of("PHONG_TH"));
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(documentRepository.findByVbdenOrgView(eq("vbden"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname(viewname);
+        request.setItems("getall");
+
+        service.execute("vbden", request);
+
+        assertThat(filterCaptor.getValue().isNewestCreatedFirst()).isTrue();
     }
 
     // dxl 1430-1466: giong quamangnoibo nhung document_internet="2".
@@ -1819,104 +1959,112 @@ class ViewQueryServiceTest {
         verify(documentRepository).findByAnyFieldContains(eq("vbden"), eq(List.of("user_to_readed")), eq("username_test"), any());
     }
 
-    @Test
-    void execute_theodoi_shouldQueryByUserTrackContainment() {
-        when(documentRepository.findByAnyFieldContains(eq("vbden"), eq(List.of("user_track")), eq("username_test"), any()))
-            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-
-        ViewQueryRequest request = new ViewQueryRequest();
-        request.setViewname("theodoi");
-        request.setKeys(List.of("username_test"));
-
-        service.execute("vbden", request);
-
-        verify(documentRepository).findByAnyFieldContains(eq("vbden"), eq(List.of("user_track")), eq("username_test"), any());
-    }
-
-    @Test
-    void execute_datheodoi_shouldQueryByUserTrackedContainment() {
-        when(documentRepository.findByAnyFieldContains(eq("vbden"), eq(List.of("user_tracked")), eq("username_test"), any()))
-            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-
-        ViewQueryRequest request = new ViewQueryRequest();
-        request.setViewname("datheodoi");
-        request.setKeys(List.of("username_test"));
-
-        service.execute("vbden", request);
-
-        verify(documentRepository).findByAnyFieldContains(eq("vbden"), eq(List.of("user_tracked")), eq("username_test"), any());
-    }
-
-    // D.44 (01/09/2026, "tim kiem nang cao"): FE mac dinh (sortActive="") gui viewname NAY, khong
-    // phai "theodoi" - phai co alias cung dieu kien, khong thi man mac dinh vo.
-    @Test
-    void execute_theodoiSortThoihan_shouldAliasToSameConditionAsTheodoi() {
-        when(documentRepository.findByAnyFieldContains(eq("vbden"), eq(List.of("user_track")), eq("username_test"), any()))
-            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-
-        ViewQueryRequest request = new ViewQueryRequest();
-        request.setViewname("theodoi_sort_thoihan");
-        request.setKeys(List.of("username_test"));
-
-        service.execute("vbden", request);
-
-        verify(documentRepository).findByAnyFieldContains(eq("vbden"), eq(List.of("user_track")), eq("username_test"), any());
-    }
-
-    // D.44: "tim kiem nang cao" - search non-empty phai di qua overload co VbdenOrgViewFilter, khong
-    // phai overload cu (khong loc them).
-    @Test
-    void execute_theodoi_withAdvancedSearch_shouldQueryWithAdvancedFilter() {
+    // 02/10/2026 (bugfix "vbden/xuly/theodoi sap xep chua dung"): theodoi/datheodoi LUON di qua
+    // overload co filter de mang thu tu sap xep (truoc day created_on ASC co dinh).
+    private com.td.application.documents.VbdenOrgViewFilter captureTheoDoiFilter(
+            String field, String viewname, String sortOrder, Map<String, Object> search) {
         ArgumentCaptor<com.td.application.documents.VbdenOrgViewFilter> filterCaptor =
             ArgumentCaptor.forClass(com.td.application.documents.VbdenOrgViewFilter.class);
         when(documentRepository.findByAnyFieldContains(
-                eq("vbden"), eq(List.of("user_track")), eq("username_test"), filterCaptor.capture(), any()))
+                eq("vbden"), eq(List.of(field)), eq("username_test"), filterCaptor.capture(), any()))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         ViewQueryRequest request = new ViewQueryRequest();
-        request.setViewname("theodoi");
+        request.setViewname(viewname);
         request.setKeys(List.of("username_test"));
+        request.setSortOrder(sortOrder);
+        if (search != null) {
+            request.setSearch(search);
+        }
+
+        service.execute("vbden", request);
+
+        verify(documentRepository, never()).findByAnyFieldContains(any(), any(), any(), any(Pageable.class));
+        return filterCaptor.getValue();
+    }
+
+    @Test
+    void execute_theodoi_shouldQueryByUserTrackContainment_sortedByReceivedDateDesc() {
+        var filter = captureTheoDoiFilter("user_track", "theodoi", null, null);
+
+        assertThat(filter.getPrimarySortField()).isEqualTo("received_date");
+        assertThat(filter.getPrimarySortType()).isEqualTo("datetime");
+        assertThat(filter.isSortDescending()).isTrue();
+        assertThat(filter.getSecondarySortField()).isNull();
+    }
+
+    @Test
+    void execute_datheodoi_shouldQueryByUserTrackedContainment_sortedByReceivedDateDesc() {
+        var filter = captureTheoDoiFilter("user_tracked", "datheodoi", null, null);
+
+        assertThat(filter.getPrimarySortField()).isEqualTo("received_date");
+        assertThat(filter.isSortDescending()).isTrue();
+    }
+
+    // FE mac dinh (sortActive="") gui viewname NAY - dxl 3290: deadline_date TANG, received_date GIAM.
+    @Test
+    void execute_theodoiSortThoihan_shouldSortByDeadlineAscThenReceivedDesc() {
+        var filter = captureTheoDoiFilter("user_track", "theodoi_sort_thoihan", null, null);
+
+        assertThat(filter.getPrimarySortField()).isEqualTo("deadline_date");
+        assertThat(filter.getPrimarySortType()).isEqualTo("datetime");
+        assertThat(filter.isSortDescending()).isFalse();
+        assertThat(filter.getSecondarySortField()).isEqualTo("received_date");
+        assertThat(filter.getSecondarySortType()).isEqualTo("datetime");
+        assertThat(filter.getSecondarySortDescending()).isTrue();
+    }
+
+    // Nut sort cot "Ngay den": sortOrder asc/desc thang ca ten view.
+    @Test
+    void execute_theodoi_withSortOrderAsc_shouldSortByReceivedDateAsc() {
+        var filter = captureTheoDoiFilter("user_track", "theodoi", "asc", null);
+
+        assertThat(filter.getPrimarySortField()).isEqualTo("received_date");
+        assertThat(filter.isSortDescending()).isFalse();
+        assertThat(filter.getSecondarySortField()).isNull();
+    }
+
+    @Test
+    void execute_datheodoi_withSortOrderAsc_shouldSortByReceivedDateAsc() {
+        var filter = captureTheoDoiFilter("user_tracked", "datheodoi", "ASC", null);
+
+        assertThat(filter.isSortDescending()).isFalse();
+    }
+
+    // D.44: "tim kiem nang cao" - dieu kien loc giu nguyen, cong them thu tu sap xep.
+    @Test
+    void execute_theodoi_withAdvancedSearch_shouldQueryWithAdvancedFilter() {
         Map<String, Object> search = new java.util.LinkedHashMap<>();
         search.put("status", "2");
         search.put("unit_in_charge", "UBND tinh");
         search.put("unit_process", "H56.09");
         search.put("user_process", "nguyenvana;tranthib");
         search.put("received_date", List.of("01/08/2026", "31/08/2026"));
-        request.setSearch(search);
 
-        service.execute("vbden", request);
+        var filter = captureTheoDoiFilter("user_track", "theodoi", null, search);
 
-        var filter = filterCaptor.getValue();
-        assertThat(filter).isNotNull();
         assertThat(filter.getIncludeFieldValues()).containsEntry("status", List.of("2"));
         assertThat(filter.getContainsAnyFieldValues()).containsEntry("unit_in_charge", List.of("UBND tinh"));
         assertThat(filter.getContainsAnyFieldValues()).containsEntry("unit_process", List.of("H56.09"));
         assertThat(filter.getContainsAnyFieldValues()).containsEntry("user_process", List.of("nguyenvana", "tranthib"));
         assertThat(filter.getMinReceivedDate()).isEqualTo(java.time.LocalDate.of(2026, 8, 1));
         assertThat(filter.getMaxReceivedDate()).isEqualTo(java.time.LocalDate.of(2026, 8, 31));
-        // findByAnyFieldContains 4-tham-so (khong co filter) KHONG duoc goi khi co search.
-        verify(documentRepository, never()).findByAnyFieldContains(any(), any(), any(), any(Pageable.class));
+        assertThat(filter.getPrimarySortField()).isEqualTo("received_date");
     }
 
     @Test
     void execute_theodoi_withUnrecognizedSearchFields_shouldIgnoreThemAndNotFilter() {
-        when(documentRepository.findByAnyFieldContains(eq("vbden"), eq(List.of("user_track")), eq("username_test"), any()))
-            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
-
-        ViewQueryRequest request = new ViewQueryRequest();
-        request.setViewname("theodoi");
-        request.setKeys(List.of("username_test"));
         Map<String, Object> search = new java.util.LinkedHashMap<>();
         // 09/09/2026: "priority" GIO DA duoc nhan dien (mo rong cutover dashboard toanbovanban) - doi
         // sang field VAN con la (document_internet/delivery_method/document_register_id - chi dung o
         // path bao cao khac cua CollapseVBden.jsx, chua co bang chung can cho theodoi/toanbovanban).
         search.put("document_internet", "1");
-        request.setSearch(search);
 
-        service.execute("vbden", request);
+        var filter = captureTheoDoiFilter("user_track", "theodoi", null, search);
 
-        // Khong field nao nhan dien duoc -> buildAdvancedSearchFilter tra null -> di qua overload cu.
-        verify(documentRepository).findByAnyFieldContains(eq("vbden"), eq(List.of("user_track")), eq("username_test"), any(Pageable.class));
+        assertThat(filter.getIncludeFieldValues()).isNull();
+        assertThat(filter.getContainsAnyFieldValues()).isNull();
+        assertThat(filter.getMinReceivedDate()).isNull();
     }
 
     // N20 (07/09/2026, "vanbancantheodoi") - dxl 2178-2208: selection CHI "Form=DocumentIn", khoa qua
@@ -2419,7 +2567,7 @@ class ViewQueryServiceTest {
         VbdiDocument document = new VbdiDocument("Van ban cho vao so", "vbdi", VbdiStatus.DRAFT, null, null, null, null);
         document.replaceDynamicFields("{}");
         Page<VbdiDocument> page = new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1);
-        when(vbdiDocumentRepository.findWaitingForRegistrationByIdentifier(eq("vbdi"), eq(VbdiStatus.DRAFT), eq("PHONG_TH"), any()))
+        when(vbdiDocumentRepository.findWaitingForRegistrationByIdentifier(eq("vbdi"), eq(VbdiStatus.DRAFT), eq("PHONG_TH"), any(), any()))
             .thenReturn(page);
 
         ViewQueryRequest request = new ViewQueryRequest();
@@ -2446,7 +2594,7 @@ class ViewQueryServiceTest {
         VbdiDocument document = new VbdiDocument("Van ban moi", "vbdi", VbdiStatus.DRAFT, null, null, null, null);
         document.replaceDynamicFields("{\"unit_publish_identifier\":\"H05.01\"}");
         Page<VbdiDocument> page = new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1);
-        when(vbdiDocumentRepository.findWaitingForRegistrationByIdentifier(eq("vbdi"), eq(VbdiStatus.DRAFT), eq("H05.01"), any()))
+        when(vbdiDocumentRepository.findWaitingForRegistrationByIdentifier(eq("vbdi"), eq(VbdiStatus.DRAFT), eq("H05.01"), any(), any()))
             .thenReturn(page);
 
         ViewQueryRequest request = new ViewQueryRequest();
@@ -2468,7 +2616,7 @@ class ViewQueryServiceTest {
         var result = service.execute("vbdi", request);
 
         assertThat(result.getTotalItems()).isZero();
-        verify(vbdiDocumentRepository, never()).findWaitingForRegistrationByIdentifier(anyString(), anyString(), anyString(), any());
+        verify(vbdiDocumentRepository, never()).findWaitingForRegistrationByIdentifier(anyString(), anyString(), anyString(), any(), any());
     }
 
     // 11/09/2026 (port "vbdi/thungrac/thungrac" - SUA LAI sau khi nguoi dung bao "FE van goi
@@ -3047,7 +3195,7 @@ class ViewQueryServiceTest {
         VbdiDocument document = new VbdiDocument("VB quan trong", "vbdi", VbdiStatus.DRAFT, null, null, null, null);
         Page<VbdiDocument> page = new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1);
         when(vbdiDocumentRepository.findByFieldContainsMemberAnySeparator(
-                eq("vbdi"), statusCaptor.capture(), eq("MarkImportant"), eq("user1"), any(), any()))
+                eq("vbdi"), statusCaptor.capture(), eq("markimportant"), eq("user1"), any(), any()))
             .thenReturn(page);
 
         ViewQueryRequest request = new ViewQueryRequest();
@@ -3292,7 +3440,7 @@ class ViewQueryServiceTest {
         service.execute("vbdi", request);
 
         assertThat(filterCaptor.getValue().getExtraPredicateSql())
-            .contains("send_agent").contains("deletelistWaitingToSend");
+            .contains("send_agent").contains("deletelistwaitingtosend");
     }
 
     // vwCreator_DocumentOut_Reply_Draftor (route "datralai"): status=RETURNED_BY_CLERK ("3"), KHAC
@@ -3356,7 +3504,7 @@ class ViewQueryServiceTest {
         assertThat(fieldsCaptor.getValue())
             .containsExactly("user_creator", "unit_creator_identifier", "unit_publish_identifier", "user_draft");
         assertThat(filterCaptor.getValue().getExtraPredicateSql())
-            .contains("is_document_reply").contains("deletelistWaitingToSend");
+            .contains("is_document_reply").contains("deletelistwaitingtosend");
     }
 
     // vwCreator_DocumentOut_Revoke (route "vanbandathuhoi"): extraPredicateSql rieng (revoke_documentOut).
@@ -3376,7 +3524,7 @@ class ViewQueryServiceTest {
         service.execute("vbdi", request);
 
         assertThat(fieldsCaptor.getValue()).containsExactly("user_creator", "unit_creator_identifier");
-        assertThat(filterCaptor.getValue().getExtraPredicateSql()).contains("revoke_documentOut");
+        assertThat(filterCaptor.getValue().getExtraPredicateSql()).contains("revoke_documentout");
     }
 
     // vwDocumentOut_Coordinater_Receive (route "chophoihop") + vwDocumentOut_coordinater ("phoihop"):
@@ -3579,10 +3727,11 @@ class ViewQueryServiceTest {
 
     // 09/09/2026 (port not SoLuongCanXuLy): "vwDocumentOut_Submited" THAT (dxl 1608-1641) - KHAC view
     // tren (khong co "Creator_") - CUNG field/status nhung THEM dieu kien xoavanbandi rong.
+    // 29/09/2026: khoa mo rong user_creator OR user_signer (nguoi ky cung thay trong "Cho ban hanh").
     @Test
     void duthaoVwDocumentOutSubmited_shouldMatchDxlFormulaWithXoaVanBanDiCondition() {
         VbdenOrgViewFilter f = capturedFilterFor("vwDocumentOut_Submited");
-        assertThat(f.getOrgFieldNames()).containsExactly("user_creator");
+        assertThat(f.getOrgFieldNames()).containsExactly("user_creator", "user_signer");
         assertThat(f.getIncludeFieldValues())
             .containsEntry("status", List.of(DuThaoStatus.PUBLISHED));
         assertThat(f.getRequireEmptyFieldName()).isEqualTo("xoavanbandi");
@@ -4223,6 +4372,58 @@ class ViewQueryServiceTest {
         return new AppUser(
             UUID.randomUUID().toString(), username, fullName, email, null, null, true,
             null, 0, null, null, null, null, null, null, identifier, false, null);
+    }
+
+    // 02/10/2026 (cutover tab "VAN BAN LIEN QUAN" ho so cong viec): vwDocument_Profiles_ID - FE gui id
+    // ho so VIET HOA, Java luu UUID viet thuong -> ha thuong; vbdi khong loc status.
+    @Test
+    void execute_vbdiDocumentProfilesId_shouldQueryDocumentProfilesIdLowercasedWithoutStatus() {
+        UUID hosocvId = UUID.randomUUID();
+        VbdiDocument document = new VbdiDocument("VB di gan ho so", "vbdi", VbdiStatus.ISSUED, null, null, null, null);
+        when(vbdiDocumentRepository.findByFieldContainsMemberAnySeparator(
+                eq("vbdi"), isNull(), eq("document_profiles_id"), eq(hosocvId.toString()), any(), any()))
+            .thenReturn(new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwDocument_Profiles_ID");
+        request.setKeys(List.of(hosocvId.toString().toUpperCase()));
+
+        assertThat(service.execute("vbdi", request).getTotalItems()).isEqualTo(1L);
+    }
+
+    @Test
+    void execute_vbdenDocumentProfilesId_shouldQueryNewestCreatedFirst() {
+        UUID hosocvId = UUID.randomUUID();
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(documentRepository.findByAnyFieldContains(
+                eq("vbden"), eq(List.of("document_profiles_id")), eq(hosocvId.toString()), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwDocument_Profiles_ID");
+        request.setKeys(List.of(hosocvId.toString().toUpperCase()));
+
+        service.execute("vbden", request);
+
+        assertThat(filterCaptor.getValue().isNewestCreatedFirst()).isTrue();
+    }
+
+    @Test
+    void execute_hosocvOtherRelatedDocument_shouldQueryVanBanKhacTypeByDocumentProfilesId() {
+        UUID hosocvId = UUID.randomUUID();
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(hoSoCVDocumentRepository.findByVbdenOrgView(eq("hosocv_vbkhac"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwOther_Related_Document_Document_Profiles_ID");
+        request.setKeys(List.of(hosocvId.toString().toUpperCase()));
+
+        service.execute("hosocv", request);
+
+        assertThat(filterCaptor.getValue().getOrgFieldNames()).containsExactly("document_profiles_id");
+        assertThat(filterCaptor.getValue().getOrgValue()).isEqualTo(hosocvId.toString());
+        assertThat(filterCaptor.getValue().isNewestCreatedFirst()).isTrue();
     }
 
     private AppUser newLeaderUser(String username, String fullName, int sortOrder, String capLanhDao) {

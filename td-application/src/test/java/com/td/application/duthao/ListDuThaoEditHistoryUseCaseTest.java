@@ -30,6 +30,8 @@ class ListDuThaoEditHistoryUseCaseTest {
 
     @Mock
     private DuThaoEditHistoryDocumentRepository repository;
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private com.td.application.sharedcore.AppUserRepository appUserRepository;
 
     private ListDuThaoEditHistoryUseCase useCase;
 
@@ -37,7 +39,8 @@ class ListDuThaoEditHistoryUseCaseTest {
     void setUp() {
         // Khởi tạo trong BeforeEach (KHÔNG phải field initializer): MockitoExtension inject mock
         // SAU khi tạo thể hiện test nên initializer sẽ thấy null.
-        useCase = new ListDuThaoEditHistoryUseCase(repository);
+        useCase = new ListDuThaoEditHistoryUseCase(
+            new com.td.application.sharedcore.UserFullNameResolver(appUserRepository), repository);
     }
 
     @Test
@@ -48,7 +51,7 @@ class ListDuThaoEditHistoryUseCaseTest {
         var e2 = new DuThaoEditHistoryDocument(parentId, "draft_document",
             "{\"priority\":{\"oldvalue\":\"Thường\",\"newvalue\":\"Khẩn\"}}", "Nguyen Van A", "skhcn");
 
-        when(repository.findByParentIdAsc(org.mockito.ArgumentMatchers.eq(parentId),
+        when(repository.findByParentIdNewestFirst(org.mockito.ArgumentMatchers.eq(parentId),
             org.mockito.ArgumentMatchers.any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(e1, e2), PageRequest.of(0, 20), 2));
 
@@ -71,7 +74,7 @@ class ListDuThaoEditHistoryUseCaseTest {
         assertThat(response.getItems().get(0).get("created")).asString().matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}");
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(repository).findByParentIdAsc(org.mockito.ArgumentMatchers.eq(parentId), pageableCaptor.capture());
+        verify(repository).findByParentIdNewestFirst(org.mockito.ArgumentMatchers.eq(parentId), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
     }
@@ -79,7 +82,7 @@ class ListDuThaoEditHistoryUseCaseTest {
     @Test
     void execute_shouldClampPageSizeAboveMax() {
         UUID parentId = UUID.randomUUID();
-        when(repository.findByParentIdAsc(org.mockito.ArgumentMatchers.eq(parentId),
+        when(repository.findByParentIdNewestFirst(org.mockito.ArgumentMatchers.eq(parentId),
             org.mockito.ArgumentMatchers.any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of()));
 
@@ -91,9 +94,34 @@ class ListDuThaoEditHistoryUseCaseTest {
         useCase.execute(request);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(repository).findByParentIdAsc(org.mockito.ArgumentMatchers.eq(parentId), pageableCaptor.capture());
+        verify(repository).findByParentIdNewestFirst(org.mockito.ArgumentMatchers.eq(parentId), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(2); // 3-1
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(ListDuThaoEditHistoryUseCaseTest.maxSize());
+    }
+
+    /** 25/09/2026: dòng vết thiếu tên (creator_name rỗng) được tra bù tên đầy đủ theo user_creator. */
+    @Test
+    void execute_shouldResolveFullName_whenStoredNameMissing() {
+        UUID parentId = UUID.randomUUID();
+        var e1 = new DuThaoEditHistoryDocument(parentId, "draft_document", "{}", null, "skhcn");
+        var e2 = new DuThaoEditHistoryDocument(parentId, "draft_document", "{}", "skhcn", "skhcn");
+        when(repository.findByParentIdNewestFirst(org.mockito.ArgumentMatchers.eq(parentId),
+            org.mockito.ArgumentMatchers.any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(e1, e2), PageRequest.of(0, 20), 2));
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("skhcn"))
+            .thenReturn(java.util.Optional.of(new com.td.domain.sharedcore.AppUser(
+                "kc", "skhcn", "Văn thư Sở KHCN", null, null, null, true)));
+
+        var request = new ListDuThaoEditHistoryRequest();
+        request.setParentId(parentId);
+        var response = useCase.execute(request);
+
+        assertThat(response.getItems()).extracting(item -> item.get("creator"))
+            .containsExactly("Văn thư Sở KHCN", "Văn thư Sở KHCN");
+        assertThat(response.getItems()).extracting(item -> item.get("user_creator"))
+            .containsExactly("skhcn", "skhcn");
+        // tra 1 lần cho cùng username trong 1 lượt đọc
+        verify(appUserRepository, org.mockito.Mockito.times(1)).findByUsernameAndDeletedOnIsNull("skhcn");
     }
 
     private static int maxSize() {

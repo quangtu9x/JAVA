@@ -115,6 +115,34 @@ class PostgresDuThaoDocumentRepositoryTest {
 
     // DT-002 (26/08/2026) - vwUser_Coordinated: OR-group giua 2 field/2 dieu kien status khac nhau.
     // Nhanh 1 (fieldWithoutStatus) KHONG duoc co dieu kien status di kem trong cung nhom OR cua no.
+    // 01/10/2026 - view gop "Van thu tra lai": moi cap (return_document_out_for -> status) la 1 nhanh OR,
+    // khoa return_document_out_for_user so khop khong phan biet hoa thuong.
+    @Test
+    void appendReturnedByClerkPredicate_shouldPairReturnForWithStatus() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        Map<String, String> pairs = new LinkedHashMap<>();
+        pairs.put("1", "1");
+        pairs.put("3", "2");
+
+        repository.appendReturnedByClerkPredicate(sql, parameters, pairs, " LPHA ");
+
+        String text = sql.toString();
+        assertThat(text).contains("LOWER(TRIM(COALESCE(d.dynamic_fields->>'return_document_out_for_user', ''))) = :returnedForUser");
+        assertThat(text).contains("(COALESCE(d.dynamic_fields->>'return_document_out_for', '') = :returnedFor0 AND COALESCE(d.status, '') = :returnedStatus0)"
+            + " OR (COALESCE(d.dynamic_fields->>'return_document_out_for', '') = :returnedFor1 AND COALESCE(d.status, '') = :returnedStatus1)");
+        assertThat(parameters).containsEntry("returnedForUser", "lpha");
+        assertThat(parameters).containsEntry("returnedFor1", "3");
+        assertThat(parameters).containsEntry("returnedStatus1", "2");
+    }
+
+    @Test
+    void appendReturnedByClerkPredicate_withBlankUser_shouldMatchNothing() {
+        StringBuilder sql = new StringBuilder();
+        repository.appendReturnedByClerkPredicate(sql, new LinkedHashMap<>(), Map.of("1", "1"), " ");
+        assertThat(sql.toString()).isEqualTo(" AND 1 = 0");
+    }
+
     @Test
     void appendFieldOrFieldWithStatusPredicate_shouldOrTwoBranchesWithStatusOnlyOnSecond() {
         StringBuilder sql = new StringBuilder();
@@ -150,5 +178,37 @@ class PostgresDuThaoDocumentRepositoryTest {
         String text = sql.toString();
         assertThat(text).contains("AND 1 = 0");
         assertThat(text).doesNotContain(" IN ()");
+    }
+
+    // Bugfix 27/09/2026 (DT-29136): FE ghi user_coordinator dang chuoi "demo1;demo2;demo3" - nhanh
+    // containment/equality toan chuoi khong khop khi co tu 2 nguoi. Moi field khoa ca nhan phai co
+    // them nhanh khop THANH VIEN (neo ";" 2 dau, lowercase, bo khoang trang, escape ky tu LIKE).
+    @Test
+    void appendAnyFieldContainsPredicate_shouldAlsoMatchMemberOfDelimitedString() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        repository.appendAnyFieldContainsPredicate(sql, parameters, List.of("user_coordinator"), "Demo_1");
+
+        String text = sql.toString();
+        assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_coordinator', '') = :containsFieldScalar0");
+        assertThat(text).contains(
+            "(';' || REPLACE(LOWER(COALESCE(d.dynamic_fields->>'user_coordinator', '')), ' ', '') || ';') LIKE :containsFieldMember0");
+        assertThat(parameters).containsEntry("containsFieldMember0", "%;demo\\_1;%");
+    }
+
+    @Test
+    void appendFieldOrFieldWithStatusPredicate_shouldAlsoMatchMemberOfDelimitedStringOnBothBranches() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        repository.appendFieldOrFieldWithStatusPredicate(
+            sql, parameters, "user_coordinated", "user_coordinator", List.of("8"), "demo1");
+
+        String text = sql.toString();
+        assertThat(text).contains("LIKE :orGroupMember0").contains("LIKE :orGroupMember1");
+        assertThat(text.indexOf("orGroupMember0")).isLessThan(text.indexOf("d.status"));
+        assertThat(parameters).containsEntry("orGroupMember0", "%;demo1;%");
+        assertThat(parameters).containsEntry("orGroupMember1", "%;demo1;%");
     }
 }

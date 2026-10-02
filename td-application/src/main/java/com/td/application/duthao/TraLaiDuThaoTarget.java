@@ -12,7 +12,15 @@ enum TraLaiDuThaoTarget {
     LANH_DAO("1", DuThaoStatus.PENDING_SIGNATURE, "vttralanhdao", "signer", "user_signer"),
 
     /** {@code TraLaiDuThaoChoNguoiSoanThao()} — trả về cho người soạn thảo sửa lại (dự thảo → RETURNED). */
-    NGUOI_SOAN_THAO("2", DuThaoStatus.RETURNED, "vttranguoisoan", "creator", "user_creator");
+    NGUOI_SOAN_THAO("2", DuThaoStatus.RETURNED, "vttranguoisoan", "creator", "user_creator"),
+
+    /**
+     * 01/10/2026 (nút "Người trình" ở VBĐi — FE từng gọi {@code qlvb/vbdi/tralainguoitrinhky}, endpoint
+     * KHÔNG tồn tại cả ở Domino): trả về cho NGƯỜI TRÌNH KÝ = người thực hiện vết {@code chuyenkyduyet}
+     * GẦN NHẤT của dự thảo (không có field sẵn trên dự thảo → 2 field nguồn {@code null}, xem
+     * {@link TraLaiDuThaoSupport#resolveReceiver}). Mã mới {@code return_document_out_for="3"}.
+     */
+    NGUOI_TRINH("3", DuThaoStatus.RETURNED, "vttranguoitrinh", null, null);
 
     final String returnDocumentOutForValue;
     final String targetDraftStatus;

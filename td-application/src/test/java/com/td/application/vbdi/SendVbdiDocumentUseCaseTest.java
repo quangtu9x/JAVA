@@ -133,12 +133,12 @@ class SendVbdiDocumentUseCaseTest {
     }
 
     /**
-     * Không có {@code contact_unit} nào trong lượt gửi (chỉ coordinator/internal_unit) —
+     * Không có {@code contact_unit}/{@code internal_unit} nào trong lượt gửi (chỉ coordinator) —
      * KHÔNG được gọi {@link PrepareVbdiDeliveryFilesUseCase} (tránh copy vô ích khi td-woker không
-     * dùng tới, xem javadoc {@code prepareDeliveryFiles}).
+     * dùng tới, xem javadoc {@code prepareDeliveryFiles}) — coordinator KHÔNG tạo văn bản đến thật.
      */
     @Test
-    void execute_withoutContactUnit_shouldNotPrepareDeliveryFiles() {
+    void execute_withoutContactUnitOrInternalUnit_shouldNotPrepareDeliveryFiles() {
         var document = issuedDocument();
         when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
         when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
@@ -150,6 +150,100 @@ class SendVbdiDocumentUseCaseTest {
         useCase.execute(request);
 
         verifyNoInteractions(prepareVbdiDeliveryFilesUseCase);
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (bugfix người dùng: rà soát "Phát hành kèm văn bản đến" phát hiện điều kiện
+     * chuẩn bị tệp CŨ chỉ kiểm tra {@code contact_unit} — lỗi thời từ khi {@code internal_unit} CŨNG
+     * tạo văn bản đến thật (18/09/2026, xem {@code VbdiDeliveryTaskHandler}): gửi CHỈ tới
+     * {@code internal_unit} (KHÔNG có {@code contact_unit}) PHẢI vẫn chuẩn bị tệp đính kèm — trước
+     * bản vá, văn bản đến tạo cho internal_unit sẽ LUÔN thiếu tệp dù văn bản đi có tệp.
+     */
+    @Test
+    void execute_withOnlyInternalUnit_shouldPrepareDeliveryFiles() {
+        var document = issuedDocument();
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+        when(prepareVbdiDeliveryFilesUseCase.execute(any())).thenReturn(Result.success(List.of()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setInternalUnit(List.of(recipient("H05.01.02", "Phong Cong nghe")));
+
+        useCase.execute(request);
+
+        verify(prepareVbdiDeliveryFilesUseCase, org.mockito.Mockito.times(1)).execute(any());
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (yêu cầu người dùng: "nếu check vào phát hành kèm văn bản đến thì khi gửi
+     * phải gửi tất cả những file đính kèm của văn bản đến theo"): {@code phathanhkemvbden="1"} +
+     * {@code documentin_obj} có 1 văn bản đến — id văn bản đến đó phải được forward vào
+     * {@code additionalSourceDocumentIds} của {@link PrepareVbdiDeliveryFilesRequest}.
+     */
+    @Test
+    void execute_withPhatHanhKemVbdenFlagOn_shouldIncludeDocumentInIdsInDeliveryRequest() {
+        var document = issuedDocument();
+        UUID vbdenId = UUID.randomUUID();
+        document.replaceDynamicFields(("{\"phathanhkemvbden\":\"1\",\"documentin_obj\":"
+            + "[{\"id\":\"%s\",\"code\":\"123/CV-UBND\"}]}").formatted(vbdenId));
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+        when(prepareVbdiDeliveryFilesUseCase.execute(any())).thenReturn(Result.success(List.of()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setContactUnit(List.of(recipient("H56.07.03", "Don vi lien he")));
+
+        useCase.execute(request);
+
+        ArgumentCaptor<com.td.application.documents.PrepareVbdiDeliveryFilesRequest> captor =
+            ArgumentCaptor.forClass(com.td.application.documents.PrepareVbdiDeliveryFilesRequest.class);
+        verify(prepareVbdiDeliveryFilesUseCase).execute(captor.capture());
+        assertThat(captor.getValue().getAdditionalSourceDocumentIds()).containsExactly(vbdenId);
+    }
+
+    /** Đối chứng: {@code phathanhkemvbden} KHÔNG bật (hoặc rỗng) — KHÔNG forward id nào dù có {@code documentin_obj}. */
+    @Test
+    void execute_withPhatHanhKemVbdenFlagOff_shouldNotIncludeAnyDocumentInIds() {
+        var document = issuedDocument();
+        UUID vbdenId = UUID.randomUUID();
+        document.replaceDynamicFields(("{\"documentin_obj\":[{\"id\":\"%s\"}]}").formatted(vbdenId));
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+        when(prepareVbdiDeliveryFilesUseCase.execute(any())).thenReturn(Result.success(List.of()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setContactUnit(List.of(recipient("H56.07.03", "Don vi lien he")));
+
+        useCase.execute(request);
+
+        ArgumentCaptor<com.td.application.documents.PrepareVbdiDeliveryFilesRequest> captor =
+            ArgumentCaptor.forClass(com.td.application.documents.PrepareVbdiDeliveryFilesRequest.class);
+        verify(prepareVbdiDeliveryFilesUseCase).execute(captor.capture());
+        assertThat(captor.getValue().getAdditionalSourceDocumentIds()).isEmpty();
+    }
+
+    /** 30/09/2026: tên tệp trong {@code tepkemtheo} ("a;b;") được forward để phía nhận chia nhóm. */
+    @Test
+    void execute_shouldForwardTepKemTheoFilenamesToDeliveryRequest() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"tepbanhanh\":\"qd.pdf;\",\"tepkemtheo\":\"pl1.pdf; pl2.docx;\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+        when(prepareVbdiDeliveryFilesUseCase.execute(any())).thenReturn(Result.success(List.of()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setContactUnit(List.of(recipient("H56.07.03", "Don vi lien he")));
+
+        useCase.execute(request);
+
+        ArgumentCaptor<com.td.application.documents.PrepareVbdiDeliveryFilesRequest> captor =
+            ArgumentCaptor.forClass(com.td.application.documents.PrepareVbdiDeliveryFilesRequest.class);
+        verify(prepareVbdiDeliveryFilesUseCase).execute(captor.capture());
+        assertThat(captor.getValue().getAttachedFilenames()).containsExactly("pl1.pdf", "pl2.docx");
     }
 
     @Test
@@ -360,9 +454,17 @@ class SendVbdiDocumentUseCaseTest {
     }
 
     @Test
-    void execute_whenSendAgentAlreadyMarked_shouldNotSaveAgain() {
+    void execute_whenSendAgentAlreadyMarkedAndRecipientNameAlreadyOnField_shouldNotSaveAgain() {
         var document = issuedDocument();
-        document.replaceDynamicFields("{\"send_agent\":\"1\"}");
+        // 21/09/2026 (xem javadoc addendum SendVbdiDocumentUseCase#applySendSideEffects): giu nguyen
+        // y dinh test goc ("khong doi gi thi khong save lai") nhung PHAI dat san ten nguoi nhan tren
+        // "coordinator_rtext" - tu khi use case gop ten nguoi nhan MOI vao field nay, resend 1 nguoi
+        // nhan CHUA co ten tren field se hop le lam thay doi field (can save), khac voi truoc ban vay.
+        // Bo sung 21/09/2026 (2, xem javadoc COORDINATOR_HIDE_FIELD): CUNG phai dat san
+        // coordinator_hide_rtext/coordinator_hide_not_seen_rtext - tu khi resend coordinator CUNG gop
+        // username vao 2 field nay, thieu san se lam thay doi field (can save) o lan resend nay.
+        document.replaceDynamicFields("{\"send_agent\":\"1\",\"coordinator_rtext\":\"Nong Thanh Hoang\","
+            + "\"coordinator_hide_rtext\":\"hoangnt.skhcn\",\"coordinator_hide_not_seen_rtext\":\"hoangnt.skhcn\"}");
         when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
         when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
 
@@ -374,6 +476,176 @@ class SendVbdiDocumentUseCaseTest {
         useCase.execute(request);
 
         verify(vbdiDocumentRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (bugfix người dùng báo "Gửi bổ sung xong, tab Phát hành không thấy thông
+     * tin đơn vị gửi bổ sung" — xem javadoc {@code SendVbdiDocumentUseCase#applySendSideEffects}):
+     * "Gửi bổ sung" thêm 1 đơn vị nội bộ MỚI (chưa từng có trên field {@code internal_unit_rtext}) —
+     * field này phải được GỘP THÊM tên đơn vị mới (giữ tên cũ, nối "; "), không ghi đè mất tên cũ.
+     */
+    @Test
+    void execute_withGuiBoSungType_shouldMergeNewRecipientNameIntoRtextFieldKeepingExisting() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"internal_unit_rtext\":\"Phong Cong nghe\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setSendType(VbdiSendType.GUI_BO_SUNG);
+        request.setInternalUnit(List.of(recipient("H56.07.03", "Trung tam Ky thuat")));
+
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()))
+            .containsEntry("internal_unit_rtext", "Phong Cong nghe; Trung tam Ky thuat");
+        verify(vbdiDocumentRepository).save(document);
+    }
+
+    /**
+     * Gửi bổ sung LẶP LẠI cùng 1 đơn vị đã có sẵn trên field — KHÔNG thêm trùng tên (dedup theo
+     * chuỗi con, không phân biệt hoa/thường — đúng {@code SendDocument.java} Domino gốc).
+     */
+    @Test
+    void execute_withGuiBoSungType_shouldNotDuplicateNameAlreadyOnField() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"internal_unit_rtext\":\"Phong Cong nghe\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setSendType(VbdiSendType.GUI_BO_SUNG);
+        request.setInternalUnit(List.of(recipient("H05.01", "Phong Cong nghe")));
+
+        useCase.execute(request);
+
+        assertThat(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()))
+            .containsEntry("internal_unit_rtext", "Phong Cong nghe");
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (yêu cầu người dùng: "Gửi văn bản đi" tới CÁ NHÂN phải khiến văn bản xuất
+     * hiện ở danh sách cá nhân liên quan của người đó — tiền đề để "Lấy lại" có gì để gỡ, xem javadoc
+     * {@code SendVbdiDocumentUseCase#COORDINATOR_HIDE_FIELD}): gửi tới coordinator phải gộp username
+     * vào CẢ {@code coordinator_hide_rtext} lẫn {@code coordinator_hide_not_seen_rtext}.
+     */
+    @Test
+    void execute_toCoordinator_shouldAddUsernameToCoordinatorHideFields() {
+        var document = issuedDocument();
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setCoordinator(List.of(recipient("hoangnt.skhcn", "Nong Thanh Hoang")));
+
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()))
+            .containsEntry("coordinator_hide_rtext", "hoangnt.skhcn")
+            .containsEntry("coordinator_hide_not_seen_rtext", "hoangnt.skhcn");
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (yêu cầu người dùng: "khi lấy lại thì loại thông tin của cá nhân đấy để
+     * không nhìn thấy ở danh sách cá nhân liên quan của người đấy nữa"): "Lấy lại" 1 cá nhân đã từng
+     * được gửi phải GỠ username khỏi CẢ 3 field hide (kể cả {@code coordinator_hide_seen_rtext} — họ
+     * có thể đã xem trước khi bị lấy lại). 30/09/2026: tên ở {@code coordinator_rtext} (tab "Phát hành")
+     * được GIỮ LẠI (yêu cầu người dùng). KHÔNG động tới cá nhân KHÁC còn lại trên cùng field.
+     */
+    @Test
+    void execute_layLaiCoordinator_shouldRemoveFromHideFieldsButKeepDisplayField() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"coordinator_rtext\":\"Nong Thanh Hoang; Tran Thi Binh\","
+            + "\"coordinator_hide_rtext\":\"hoangnt.skhcn;binhtt.skhcn\","
+            + "\"coordinator_hide_not_seen_rtext\":\"hoangnt.skhcn;binhtt.skhcn\","
+            + "\"coordinator_hide_seen_rtext\":\"hoangnt.skhcn\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setSendType(VbdiSendType.LAY_LAI_VAN_BAN);
+        request.setCoordinator(List.of(recipient("hoangnt.skhcn", "Nong Thanh Hoang")));
+
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        assertThat(fields).containsEntry("coordinator_rtext", "Nong Thanh Hoang; Tran Thi Binh");
+        assertThat(fields).containsEntry("coordinator_hide_rtext", "binhtt.skhcn");
+        assertThat(fields).containsEntry("coordinator_hide_not_seen_rtext", "binhtt.skhcn");
+        // hoangnt.skhcn da tung xem (co trong hide_seen) - van phai bi go het du da xem hay chua.
+        assertThat(fields.get("coordinator_hide_seen_rtext")).isEqualTo("");
+        verify(vbdiDocumentRepository).save(document);
+    }
+
+    /** 30/09/2026 (ảnh người dùng gửi): "Lấy lại" đơn vị nội bộ — tab Phát hành vẫn giữ tên đơn vị. */
+    @Test
+    void execute_layLaiInternalUnit_shouldKeepNameOnPhatHanhTab() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"internal_unit_rtext\":\"Trung tâm CNTT-TT\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setSendType(VbdiSendType.LAY_LAI_VAN_BAN);
+        request.setInternalUnit(List.of(recipient("H05.01.09", "Trung tâm CNTT-TT")));
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        assertThat(fields).containsEntry("internal_unit_rtext", "Trung tâm CNTT-TT");
+    }
+
+    /**
+     * Đối chứng: "Lấy lại" KHÔNG set {@code send_agent} (không thuộc họ GỬI — xem javadoc
+     * {@code SEND_FAMILY_TYPES}/{@code REVOKE_FAMILY_TYPES}) dù có thay đổi field khác.
+     */
+    @Test
+    void execute_layLaiCoordinator_shouldNotSetSendAgent() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"coordinator_hide_rtext\":\"hoangnt.skhcn\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setSendType(VbdiSendType.LAY_LAI_VAN_BAN);
+        request.setCoordinator(List.of(recipient("hoangnt.skhcn", "Nong Thanh Hoang")));
+
+        useCase.execute(request);
+
+        assertThat(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()))
+            .doesNotContainKey("send_agent");
+    }
+
+    /**
+     * Đơn vị nội bộ khi "Lấy lại": 30/09/2026 GIỮ tên ở {@code internal_unit_rtext} (tab "Phát hành", yêu
+     * cầu người dùng) — và KHÔNG động tới field {@code coordinator_hide_*} (chỉ áp dụng cho nhóm
+     * coordinator, xem javadoc {@code applyRevokeSideEffects}).
+     */
+    @Test
+    void execute_layLaiInternalUnit_shouldKeepDisplayFieldAndNotTouchHideFields() {
+        var document = issuedDocument();
+        document.replaceDynamicFields("{\"internal_unit_rtext\":\"Phong Cong nghe; Phong Ke hoach\"}");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setSendType(VbdiSendType.LAY_LAI_VAN_BAN);
+        request.setInternalUnit(List.of(recipient("H05.01", "Phong Cong nghe")));
+
+        useCase.execute(request);
+
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        assertThat(fields).containsEntry("internal_unit_rtext", "Phong Cong nghe; Phong Ke hoach");
+        assertThat(fields).doesNotContainKey("coordinator_hide_rtext");
     }
 
     /**

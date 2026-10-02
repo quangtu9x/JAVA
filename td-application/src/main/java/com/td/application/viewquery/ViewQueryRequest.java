@@ -64,4 +64,11 @@ public class ViewQueryRequest {
      * giữ nguyên hành vi hiện tại.
      */
     private Map<String, Object> search = new LinkedHashMap<>();
+
+    /**
+     * 02/10/2026 (route {@code vbden/xuly/theodoi} — nút sắp xếp cột "Ngày đến"): {@code "asc"}/
+     * {@code "desc"} theo {@code received_date}. Rỗng/null = thứ tự mặc định của view. Hiện chỉ
+     * {@code theodoi}/{@code datheodoi} đọc field này.
+     */
+    private String sortOrder;
 }

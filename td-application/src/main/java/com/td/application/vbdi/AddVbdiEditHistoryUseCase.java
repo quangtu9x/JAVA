@@ -5,6 +5,7 @@ import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.DocumentLogService;
 import com.td.domain.vbdi.VbdiEditHistoryDocument;
+import com.td.application.sharedcore.UserFullNameResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class AddVbdiEditHistoryUseCase {
     private final VbdiDocumentRepository vbdiDocumentRepository;
     private final CurrentUserProvider currentUserProvider;
     private final DocumentLogService documentLogService;
+    private final UserFullNameResolver userFullNameResolver;
 
     public Result<UUID> execute(AddVbdiEditHistoryRequest request) {
         if (request == null || request.getParentId() == null) {
@@ -62,14 +64,18 @@ public class AddVbdiEditHistoryUseCase {
             return Result.failure("Danh sách thay đổi (edit_obj) trống, không ghi vết");
         }
 
+        String username = currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME);
         var savedFormEdit = request.getFormEdit() == null || request.getFormEdit().isBlank()
             ? DEFAULT_FORM_EDIT : request.getFormEdit();
         var entity = new VbdiEditHistoryDocument(
             request.getParentId(),
             savedFormEdit,
             toJson(editObj),
-            request.getCreatorName(),
-            currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME));
+            // 25/09/2026: tên hiển thị do SERVER tra theo tài khoản đăng nhập (xem
+            // UserFullNameResolver) — trước đây lấy nguyên creatorName client gửi, nhiều đường ghi vết
+            // phụ (gắn tệp, ký số) không gửi nên dòng vết chỉ hiện tài khoản.
+            userFullNameResolver.resolveForWrite(username, request.getCreatorName()),
+            username);
 
         var saved = vbdiEditHistoryDocumentRepository.save(entity);
         documentLogService.logCreate(saved.getId(), buildSnapshot(saved, editObj.size()));

@@ -41,6 +41,8 @@ class AddVbdiEditHistoryUseCaseTest {
     private CurrentUserProvider currentUserProvider;
     @Mock
     private DocumentLogService documentLogService;
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private com.td.application.sharedcore.AppUserRepository appUserRepository;
 
     private AddVbdiEditHistoryUseCase useCase;
 
@@ -49,7 +51,8 @@ class AddVbdiEditHistoryUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new AddVbdiEditHistoryUseCase(
-            editHistoryRepository, vbdiDocumentRepository, currentUserProvider, documentLogService);
+            editHistoryRepository, vbdiDocumentRepository, currentUserProvider, documentLogService,
+            new com.td.application.sharedcore.UserFullNameResolver(appUserRepository));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo1"));
     }
 

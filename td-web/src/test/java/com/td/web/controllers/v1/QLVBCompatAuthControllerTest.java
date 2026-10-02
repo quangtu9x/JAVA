@@ -5,6 +5,7 @@ import com.td.application.sharedcore.GetUserOrganizationProfileUseCase;
 import com.td.application.sharedcore.GetUserRoleGroupConfigUseCase;
 import com.td.application.sharedcore.UserOrganizationProfileDto;
 import com.td.application.sharedcore.UserRoleGroupConfigDto;
+import com.td.infrastructure.security.AccountProvisioningChecker;
 import com.td.infrastructure.security.AuthenticatedUser;
 import com.td.infrastructure.security.TdTokenService;
 import org.junit.jupiter.api.Test;
@@ -44,16 +45,27 @@ class QLVBCompatAuthControllerTest {
     private GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
     @Mock
     private GetSystemConfigurationUseCase getSystemConfigurationUseCase;
+    @Mock
+    private AccountProvisioningChecker accountProvisioningChecker;
 
     private QLVBCompatAuthController newController() {
         return new QLVBCompatAuthController(
-            tdTokenService, getUserRoleGroupConfigUseCase, getUserOrganizationProfileUseCase, getSystemConfigurationUseCase);
+            tdTokenService, getUserRoleGroupConfigUseCase, getUserOrganizationProfileUseCase,
+            getSystemConfigurationUseCase, accountProvisioningChecker);
+    }
+
+    // Mockito trả về false mặc định cho isSuperAdmin() khi KHÔNG stub — đúng ý nghĩa "người dùng
+    // thường" cho mọi test không gọi hàm này, chỉ cần stub true riêng cho 3 test superAdmin dưới đây.
+    private void stubSuperAdmin(String username) {
+        lenient().when(accountProvisioningChecker.isSuperAdmin(org.mockito.ArgumentMatchers.eq(username), any()))
+            .thenReturn(true);
     }
 
     @Test
     void profile_shouldMergeRealKeycloakRoles_intoSuperAdminRoles_notOverwriteThem() {
         lenient().when(tdTokenService.issue(any(), anyMap())).thenReturn("fake-tdtoken");
         when(getUserOrganizationProfileUseCase.execute("admin")).thenReturn(new UserOrganizationProfileDto());
+        stubSuperAdmin("admin");
         var controller = newController();
 
         Jwt jwt = Jwt.withTokenValue("token")
@@ -81,6 +93,7 @@ class QLVBCompatAuthControllerTest {
     void profile_forSuperAdminWithoutAppUserRecord_shouldFallbackToLegacyDemoOrgValues() {
         lenient().when(tdTokenService.issue(any(), anyMap())).thenReturn("fake-tdtoken");
         when(getUserOrganizationProfileUseCase.execute("admin")).thenReturn(new UserOrganizationProfileDto());
+        stubSuperAdmin("admin");
         var controller = newController();
 
         Jwt jwt = Jwt.withTokenValue("token")
@@ -104,7 +117,11 @@ class QLVBCompatAuthControllerTest {
     void profile_forRegularUser_shouldUseTheirOwnRealRoles_notSuperAdminList() {
         lenient().when(tdTokenService.issue(any(), anyMap())).thenReturn("fake-tdtoken");
         when(getUserRoleGroupConfigUseCase.execute(anyString())).thenReturn(new UserRoleGroupConfigDto());
-        when(getUserOrganizationProfileUseCase.execute(anyString())).thenReturn(new UserOrganizationProfileDto());
+        // AppUser TỒN TẠI (username set) nhưng chưa gán tổ chức nào — khác hẳn case "chưa khai báo"
+        // (isAccountProvisioned mới thêm chặn RIÊNG case đó, xem test provisioned_* ở dưới).
+        var orgProfile = new UserOrganizationProfileDto();
+        orgProfile.setUsername("nhanvien01");
+        when(getUserOrganizationProfileUseCase.execute(anyString())).thenReturn(orgProfile);
         var controller = newController();
 
         Jwt jwt = Jwt.withTokenValue("token")
@@ -137,7 +154,9 @@ class QLVBCompatAuthControllerTest {
     @Test
     void profile_forRegularUser_withRoleGroup_shouldMergePermissionsAndMenusFromRoleGroup() {
         lenient().when(tdTokenService.issue(any(), anyMap())).thenReturn("fake-tdtoken");
-        when(getUserOrganizationProfileUseCase.execute("nhanvien02")).thenReturn(new UserOrganizationProfileDto());
+        var orgProfile = new UserOrganizationProfileDto();
+        orgProfile.setUsername("nhanvien02");
+        when(getUserOrganizationProfileUseCase.execute("nhanvien02")).thenReturn(orgProfile);
         var roleGroupConfig = new UserRoleGroupConfigDto();
         roleGroupConfig.setPermissionCodes(List.of("QCapNhatVBDen"));
         roleGroupConfig.setMenuFields(Map.of(
@@ -173,7 +192,9 @@ class QLVBCompatAuthControllerTest {
     // lại: claim token phải khớp CHÍNH XÁC roles đã hiển thị ở profile.
     @Test
     void profile_forRegularUser_withRoleGroup_shouldEmbedMergedRolesIntoTdTokenClaim() {
-        when(getUserOrganizationProfileUseCase.execute("nhanvien06")).thenReturn(new UserOrganizationProfileDto());
+        var orgProfile = new UserOrganizationProfileDto();
+        orgProfile.setUsername("nhanvien06");
+        when(getUserOrganizationProfileUseCase.execute("nhanvien06")).thenReturn(orgProfile);
         var roleGroupConfig = new UserRoleGroupConfigDto();
         roleGroupConfig.setPermissionCodes(List.of("QCapNhatVBDen"));
         when(getUserRoleGroupConfigUseCase.execute("nhanvien06")).thenReturn(roleGroupConfig);
@@ -287,7 +308,9 @@ class QLVBCompatAuthControllerTest {
     void profile_withoutKiemNhiem_shouldNotIncludeUserOtherObjKey() {
         lenient().when(tdTokenService.issue(any(), anyMap())).thenReturn("fake-tdtoken");
         when(getUserRoleGroupConfigUseCase.execute(anyString())).thenReturn(new UserRoleGroupConfigDto());
-        when(getUserOrganizationProfileUseCase.execute(anyString())).thenReturn(new UserOrganizationProfileDto());
+        var orgProfile = new UserOrganizationProfileDto();
+        orgProfile.setUsername("nhanvien05");
+        when(getUserOrganizationProfileUseCase.execute(anyString())).thenReturn(orgProfile);
         var controller = newController();
 
         Jwt jwt = Jwt.withTokenValue("token")
@@ -303,6 +326,83 @@ class QLVBCompatAuthControllerTest {
         var response = controller.profile(authentication);
 
         assertThat(response.getBody()).doesNotContainKey("user_other_obj");
+    }
+
+    // Yêu cầu người dùng (22/09/2026, "tài khoản đăng nhập được ở hệ thống đăng nhập nhưng chưa khai
+    // báo trong danh mục thì không cho vào hệ thống"): trước đây profile() vẫn build đầy đủ + trả 200
+    // dù không tìm thấy AppUser. Khoá lại: PHẢI trả accountProvisioned=false, KHÔNG build hồ sơ/menu/
+    // token thật nào.
+    @Test
+    void profile_forAccountWithoutAppUserRecord_shouldRejectWithoutBuildingFullProfile() {
+        when(getUserOrganizationProfileUseCase.execute("chuakhaibao01")).thenReturn(new UserOrganizationProfileDto());
+        var controller = newController();
+
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .claim("preferred_username", "chuakhaibao01")
+            .claim("realm_access", Map.of("roles", List.of("USER")))
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+            jwt, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        var response = controller.profile(authentication);
+
+        assertThat(response.getBody().get("accountProvisioned")).isEqualTo(Boolean.FALSE);
+        assertThat(response.getBody()).doesNotContainKey("agency");
+        assertThat(response.getBody()).doesNotContainKey("roles");
+        assertThat(response.getBody()).doesNotContainKey("tdtoken");
+        verify(tdTokenService, org.mockito.Mockito.never()).issue(any(), anyMap());
+        verify(getUserRoleGroupConfigUseCase, org.mockito.Mockito.never()).execute(anyString());
+    }
+
+    @Test
+    void authen_forAccountWithoutAppUserRecord_shouldRejectWithoutIssuingToken() {
+        when(getUserOrganizationProfileUseCase.execute("chuakhaibao02")).thenReturn(new UserOrganizationProfileDto());
+        var controller = newController();
+
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .claim("preferred_username", "chuakhaibao02")
+            .claim("realm_access", Map.of("roles", List.of("USER")))
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+            jwt, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        var response = controller.authen(null, authentication);
+
+        assertThat(response.getBody().get("accountProvisioned")).isEqualTo(Boolean.FALSE);
+        assertThat(response.getBody().get("token")).isNull();
+        assertThat(response.getBody().get("isAuthSuccessful")).isEqualTo(Boolean.FALSE);
+        verify(tdTokenService, org.mockito.Mockito.never()).issue(any(), anyMap());
+    }
+
+    // Tài khoản superAdmin KHÔNG có AppUser vẫn PHẢI được cho vào (hành vi bootstrap demo/test cũ,
+    // xem javadoc isAccountProvisioned) - không bị chặn bởi luật mới.
+    @Test
+    void authen_forSuperAdminWithoutAppUserRecord_shouldStillIssueToken() {
+        when(getUserOrganizationProfileUseCase.execute("admin")).thenReturn(new UserOrganizationProfileDto());
+        when(tdTokenService.issue(any(), anyMap())).thenReturn("fake-tdtoken");
+        stubSuperAdmin("admin");
+        var controller = newController();
+
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .claim("preferred_username", "admin")
+            .claim("realm_access", Map.of("roles", List.of("ADMIN")))
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+            jwt, List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
+
+        var response = controller.authen(null, authentication);
+
+        assertThat(response.getBody().get("token")).isEqualTo("fake-tdtoken");
+        assertThat(response.getBody()).doesNotContainKey("accountProvisioned");
     }
 
     // N16 (03/09/2026, xem javadoc getCauHinh()): mac dinh (khong cau hinh qua application.yml/bien

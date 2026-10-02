@@ -130,5 +130,7 @@ public class VbdiDeliveryPayload {
         private Long size;
         private String contentType;
         private String fileExtension;
+        /** "tepbanhanh"/"tepkemtheo" (bổ sung 30/09/2026); {@code null} ở message cũ = không phân nhóm. */
+        private String attachmentGroup;
     }
 }

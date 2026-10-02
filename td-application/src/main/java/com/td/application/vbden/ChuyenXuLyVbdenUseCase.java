@@ -823,8 +823,31 @@ public class ChuyenXuLyVbdenUseCase {
         parent.update(null, null, newStatus, null, null, null, null);
     }
 
+    // Bugfix 27/09/2026 (bao loi nguoi dung "van ban den -> chu tri xu ly -> cot Nguoi chuyen thinh
+    // thoang khong the hien (demo3)"): truoc day ghi entry theo khoa TU DAT (nguoi_chuyen/thoi_gian/
+    // user_process dang List, KHONG co unit_*) - KHAC hop dong Domino that TDUlties.updateChuyenXuLy
+    // History() ma FE (ColumnsDen*.jsx#findUserCreatorByUsername) doc: user_creator + timeupdate
+    // "dd/MM/yyyy HH:mm:ss" + user_process/user_coordinate/user_to_read/user_manage/unit_process/
+    // unit_coordinate/unit_to_read (chuoi ";", CHI dat khi co gia tri; rong thi lay tu *_obj theo
+    // username/identifier). Hau qua: moi van ban phan cong qua Java mat ten nguoi chuyen, van ban
+    // du lieu Domino cu van hien -> "thinh thoang". Giu them action/opinion (bo sung cua Java, FE
+    // khong doc, vo hai). Du lieu cu da ghi sai khoa: chuan hoa bang migration V1.0.66.
+    //
+    // KHAC CO Y Domino: Domino CHI ghi voi chuyenxuly/vanthuchuyenvanban (ChuyenXuLy.java:193), bo sot
+    // phanxuly/phanphoi (ChuyenXuLy.java:432-439 - CUNG giao chu tri) => van ban giao qua "Phan xu ly"/
+    // "Phan phoi" KHONG BAO GIO co "Nguoi chuyen" ngay ca tren Domino (nguyen nhan "thinh thoang").
+    // Ghi cho 4 action giao chu tri; KHONG ghi chuyenphoihop/xemdebiet/capnhat* (dung Domino - cot
+    // "Nguoi chuyen" chi o tab chu tri, ghi them se hien sai nguoi chuyen phoi hop).
+    static final DateTimeFormatter HISTORY_TIME_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+    static final java.util.Set<String> HISTORY_ACTIONS =
+        java.util.Set.of("chuyenxuly", "vanthuchuyenvanban", "phanxuly", "phanphoi");
+
     private void appendChuyenXuLyHistory(
             Map<String, Object> fields, ChuyenXuLyVbdenRequest request, String actingUsername, List<String> newAssignees) {
+        String action = request.getAction() == null ? "" : request.getAction().trim();
+        if (!HISTORY_ACTIONS.contains(action.toLowerCase())) {
+            return;
+        }
         List<Object> history = new ArrayList<>();
         Object existing = fields.get(CHUYENXULY_HISTORY_FIELD);
         if (existing instanceof List<?> existingList) {
@@ -832,14 +855,63 @@ public class ChuyenXuLyVbdenUseCase {
         }
 
         Map<String, Object> entry = new LinkedHashMap<>();
-        entry.put("action", request.getAction());
-        entry.put(USER_PROCESS_FIELD, newAssignees);
-        entry.put("nguoi_chuyen", actingUsername);
-        entry.put("opinion", request.getOpinion());
-        entry.put("thoi_gian", LocalDateTime.now().toString());
+        putIfNotBlank(entry, "user_creator", actingUsername);
+        String userProcess = firstNonBlank(request.getUserProcess(),
+            joinObjValues(request.getUserProcessObj(), "username") + joinObjValues(request.getUserAssignerObj(), "username"));
+        if (userProcess.isBlank() && newAssignees != null && !newAssignees.isEmpty()) {
+            userProcess = String.join(";", newAssignees);
+        }
+        putIfNotBlank(entry, USER_PROCESS_FIELD, userProcess);
+        putIfNotBlank(entry, "user_coordinate",
+            firstNonBlank(request.getUserCoordinate(), joinObjValues(request.getUserCoordinateObj(), "username")));
+        putIfNotBlank(entry, "user_to_read",
+            firstNonBlank(request.getUserToRead(), joinObjValues(request.getUserToReadObj(), "username")));
+        putIfNotBlank(entry, "user_manage", request.getUserManage());
+        putIfNotBlank(entry, "unit_process",
+            firstNonBlank(request.getUnitProcess(), joinObjValues(request.getUserProcessObj(), "identifier")));
+        putIfNotBlank(entry, "unit_coordinate",
+            firstNonBlank(request.getUnitCoordinate(), joinObjValues(request.getUserCoordinateObj(), "identifier")));
+        putIfNotBlank(entry, "unit_to_read",
+            firstNonBlank(request.getUnitToRead(), joinObjValues(request.getUserToReadObj(), "identifier")));
+        entry.put("timeupdate", LocalDateTime.now().format(HISTORY_TIME_FORMAT));
+        entry.put("action", action);
+        putIfNotBlank(entry, "opinion", request.getOpinion());
         history.add(entry);
 
         fields.put(CHUYENXULY_HISTORY_FIELD, history);
+    }
+
+    private static void putIfNotBlank(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value.trim());
+        }
+    }
+
+    private static String firstNonBlank(String primary, String fallback) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        return fallback == null ? "" : fallback;
+    }
+
+    // Domino TDUlties.get_itemsValue_by_stringArrObj: noi gia tri itemName cua tung phan tu mang JSON,
+    // moi gia tri kem ";" o cuoi. JSON loi/rong -> "".
+    private static String joinObjValues(String jsonArray, String itemName) {
+        if (jsonArray == null || jsonArray.isBlank()) {
+            return "";
+        }
+        StringBuilder result = new StringBuilder();
+        try {
+            for (var node : OBJECT_MAPPER.readTree(jsonArray)) {
+                var value = node.get(itemName);
+                if (value != null && !value.asText().isBlank()) {
+                    result.append(value.asText().trim()).append(';');
+                }
+            }
+        } catch (Exception ex) {
+            return "";
+        }
+        return result.toString();
     }
 
     private Map<String, Object> buildSnapshot(BusinessDocument document) {

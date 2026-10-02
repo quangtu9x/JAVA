@@ -97,4 +97,27 @@ class PostgresHoSoCVDocumentRepositoryTest {
 
         assertThat(sql.toString()).isEmpty();
     }
+
+    // 01/10/2026: "Chua phoi hop" (Domino fieldnot_user_coordinated) - field KHONG chua gia tri o ca 3
+    // dang: phan tu mang JSON, scalar bang, thanh vien chuoi "a;b".
+    @Test
+    void appendExcludeMemberFieldValuePredicates_shouldNegateArrayScalarAndDelimitedMember() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        repository.appendExcludeMemberFieldValuePredicates(sql, parameters, Map.of("user_coordinated", List.of("lpha")));
+
+        String text = sql.toString();
+        assertThat(text).startsWith(" AND NOT (COALESCE(d.dynamic_fields->'user_coordinated' @> jsonb_build_array(CAST(:noneVal0_0 AS text)), false)");
+        assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_coordinated', '') = :noneValScalar0_0");
+        assertThat(text).contains("LIKE :noneValMember0_0");
+        assertThat(parameters).containsEntry("noneVal0_0", "lpha").containsEntry("noneValMember0_0", "%;lpha;%");
+    }
+
+    @Test
+    void appendExcludeMemberFieldValuePredicates_withNullMap_shouldAppendNothing() {
+        StringBuilder sql = new StringBuilder();
+        repository.appendExcludeMemberFieldValuePredicates(sql, new LinkedHashMap<>(), null);
+        assertThat(sql.toString()).isEmpty();
+    }
 }

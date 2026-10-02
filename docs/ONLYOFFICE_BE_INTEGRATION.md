@@ -146,3 +146,49 @@ thống giờ đều không còn giới hạn độ dài khoá, không chỉ ri�
 - Mới wiring vào module **dự thảo** (`iconlistduthao.jsx`) — các module khác (vbden/vbdi/vbcddh...)
   chưa có icon này, cần lặp lại đúng pattern ở mục 1 cho từng module khi có yêu cầu.
 - Chưa có cấu hình `ONLYOFFICE_CALLBACK_BASE_URL`/`ONLYOFFICE_DOCSERVER_URL` riêng cho production.
+
+---
+
+## Cập nhật 25/09/2026: lưu bản sửa thành TỆP MỚI, không ghi đè tệp gốc
+
+**Yêu cầu người dùng:** "sửa file ở OnlyOffice → tôi muốn lưu vết và file mới, không lưu đè vào file cũ,
+có thể tham khảo chức năng sửa file cũ (bte)".
+
+**Hành vi mới** (tham khảo luồng "Sửa tệp" BTE, `ThanhHoaDEV/src/utils/tdbte/tdeditorJavaFile.js`):
+
+| Bước | Thành phần | Chi tiết |
+|---|---|---|
+| Mở trình soạn thảo | `BuildOnlyOfficeEditorConfigUseCaseImpl#buildDocumentKey` | `key` thêm hậu tố `_e<số bản đã sửa ra từ tệp gốc>`. Sau mỗi lần lưu xong, lần mở sau có key mới, tức phiên mới; người cùng mở lúc chưa ai lưu vẫn chung phiên. |
+| Callback status 2/6 | `SaveOnlyOfficeCallbackUseCaseImpl` | Lần đầu của phiên: tạo dòng `file_metadata` **mới** (cùng `document_id`, cùng thư mục MinIO, `source_file_id` = tệp gốc, `edit_session_key` = `payload.key`), tên `<tên gốc trước dấu _>_<username>_<ddMMyyyyHHmmss>.<đuôi>` giống BTE. Các lần sau trong cùng phiên ghi đè đúng tệp mới đó, không tạo trùng. **Tệp gốc không bị đụng tới.** |
+| FE chờ lưu xong | `GET /api/v1/onlyoffice/files/{fileId}/edited-file?key=` (`GetOnlyOfficeEditedFileUseCase`) | Trả `{file_id, name, document_id, size}` khi phiên đã lưu ra tệp mới, `data=null` nếu chưa. |
+| FE sau khi có tệp mới | `OnlyOfficeEditorModal.jsx#logSavedAsNewFile` | Nếu là dự thảo và mở từ danh sách phân loại (`tepbanhanh`/`tepkemtheo`) có tệp cũ: đổi tên tệp cũ thành tệp mới trong danh sách đó (`luuDuThao`). Sau đó ghi vết quá trình xử lý (`ganKemTepDuThao`): "Đã sửa tệp "X" qua OnlyOffice (giữ nguyên bản gốc), lưu thành tệp mới "Y", thay thế ở tệp văn bản phát hành. Ý kiến: …". |
+
+- **Schema:** migration `V1.0.65__Add_File_Edit_Source_Tracking.sql` thêm `file_metadata.source_file_id` và
+  `edit_session_key`.
+- **FE:** thời gian chờ tăng lên khoảng 30 giây (20 × 1,5s), vì Document Server thường gọi callback khoảng
+  10 giây sau khi phiên đóng. Hết thời gian mà chưa có tệp mới thì hiện cảnh báo "Chưa xác nhận được tệp
+  mới…"; tệp vẫn được lưu khi callback tới, chỉ thiếu bước đổi danh sách phân loại và ghi vết.
+- **Module khác dự thảo** (dùng chung `Files/index.jsx`): chỉ có tệp mới, không đổi danh sách phân loại và
+  không ghi vết, vì vết quá trình hiện chỉ có API cho dự thảo.
+- **Kiểm chứng:**
+  - `SaveOnlyOfficeCallbackUseCaseImplTest` (4 test): tạo tệp mới, không ghi tệp gốc; cùng phiên thì ghi
+    tiếp đúng tệp; tệp gốc không tồn tại thì lỗi; quy tắc đặt tên.
+  - Migration chạy thật trên `h05_01_sokhcn` trong transaction rồi ROLLBACK.
+  - **Chưa thử với Document Server thật.**
+
+### Điều chỉnh 25/09/2026 (2): vết gọn + tệp hiện dưới vết + không cắt tên
+
+Làm theo tiền lệ của luồng ký số (`ThanhHoaDEV/src/utils/tdesign/tdsignJavaFile.js`):
+
+- **Vết ở "Quá trình xử lý"** chỉ ngắn gọn: `Đã sửa`, có ý kiến thì thành `Đã sửa. Ý kiến: …`.
+- **Chuỗi chi tiết** (sửa từ tệp nào, thay bằng tệp nào, ở đâu) lưu vào `file_metadata.description` của tệp
+  mới, để sau này tra lại được đã sửa ở tệp nào.
+- **Tệp mới hiện ngay dưới vết**, đọc/tải được như gắn kèm tệp thủ công:
+  - Endpoint mới `POST /api/v1/onlyoffice/files/{fileId}/link-process`, body `{processId, description}`
+    (`LinkOnlyOfficeEditedFileToProcessUseCase`), gắn `process_id` = id vết vừa ghi.
+  - Chỉ nhận tệp do sửa trực tuyến tạo ra (`source_file_id` có giá trị) và vết thuộc cùng dự thảo.
+- **Bugfix tên tệp bị cắt:** bản đầu cắt tên tại dấu `_` đầu tiên như BTE, nên
+  "phan_cong_ct_…_final.docx" thành "phan_…". Nay giữ nguyên tên gốc:
+  `<tên gốc đầy đủ>_<username>_<ddMMyyyyHHmmss>.<đuôi>`. Nếu sửa tiếp một bản đã sửa thì lần ngược về tệp gốc
+  ban đầu qua `source_file_id`, nên không chồng nhiều hậu tố.
+- **Test:** `SaveOnlyOfficeCallbackUseCaseImplTest` (5), `LinkOnlyOfficeEditedFileToProcessUseCaseImplTest` (3).

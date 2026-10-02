@@ -105,7 +105,9 @@ class GetSoLuongCanXuLyUseCaseTest {
         assertThat(counts.get("dakychuabanhanh")).isEqualTo(10L);
         // Field khong duoc stub rieng - van co mat trong map (gia tri mac dinh 0 tu stub chung).
         assertThat(counts.get("vanbantralai")).isEqualTo(0L);
-        assertThat(counts).hasSize(15 + 12 + 7 + 6 + 4); // vbden + duthao + hosocv + phieutrinhtd + vbdi
+        assertThat(counts.get("draft_vanthu_tralai")).isEqualTo(0L);
+        // duthao 12 + 1 (01/10/2026: draft_vanthu_tralai - route gop "Van thu tra lai").
+        assertThat(counts).hasSize(15 + 13 + 7 + 6 + 4); // vbden + duthao + hosocv + phieutrinhtd + vbdi
         verify(resolveIdentifierByLevelUseCase, never()).resolveForCurrentUser();
     }
 

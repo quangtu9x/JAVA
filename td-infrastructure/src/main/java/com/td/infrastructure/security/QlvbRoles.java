@@ -49,11 +49,20 @@ public final class QlvbRoles {
     /** Quyền cập nhật văn bản đi — phạm vi phòng ban (dự phòng cho BL-220). */
     public static final String CAP_NHAT_VBDI_PB = "QCAPNHATVBDIPB";
 
-    /** Quyền phân công xử lý (dự phòng cho BL-211). */
+    /** Quyền phân công xử lý — toàn cơ quan (dự phòng cho BL-211). */
     public static final String PHAN_CONG = "QPHANCONG";
 
-    /** Quyền phân phối văn bản (dự phòng cho BL-211). */
+    /** Quyền phân phối văn bản — toàn cơ quan (dự phòng cho BL-211). */
     public static final String PHAN_PHOI = "QPHANPHOI";
+
+    /** Quyền phân công xử lý văn bản đến — phạm vi đơn vị (catalog app_permissions, code {@code QPhanCongDV}). */
+    public static final String PHAN_CONG_DV = "QPHANCONGDV";
+
+    /** Quyền phân phối văn bản đến — phạm vi đơn vị (catalog app_permissions, code {@code QPhanPhoiDV}). */
+    public static final String PHAN_PHOI_DV = "QPHANPHOIDV";
+
+    /** Quyền phân công xử lý văn bản đến — phạm vi phòng ban (catalog app_permissions, code {@code QPhanCongPhong}). */
+    public static final String PHAN_CONG_PHONG = "QPHANCONGPHONG";
 
     /**
      * Bổ sung 09/09/2026 (port số liệu CẤP CƠ QUAN của {@code SoLuongCanXuLy} — xem

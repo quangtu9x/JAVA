@@ -2,12 +2,19 @@ package com.td.infrastructure.persistence.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+// Yeu cau nguoi dung 24/09/2026 ("tep cu chua xoa, chi hien thi tep moi cap nhat, khong cho tai tep
+// cu"): tep DA DUOC THAY THE (superseded_at co gia tri, xem V1.0.64/SupersedeDocumentFilesUseCaseImpl)
+// bi an khoi MOI truy van JPA tren entity nay - liet ke, tai, xem, doi ten, xoa, ky so, copy... - de
+// khong 1 duong nao (hien tai hay them sau) vo tinh lo tep cu ra ngoai. Dong va object MinIO GIU
+// NGUYEN. Muon doc lai tep da thay the thi PHAI dung native SQL co chu dich (khong co API nao lam vay).
 @Entity
 @Table(name = "file_metadata")
+@SQLRestriction("superseded_at IS NULL")
 @Getter
 @Setter
 @Builder
@@ -91,4 +98,20 @@ public class FileMetadataEntity {
     @Builder.Default
     @Column(name = "is_primary")
     private Boolean isPrimary = Boolean.FALSE;
+
+    // Yeu cau nguoi dung 24/09/2026 - xem ghi chu @SQLRestriction o dau lop. Chi ghi qua native UPDATE
+    // (FileMetadataJpaRepository#markSuperseded); entity load qua JPA luon co gia tri null.
+    @Column(name = "superseded_at")
+    private LocalDateTime supersededAt;
+
+    @Column(name = "superseded_by")
+    private UUID supersededBy;
+
+    // Yeu cau nguoi dung 25/09/2026 (V1.0.65): tep MOI duoc sua ra tu tep goc nao (OnlyOffice luu thanh
+    // tep moi, khong ghi de) + key phien soan thao da tao ra no - xem SaveOnlyOfficeCallbackUseCaseImpl.
+    @Column(name = "source_file_id")
+    private UUID sourceFileId;
+
+    @Column(name = "edit_session_key", length = 200)
+    private String editSessionKey;
 }

@@ -93,8 +93,43 @@ class GetLegacyOrgLookupForDungChungUseCaseTest {
         assertThat(rows.get(0)).containsEntry("username", "nvb");
     }
 
+    // 27/09/2026 - vwcocautochuc_cay: goc (depth 0) + moi hau due, pre-order, anh em theo sortOrder roi ten.
+    @Test
+    void getOrganizationSubtree_shouldReturnRootAndDescendantsInTreeOrderWithDepth() {
+        var target = newUseCase();
+        Organization agency = newOrganization("H05.01", "So KHCN", "agency", 0);
+        Organization center = newOrganization("H05.01.05", "Trung tam CNTT", "unit", 3);
+        Organization office = newOrganization("H05.01.02", "Van phong so", "unit", 1);
+        Organization dept = newOrganization("H05.01.05.01", "Phong Tong hop", "department", 0);
+        when(organizationRepository.findByIdAndDeletedOnIsNull(agency.getId())).thenReturn(java.util.Optional.of(agency));
+        when(organizationRepository.findByParentIdAndDeletedOnIsNull(agency.getId())).thenReturn(List.of(center, office));
+        when(organizationRepository.findByParentIdAndDeletedOnIsNull(center.getId())).thenReturn(List.of(dept));
+        when(organizationRepository.findByParentIdAndDeletedOnIsNull(office.getId())).thenReturn(List.of());
+        when(organizationRepository.findByParentIdAndDeletedOnIsNull(dept.getId())).thenReturn(List.of());
+
+        List<Map<String, Object>> rows = target.getOrganizationSubtree(agency.getId().toString());
+
+        assertThat(rows).extracting(row -> row.get("identifier"))
+            .containsExactly("H05.01", "H05.01.02", "H05.01.05", "H05.01.05.01");
+        assertThat(rows).extracting(row -> row.get("depth")).containsExactly(0, 1, 1, 2);
+    }
+
+    @Test
+    void getOrganizationSubtree_withUnknownOrInvalidRoot_shouldReturnEmpty() {
+        var target = newUseCase();
+        UUID missing = UUID.randomUUID();
+        when(organizationRepository.findByIdAndDeletedOnIsNull(missing)).thenReturn(java.util.Optional.empty());
+
+        assertThat(target.getOrganizationSubtree(missing.toString())).isEmpty();
+        assertThat(target.getOrganizationSubtree("not-a-uuid")).isEmpty();
+    }
+
     private Organization newOrganization(String identifier, String name, String form) {
-        return new Organization(identifier, name, null, null, form, 3, name, 0,
+        return newOrganization(identifier, name, form, 0);
+    }
+
+    private Organization newOrganization(String identifier, String name, String form, int sortOrder) {
+        return new Organization(identifier, name, null, null, form, 3, name, sortOrder,
             0, null, null, null, null, null, null, null, null, null);
     }
 }

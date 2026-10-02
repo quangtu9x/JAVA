@@ -6,6 +6,7 @@ import com.td.application.sharedcore.GetUserOrganizationProfileUseCase;
 import com.td.application.sharedcore.GetUserRoleGroupConfigUseCase;
 import com.td.application.sharedcore.UserOrganizationProfileDto;
 import com.td.application.sharedcore.UserRoleGroupConfigDto;
+import com.td.infrastructure.security.AccountProvisioningChecker;
 import com.td.infrastructure.security.AuthenticatedUser;
 import com.td.infrastructure.security.TdTokenAuthenticationToken;
 import com.td.infrastructure.security.TdTokenService;
@@ -59,10 +60,8 @@ import java.util.Set;
 @Tag(name = "QLVB Compat Auth", description = "Đăng nhập tương thích FE cũ (ThanhHoaDev)")
 public class QLVBCompatAuthController {
 
-    private static final String ADMIN_ROLE = "ADMIN";
     private static final String MANAGER_ACCESS = "Manager";
     private static final String DEFAULT_USER_ACCESS = "User";
-    private static final String SUPER_ADMIN_USERNAME = "admin";
     // Fallback CHỈ dùng khi tài khoản "quản trị tối cao" không có bản ghi AppUser thật đi kèm (vd
     // "admin" bootstrap tạo qua Keycloak Admin Console, chưa từng tạo hồ sơ ở màn "Người dùng") —
     // giữ giá trị demo cũ để không hồi quy trải nghiệm test/demo hiện có. Mọi tài khoản CÓ AppUser
@@ -74,6 +73,9 @@ public class QLVBCompatAuthController {
     private final GetUserRoleGroupConfigUseCase getUserRoleGroupConfigUseCase;
     private final GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
     private final GetSystemConfigurationUseCase getSystemConfigurationUseCase;
+    // "Khóa triệt để" (22/09/2026): định nghĩa "superAdmin" giờ dùng CHUNG với AccountProvisioningFilter
+    // (chặn mọi /api/v1/*) — xem javadoc AccountProvisioningChecker, tránh lệch định nghĩa giữa 2 nơi.
+    private final AccountProvisioningChecker accountProvisioningChecker;
 
     // N16 (03/09/2026) - xem javadoc getCauHinh() ve ly do 2 field nay ton tai va gia tri mac dinh.
     // Cap nhat 16/09/2026: CHI con dung lam DEFAULT khi to chuc CHUA tung cau hinh 2 field nay o
@@ -123,6 +125,21 @@ public class QLVBCompatAuthController {
         // còn lại chưa migrate mà đọc field tổ chức từ token đều nhận null (ca đã phát hiện:
         // qlvb/danhmuc/DanhSachNguoiDung lọc theo dbpath luôn trả rỗng).
         UserOrganizationProfileDto orgProfile = getUserOrganizationProfileUseCase.execute(user.getUsername());
+
+        // Yêu cầu người dùng (22/09/2026, "tài khoản đăng nhập được ở hệ thống đăng nhập nhưng chưa
+        // khai báo trong danh mục thì không cho vào hệ thống"): trước đây KHÔNG có nhánh nào kiểm tra
+        // AppUser tồn tại — tài khoản Keycloak hợp lệ nhưng chưa có bản ghi trong bảng app_users (vd
+        // vừa tạo ở Keycloak, chưa từng khai báo ở màn "Người dùng") vẫn được cấp Tdtoken hợp lệ và
+        // vào thẳng hệ thống với hồ sơ tổ chức rỗng. Chặn tại đây (KHÔNG cấp token) — FE (Auth.tsx#
+        // getTDAuth) đọc field "accountProvisioned" TRƯỚC field "token", điều hướng sang trang thông
+        // báo tĩnh thay vì lưu phiên đăng nhập. Không áp dụng cho superAdmin (tài khoản quản trị tối
+        // cao bootstrap qua Keycloak Admin Console, xem javadoc COHQUAN_THANH_HOA).
+        if (!isAccountProvisioned(superAdmin, orgProfile)) {
+            log.warn("Dang nhap bi tu choi: tai khoan '{}' xac thuc Keycloak thanh cong nhung chua "
+                + "duoc khai bao trong danh muc nguoi dung (app_users)", user.getUsername());
+            return ResponseEntity.ok(buildNotProvisionedAuthResponse());
+        }
+
         // Bổ sung 20/08/2026 (bugfix nghiêm trọng): claim "roles" của Tdtoken trước đây CHỈ chứa role
         // Keycloak thật của user (vd chỉ "USER") — quyền nghiệp vụ QLVB (QCapNhatVBDen/QPhanCong/...)
         // gán qua "Nhóm vai trò" (RoleGroup, BL-111) CHƯA BAO GIỜ được đưa vào token thật, dù đã hiện
@@ -150,6 +167,16 @@ public class QLVBCompatAuthController {
         AuthenticatedUser user = resolvePrincipal(authentication);
         boolean superAdmin = isSuperAdmin(user);
         UserOrganizationProfileDto orgProfile = getUserOrganizationProfileUseCase.execute(user.getUsername());
+
+        // Cùng chặn như authen() ở trên (xem javadoc isAccountProvisioned) — endpoint này là 1 lối
+        // vào ĐỘC LẬP (chỉ cần Keycloak JWT hoặc Tdtoken hợp lệ, không bắt buộc phải qua /authen
+        // trước), nên phải kiểm tra lại ở đây thay vì tin tưởng /authen đã chặn.
+        if (!isAccountProvisioned(superAdmin, orgProfile)) {
+            log.warn("Lay ho so bi tu choi: tai khoan '{}' xac thuc Keycloak thanh cong nhung chua "
+                + "duoc khai bao trong danh muc nguoi dung (app_users)", user.getUsername());
+            return ResponseEntity.ok(buildNotProvisionedProfileResponse(user.getUsername()));
+        }
+
         // Fetch ĐÚNG 1 lần, dùng chung cho buildProfile() (hiển thị) lẫn buildTdTokenClaims() (claim
         // thật trong token) — tránh gọi GetUserRoleGroupConfigUseCase 2 lần trong cùng 1 request.
         UserRoleGroupConfigDto roleGroupConfig = superAdmin ? null : getUserRoleGroupConfigUseCase.execute(user.getUsername());
@@ -303,6 +330,16 @@ public class QLVBCompatAuthController {
         Map<String, Object> profile = new LinkedHashMap<>();
         String fullName = firstNonBlank(orgProfile.getFullName(), fallbackName);
         profile.put("id", stableId(username));
+        // Bổ sung 22/09/2026 (bugfix): "id" ở trên là số giả lập ổn định theo username (xem javadoc
+        // stableId) - KHÔNG PHẢI UUID PK thật của AppUser. Field MỚI này mới là UUID thật, cần cho
+        // MỌI lần FE gọi endpoint shared-core đòi UUID (vd SharedCoreUsersController#getSignatureImages)
+        // với "chính tài khoản đang đăng nhập" thay vì 1 user khác chọn từ danh sách quản trị (nơi đã
+        // có sẵn UUID thật từ GET /api/v1/shared-core/users). "" nếu không tìm thấy AppUser tương ứng.
+        profile.put("appUserId", orgProfile.getAppUserId());
+        // Bổ sung 22/09/2026 (bugfix): field "phonenumber" (lowercase, đúng quy ước FE
+        // TdPdfViewerSignModal.jsx/tdsimsign/tdsimpki.jsx đang đọc) TỪNG BỊ THIẾU HOÀN TOÀN ở đây -
+        // AppUser.phoneNumber có dữ liệu thật trong DB nhưng chưa từng lộ ra qlvb/profile.
+        profile.put("phonenumber", orgProfile.getPhoneNumber());
         profile.put("userId", username);
         profile.put("username", username);
         profile.put("fullName", fullName);
@@ -337,6 +374,9 @@ public class QLVBCompatAuthController {
         // get_ParentId_by_level() (utils/global.jsx) khi mở "Thêm mới" văn bản đến (SubFormPhanVanBan
         // /SubFormSaoY gọi hàm này ngay khi render). Xem javadoc UserOrganizationProfileDto#getParentIds.
         profile.put("parentids", org.getParentIds());
+        // Bổ sung 25/09/2026: "parents" — chuỗi TÊN tổ tiên (lá → gốc), xem javadoc
+        // UserOrganizationProfileDto#getParents (FE getTenDonvi_by_level crash khi thiếu field này).
+        profile.put("parents", org.getParents());
         // Tên field THẬT theo đúng payload Domino gốc (xem legacyAdminProfile.json + BE_THANHHOA
         // ImportNguoiDung.java/LuuDanhMuc.java) — HeaderUserMenu.jsx đọc trực tiếp các field này.
         profile.put("agency", agency);
@@ -380,7 +420,7 @@ public class QLVBCompatAuthController {
     private record ResolvedAgency(String agency, String capLanhDao) {}
 
     private ResolvedAgency resolveAgencyAndCapLanhDao(UserOrganizationProfileDto org, boolean superAdmin) {
-        boolean found = org.getUsername() != null;
+        boolean found = appUserExists(org);
         String agency = org.getAgencyName();
         String capLanhDao = org.getCapLanhDao();
         if (superAdmin && !found) {
@@ -403,6 +443,7 @@ public class QLVBCompatAuthController {
         putIfNotBlank(claims, "identifier", org.getIdentifier());
         putIfNotBlank(claims, "identifiers", org.getIdentifiers());
         putIfNotBlank(claims, "parentids", org.getParentIds());
+        putIfNotBlank(claims, "parents", org.getParents());
         putIfNotBlank(claims, "level", org.getLevel());
         putIfNotBlank(claims, "position", org.getPosition());
         putIfNotBlank(claims, "caplanhdao", resolved.capLanhDao());
@@ -515,12 +556,52 @@ public class QLVBCompatAuthController {
         return String.join(";", merged) + ";";
     }
 
-    /** Tài khoản quản trị tối cao: username {@code admin} hoặc có role Keycloak {@code ADMIN}. */
+    /** Tài khoản quản trị tối cao: username {@code admin} hoặc có role Keycloak {@code ADMIN} — xem
+     * javadoc {@link AccountProvisioningChecker#isSuperAdmin}. */
     private boolean isSuperAdmin(AuthenticatedUser user) {
-        if (SUPER_ADMIN_USERNAME.equalsIgnoreCase(user.getUsername())) {
-            return true;
-        }
-        return user.getRoles().stream().anyMatch(role -> ADMIN_ROLE.equalsIgnoreCase(role));
+        return accountProvisioningChecker.isSuperAdmin(user.getUsername(), user.getRoles());
+    }
+
+    /** {@code true} nếu {@code org} được suy ra từ 1 bản ghi {@code AppUser} thật (xem javadoc
+     * GetUserOrganizationProfileUseCase#execute — trả DTO rỗng, username null, khi không tìm thấy). */
+    private boolean appUserExists(UserOrganizationProfileDto org) {
+        return org.getUsername() != null;
+    }
+
+    /**
+     * Yêu cầu người dùng (22/09/2026): tài khoản xác thực Keycloak thành công nhưng CHƯA có bản ghi
+     * {@code AppUser} tương ứng (chưa được khai báo/cấp quyền ở màn "Người dùng") KHÔNG được coi là
+     * "đã đăng nhập" — dùng chung cho cả {@link #authen} và {@link #profile}. superAdmin (bootstrap
+     * qua Keycloak Admin Console, xem {@code COHQUAN_THANH_HOA}) LUÔN được coi là provisioned dù
+     * chưa có {@code AppUser} — giữ đúng hành vi demo/test cũ.
+     */
+    private boolean isAccountProvisioned(boolean superAdmin, UserOrganizationProfileDto org) {
+        return superAdmin || appUserExists(org);
+    }
+
+    private static final String NOT_PROVISIONED_MESSAGE =
+        "Tài khoản chưa được khai báo và cấp quyền truy cập trong hệ thống. Vui lòng liên hệ quản trị viên.";
+
+    /** Response {@code AuthModel}-shaped nhưng KHÔNG có token hợp lệ — xem javadoc isAccountProvisioned. */
+    private Map<String, Object> buildNotProvisionedAuthResponse() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("token", null);
+        response.put("refreshToken", "");
+        response.put("refreshTokenExpiryTime", "");
+        response.put("isAuthSuccessful", Boolean.FALSE);
+        response.put("isTfaEnabled", Boolean.FALSE);
+        response.put("accountProvisioned", Boolean.FALSE);
+        response.put("message", NOT_PROVISIONED_MESSAGE);
+        return response;
+    }
+
+    /** Response {@code UserModel}-shaped tối giản, KHÔNG kèm tdtoken — xem javadoc isAccountProvisioned. */
+    private Map<String, Object> buildNotProvisionedProfileResponse(String username) {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("username", username);
+        profile.put("accountProvisioned", Boolean.FALSE);
+        profile.put("message", NOT_PROVISIONED_MESSAGE);
+        return profile;
     }
 
     private String firstNonBlank(String... values) {

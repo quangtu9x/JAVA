@@ -159,8 +159,11 @@ final class VbdenIncomingDocumentWriter {
      * {@code (documentId, fileId)}) tìm đúng dòng.
      */
     record PreparedFile(UUID id, String objectKey, String bucketName, String originalFilename,
-                         Long size, String contentType, String fileExtension) {
+                         Long size, String contentType, String fileExtension, String attachmentGroup) {
     }
+
+    static final String GROUP_TEP_BAN_HANH = "tepbanhanh";
+    static final String GROUP_TEP_KEM_THEO = "tepkemtheo";
 
     /**
      * Bổ sung 07/09/2026 — chuẩn bị danh sách tệp từ {@code snapshot.getFiles()} (đã copy sẵn phía
@@ -189,7 +192,7 @@ final class VbdenIncomingDocumentWriter {
                 ? "tep-dinh-kem" : file.getOriginalFilename();
             long size = file.getSize() == null ? 0L : file.getSize();
             prepared.add(new PreparedFile(UUID.randomUUID(), file.getObjectKey(), bucket,
-                originalFilename, size, file.getContentType(), file.getFileExtension()));
+                originalFilename, size, file.getContentType(), file.getFileExtension(), file.getAttachmentGroup()));
         }
         return prepared;
     }
@@ -308,6 +311,12 @@ final class VbdenIncomingDocumentWriter {
             throws JsonProcessingException {
         Map<String, Object> fields = new LinkedHashMap<>();
         putGroupSpecificFields(fields, p);
+        // Bugfix 29/09/2026 (bao loi "vbden/xuly/chophancong - lanh dao thay van ban nhung mo chi tiet
+        // khong co chuc nang nao"): Domino gan Form="DocumentIn" cho moi van ban den; FE
+        // (VBDenButtonActionXuLy.jsx) CHI render nhom nut xu ly khi resdata.form === "DocumentIn".
+        // Truoc day Worker khong ghi field nay -> moi van ban den nhan qua mang deu "cam" nut.
+        // Du lieu da tao truoc do: backfill boi V1.0.68 (td-web).
+        fields.put("form", "DocumentIn");
         fields.put("document_internet", "1");
         fields.put("received_date", LocalDateTime.now().format(DATE_TIME_PATTERN));
         putIfNotBlank(fields, "unit_in_charge", p.getSenderOrganName());
@@ -385,8 +394,35 @@ final class VbdenIncomingDocumentWriter {
                 filesJson.add(fileEntry);
             }
             fields.put("files", filesJson);
+            putAttachmentGroupFields(fields, preparedFiles);
         }
         return objectMapper.writeValueAsString(fields);
+    }
+
+    /**
+     * Bổ sung 30/09/2026 (yêu cầu người dùng: văn bản đến nhận được phải chia "Tệp ban hành"/"Tệp kèm
+     * theo" như chi tiết văn bản đi, tệp "Phát hành kèm tệp văn bản đến" vào "Tệp kèm theo"): ghi tên
+     * tệp vào {@code tepbanhanh}/{@code tepkemtheo} theo {@link PreparedFile#attachmentGroup()} (phía gửi
+     * đã gán) — chuỗi "a.pdf;b.docx;" cùng quy ước FE. {@code filesVBden.jsx} chia nhóm theo
+     * {@code tepbanhanh} (tệp không có tên trong đó = "Tệp kèm theo"). Message cũ không có nhóm → không
+     * ghi field nào (hiển thị không phân nhóm như trước).
+     */
+    private static void putAttachmentGroupFields(Map<String, Object> fields, List<PreparedFile> preparedFiles) {
+        StringBuilder banHanh = new StringBuilder();
+        StringBuilder kemTheo = new StringBuilder();
+        for (PreparedFile f : preparedFiles) {
+            if (GROUP_TEP_BAN_HANH.equals(f.attachmentGroup())) {
+                banHanh.append(f.originalFilename()).append(';');
+            } else if (GROUP_TEP_KEM_THEO.equals(f.attachmentGroup())) {
+                kemTheo.append(f.originalFilename()).append(';');
+            }
+        }
+        if (!banHanh.isEmpty()) {
+            fields.put(GROUP_TEP_BAN_HANH, banHanh.toString());
+        }
+        if (!kemTheo.isEmpty()) {
+            fields.put(GROUP_TEP_KEM_THEO, kemTheo.toString());
+        }
     }
 
     private static void putIfNotBlank(Map<String, Object> fields, String key, String value) {

@@ -34,6 +34,10 @@ class CopyDocumentFilesUseCaseImplTest {
     private MinioService minioService;
     @Mock
     private FileMetadataJpaRepository fileMetadataRepo;
+    @Mock
+    private VbdiFilesJsonbSync vbdiFilesJsonbSync;
+    @Mock
+    private VbdenFilesJsonbSync vbdenFilesJsonbSync;
 
     @AfterEach
     void clearTenantContext() {
@@ -41,7 +45,7 @@ class CopyDocumentFilesUseCaseImplTest {
     }
 
     private CopyDocumentFilesUseCaseImpl newUseCase() {
-        return new CopyDocumentFilesUseCaseImpl(minioService, fileMetadataRepo);
+        return new CopyDocumentFilesUseCaseImpl(minioService, fileMetadataRepo, vbdiFilesJsonbSync, vbdenFilesJsonbSync);
     }
 
     @Test
@@ -96,6 +100,9 @@ class CopyDocumentFilesUseCaseImplTest {
         // Bugfix 09/09/2026 (xem javadoc FileMetadataEntity#isShared): NOT NULL o DB - dong copy
         // moi phai la false tuong minh, khong duoc null.
         assertThat(saved.getIsShared()).isFalse();
+        // Bugfix 28/09/2026: danh sach vbdi/vbden doc dynamic_fields.files - phai dong bo lai dich.
+        verify(vbdiFilesJsonbSync).syncIfVbdiDocument(targetDocumentId);
+        verify(vbdenFilesJsonbSync).syncIfVbdenDocument(targetDocumentId);
     }
 
     // Bugfix 09/09/2026: du nguon la 1 dong "dung chung" (isShared=true, vd ban forward_unit), ban

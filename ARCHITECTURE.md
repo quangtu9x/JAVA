@@ -681,6 +681,45 @@ làm ví dụ ĐÃ SỬA ĐÚNG chuẩn).
   tệp × số người dùng), không phình theo số sự kiện/số biến thể — tối ưu cả lưu trữ lẫn hiệu năng đọc
   (không cần pivot/group ở tầng ứng dụng, FE nhận sẵn 1 dòng/thực thể).
 
+### 7. Tệp đính kèm "đã được thay thế" (`file_metadata.superseded_at`) — từ 24/09/2026
+
+- Muốn ẩn tệp cũ mà KHÔNG xoá (ví dụ "Cập nhật VB" của văn bản đến, khi bản gửi lại mang bộ tệp mới) thì
+  gọi `SupersedeDocumentFilesUseCase.execute(documentId, fileIds, supersededBy)`. Hàm này ghi
+  `superseded_at`/`superseded_by`, KHÔNG xoá dòng và KHÔNG xoá object MinIO.
+- `FileMetadataEntity` có `@SQLRestriction("superseded_at IS NULL")`, nên **mọi** truy vấn JPA trên
+  entity tự bỏ qua tệp đã thay thế: liệt kê, tải/xem, đổi tên, xoá, ký số, copy, chuẩn bị tệp gửi đi,
+  đồng bộ `dynamic_fields.files`. Không cần (và không được) tự thêm điều kiện lọc ở từng nơi gọi. Tệp đã
+  thay thế không còn đường tải nào qua API — đây là yêu cầu nghiệp vụ.
+- Ngoại lệ đã biết: `em.find`/`JpaRepository.findById(id)` có thể KHÔNG áp restriction, tuỳ phiên bản
+  Hibernate. Hiện chỉ có `JavaMailEmailSender` và `BuildOnlyOfficeEditorConfigUseCaseImpl` dùng
+  `findById`, và chỉ trên tệp dự thảo/email (không bao giờ bị thay thế). Code mới phải tra theo
+  `findByIdAndDocumentId`, không dùng `findById`.
+- Tên tệp đã thay thế chỉ nên hiển thị qua snapshot của bảng lịch sử nghiệp vụ tương ứng (ví dụ
+  `vbden_update_history_documents.update_obj.superseded_files`). Muốn đọc lại dòng tệp đã thay thế thì
+  phải dùng native SQL có chủ đích.
+- Worker (`td-woker`) INSERT thẳng vào `file_metadata` bằng JDBC mà không ghi 2 cột mới. Cột nullable
+  nên giá trị mặc định là NULL (tệp hiện hành), không cần sửa worker.
+
+### 8. "Thứ tự hiển thị" (`sortOrder`) — quy ước bắt buộc, từ 24–25/09/2026
+
+Áp dụng cho MỌI thực thể có ô "Thứ tự hiển thị", cả thực thể mới lẫn thực thể sửa lại:
+
+- **Tạo mới mặc định 99**, không phải 0. Danh sách sắp tăng dần, nên để 0 thì bản ghi mới luôn nhảy lên
+  đầu. Request tạo mới dùng `Integer sortOrder = DEFAULT_SORT_ORDER`, và use case quy `null` về 99
+  (xem `CreateAppUserRequest` / `CreateCategoryRequest` / `CreatePrivateCategoryRequest`).
+- **Ô trống khi Lưu thì lưu 99**, cả thêm mới lẫn sửa. Giá trị người dùng nhập, kể cả 0, giữ nguyên.
+- **Sắp xếp danh sách**: `sortOrder` ASC → tên ASC → một khoá duy nhất (`username` / `code`) để phân
+  trang ổn định. `sortBy` do caller truyền vào làm tiêu chí chính, các tiêu chí mặc định còn lại nối sau
+  (mẫu: `SearchAppUsersUseCase#buildPageable`, `SearchCategoriesUseCase`,
+  `SearchPrivateCategoriesUseCase`). Sắp trong bộ nhớ thì so tên bằng `Collator` vi-VN.
+- **FE**: dùng `ThanhHoaDEV/src/utils/sortOrder.js` (`DEFAULT_SORT_ORDER`, `normalizeSortOrder`,
+  `applySortOrderToPayload`). Không viết lại `?? 0` hay `|| 0`.
+- **Bẫy tên field**: form FE còn giữ tên Domino `sort_order`, nhưng DTO Java là `sortOrder`. Jackson
+  (`application.yml`) chỉ bật `accept-case-insensitive-properties`, KHÔNG map snake_case sang camelCase, và
+  `fail-on-unknown-properties: false`, nên key sai tên bị bỏ qua mà không báo lỗi. Lỗi này đã khiến ô thứ
+  tự của mọi danh mục không được lưu cho tới 24/09/2026. Lớp API FE phải đổi tên trước khi gửi
+  (`applySortOrderToPayload`). Khi thêm field mới, kiểm tra tên key thật trong request.
+
 ---
 
 ## Deployment

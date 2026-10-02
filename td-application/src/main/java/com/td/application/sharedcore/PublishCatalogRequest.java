@@ -21,4 +21,7 @@ public class PublishCatalogRequest {
     private String get;
 
     private String databasetype;
+
+    /** 01/10/2026: {@code get=kythualenh} — id tổ chức "Cấp ban hành" đã chọn (xem GetKyThuaLenhSignersUseCase). */
+    private String capbanhanhid;
 }

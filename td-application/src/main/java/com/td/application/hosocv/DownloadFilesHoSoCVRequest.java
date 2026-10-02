@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * BL-240 (HoSoCV Core) — DoD (4): request cho {@code POST /api/v1/hosocv/GetAllFile}. Tương ứng
@@ -16,4 +17,11 @@ import java.util.List;
 public class DownloadFilesHoSoCVRequest {
 
     private List<HoSoFileRefDto> vanBanLienQuan = new ArrayList<>();
+
+    /**
+     * 02/10/2026 (xuất hồ sơ "Tải toàn bộ tệp" — ChiTietPage.jsx#ExportAllFile): có id hồ sơ thì
+     * server TỰ gom văn bản đi/đến đã gắn + "văn bản khác" của hồ sơ (không phụ thuộc trang danh
+     * sách FE đang hiển thị), gộp với {@link #vanBanLienQuan} nếu có.
+     */
+    private UUID hosocvId;
 }

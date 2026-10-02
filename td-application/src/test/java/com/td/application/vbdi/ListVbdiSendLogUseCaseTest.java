@@ -28,12 +28,15 @@ class ListVbdiSendLogUseCaseTest {
 
     @Mock
     private VbdiSendLogDocumentRepository repository;
+    @Mock
+    private com.td.application.sharedcore.AppUserRepository appUserRepository;
 
     private ListVbdiSendLogUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new ListVbdiSendLogUseCase(repository);
+        useCase = new ListVbdiSendLogUseCase(repository,
+            new com.td.application.sharedcore.UserFullNameResolver(appUserRepository));
     }
 
     @Test
@@ -59,8 +62,33 @@ class ListVbdiSendLogUseCaseTest {
         assertThat(item.get("recipient_identifier")).isEqualTo("hoangnt.skhcn");
         assertThat(item.get("status")).isEqualTo("Gửi văn bản");
         assertThat(item.get("content")).isEqualTo("y kien gui kem");
+        // Khong tra duoc ho so -> giu gia tri da luu; username gốc luon co o field an.
         assertThat(item.get("user_creator")).isEqualTo("xuanlt.skhcn");
+        assertThat(item.get("user_creator_username")).isEqualTo("xuanlt.skhcn");
         assertThat(item.get("created")).asString().matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}");
+    }
+
+    // 28/09/2026: dong luu tai khoan -> hien TEN DAY DU; dong cu da luu ten/"He thong tiep nhan" giu nguyen.
+    @Test
+    void execute_shouldResolveFullNameAndKeepUsernameHidden() {
+        UUID parentId = UUID.randomUUID();
+        var byUsername = new VbdiSendLogDocument(parentId, VbdiSendType.SEND_DOCUMENT,
+            VbdiSendRecipientGroup.CONTACT_UNIT, "H05.02", "So NN", null, "Gửi văn bản", null, "skhcn");
+        var bySystem = new VbdiSendLogDocument(parentId, "phan_hoi_trang_thai",
+            VbdiSendRecipientGroup.CONTACT_UNIT, "H05.02", "So NN", null, "Đã đến", null, "Hệ thống tiếp nhận");
+        var appUser = org.mockito.Mockito.mock(com.td.domain.sharedcore.AppUser.class);
+        when(appUser.getFullName()).thenReturn("Văn thư Sở KHCN");
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("skhcn")).thenReturn(java.util.Optional.of(appUser));
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("Hệ thống tiếp nhận")).thenReturn(java.util.Optional.empty());
+        when(repository.findByParentId(eq(parentId), any(Pageable.class)))
+            .thenReturn(new PageImpl<>(List.of(byUsername, bySystem), PageRequest.of(0, 20), 2));
+
+        var request = new ListVbdiSendLogRequest();
+        request.setDocumentId(parentId);
+        var items = useCase.execute(request).getItems();
+
+        assertThat(items.get(0)).containsEntry("user_creator", "Văn thư Sở KHCN").containsEntry("user_creator_username", "skhcn");
+        assertThat(items.get(1)).containsEntry("user_creator", "Hệ thống tiếp nhận");
     }
 
     @Test

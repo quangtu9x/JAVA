@@ -95,6 +95,8 @@ public class ThuHoiVanBanDiUseCase {
     private final DocumentCacheService documentCacheService;
     private final AddDraftProcessDocumentUseCase addDraftProcessDocumentUseCase;
     private final CurrentUserProvider currentUserProvider;
+    // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
+    private final DraftProcessActorFields draftProcessActorFields;
 
     public Result<UUID> execute(ThuHoiVanBanDiRequest request) {
         var draftOptional = duThaoDocumentRepository.findById(request.getId());
@@ -175,7 +177,7 @@ public class ThuHoiVanBanDiUseCase {
             if (opinion != null && !opinion.isBlank()) {
                 processFields.put(PROCESS_OPINION_FIELD, opinion);
             }
-            processFields.put(PROCESS_CREATOR_FIELD, currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME));
+            draftProcessActorFields.put(processFields, currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME));
             processRequest.setFields(processFields);
 
             addDraftProcessDocumentUseCase.execute(processRequest);

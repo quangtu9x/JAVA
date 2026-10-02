@@ -632,9 +632,58 @@ class ChuyenXuLyVbdenUseCaseTest {
 
         Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
         assertThat((List<?>) updatedFields.get("chuyenxuly_obj")).hasSize(1);
+        // 27/09/2026: dung hop dong Domino TDUlties.updateChuyenXuLyHistory (FE doc user_creator/timeupdate).
+        Map<?, ?> entry = (Map<?, ?>) ((List<?>) updatedFields.get("chuyenxuly_obj")).get(0);
+        assertThat(entry.get("user_creator")).isEqualTo("vanthu01");
+        assertThat(entry.get("user_process")).isEqualTo("nguyenvana");
+        assertThat(entry.get("timeupdate").toString()).matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}");
+        assertThat(entry.get("opinion")).isEqualTo("Xin y kien");
+        assertThat(entry.containsKey("nguoi_chuyen")).isFalse();
+        assertThat(entry.containsKey("thoi_gian")).isFalse();
 
         verify(documentLogService).logUpdate(eq(parent.getId()), any(), any());
         verify(documentCacheService).evict(parent.getId());
+    }
+
+    @Test
+    void execute_shouldFillUnitAndUserFromObjWhenPlainFieldsBlank() {
+        BusinessDocument parent = newDocument("vbden", "{}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("leaderA"));
+        when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("phanxuly");
+        request.setUserProcessObj("[{\"username\":\"demo3\",\"identifier\":\"H05.01.01\"}]");
+
+        useCase.execute(request);
+
+        Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        Map<?, ?> entry = (Map<?, ?>) ((List<?>) updatedFields.get("chuyenxuly_obj")).get(0);
+        assertThat(entry.get("user_creator")).isEqualTo("leaderA");
+        assertThat(entry.get("user_process")).isEqualTo("demo3;");
+        assertThat(entry.get("unit_process")).isEqualTo("H05.01.01;");
+    }
+
+    @Test
+    void execute_withCoordinateOnlyAction_shouldNotAppendChuyenXuLyHistory() {
+        BusinessDocument parent = newDocument("vbden", "{}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("leaderA"));
+        when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenphoihop");
+        request.setUserCoordinate("demo4");
+
+        useCase.execute(request);
+
+        Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat(updatedFields.get("chuyenxuly_obj")).isNull();
     }
 
     // R8 (22/08/2026): moi nguoi moi duoc giao chu tri (newAssignees) phai duoc ghi 1 node vao

@@ -8,6 +8,7 @@ import com.td.application.sharedcore.GetAppUserUseCase;
 import com.td.application.sharedcore.GetKiemNhiemPendingCountUseCase;
 import com.td.application.sharedcore.GetUserOrganizationProfileUseCase;
 import com.td.application.sharedcore.GetUserRoleGroupConfigUseCase;
+import com.td.application.sharedcore.GetUserSignatureImagesUseCase;
 import com.td.application.sharedcore.ListUserDirectoryUseCase;
 import com.td.application.sharedcore.LockAppUsersUseCase;
 import com.td.application.sharedcore.SearchAppUsersUseCase;
@@ -15,6 +16,7 @@ import com.td.application.sharedcore.SwitchUserUseCase;
 import com.td.application.sharedcore.TransferAppUsersUseCase;
 import com.td.application.sharedcore.UnlockAppUsersUseCase;
 import com.td.application.sharedcore.UpdateAppUserUseCase;
+import com.td.application.sharedcore.UploadUserSignatureImageUseCase;
 import com.td.application.sharedcore.UserOrganizationProfileDto;
 import com.td.application.sharedcore.UserRoleGroupConfigDto;
 import com.td.domain.sharedcore.AppUser;
@@ -83,6 +85,10 @@ class SharedCoreUsersControllerTest {
     private GetUserRoleGroupConfigUseCase getUserRoleGroupConfigUseCase;
     @MockBean
     private TdTokenService tdTokenService;
+    @MockBean
+    private UploadUserSignatureImageUseCase uploadUserSignatureImageUseCase;
+    @MockBean
+    private GetUserSignatureImagesUseCase getUserSignatureImagesUseCase;
 
     @Test
     void createUser_withoutOrganizationIdAndLevel_shouldReturn400() throws Exception {

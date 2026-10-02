@@ -14,7 +14,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -39,6 +42,13 @@ import java.util.UUID;
  * nơi nhận hoạt động (nơi nhận đọc thẳng theo {@code objectKey} trả về, không phụ thuộc dòng này).
  * Ghi dòng kiểm toán này lỗi (vd DB tạm thời lỗi) KHÔNG làm hỏng việc trả về tệp đã copy thành công —
  * chỉ log cảnh báo (best-effort, giống các side-effect kiểm toán khác trong module này).</p>
+ *
+ * <p><b>Bổ sung 21/09/2026 (yêu cầu người dùng "Phát hành kèm văn bản đến")</b>:
+ * {@link PrepareVbdiDeliveryFilesRequest#getAdditionalSourceDocumentIds()} — copy THÊM tệp của các
+ * văn bản đến (module {@code vbden}) liên quan, CÙNG namespace/thư mục với tệp của chính văn bản đi
+ * (chỉ khác {@code sourceDocumentId} trong đường dẫn/dòng kiểm toán — không có sự khác biệt cấu trúc
+ * nào khác, đúng tinh thần Domino gốc copy thẳng item file vào document đích, không phân biệt nguồn ở
+ * phía nơi nhận).</p>
  */
 @Slf4j
 @Service
@@ -57,24 +67,52 @@ public class PrepareVbdiDeliveryFilesUseCaseImpl implements PrepareVbdiDeliveryF
         if (request == null || request.getDocumentId() == null) {
             return Result.success(List.of());
         }
-        List<FileMetadataEntity> sourceFiles = fileMetadataRepo.findAllByDocumentId(request.getDocumentId());
         String senderSegment = safeSegment(request.getSenderIdentifier());
         String datePath = LocalDateTime.now().format(DATE_PATH_FORMAT);
 
         List<VbdiDeliveryFileRef> refs = new ArrayList<>();
+        Set<String> attachedNames = normalizeNames(request.getAttachedFilenames());
+        copyAllFilesOf(request.getDocumentId(), senderSegment, datePath, refs, attachedNames);
+
+        // Bo sung 21/09/2026 (yeu cau nguoi dung "Phat hanh kem van ban den"): tep dinh kem cua CAC
+        // van ban den lien quan - dung CHUNG namespace/thu muc voi tep cua chinh van ban di (khong
+        // phan biet nguon o phia nhan, dung tinh than Domino goc copy THANG item vao document dich).
+        if (request.getAdditionalSourceDocumentIds() != null) {
+            for (UUID vbdenId : request.getAdditionalSourceDocumentIds()) {
+                if (vbdenId != null) {
+                    // Bo sung 30/09/2026: tep "Phat hanh kem van ban den" LUON vao "Tep kem theo" o noi nhan.
+                    copyAllFilesOf(vbdenId, senderSegment, datePath, refs, null);
+                }
+            }
+        }
+        return Result.success(refs);
+    }
+
+    /**
+     * {@code attachedNames}: {@code null} = mọi tệp của nguồn này là "Tệp kèm theo" (văn bản đến kèm
+     * theo); khác {@code null} = tệp có tên trong tập là "Tệp kèm theo", còn lại "Tệp ban hành" (văn bản
+     * đi — khớp {@code filesVBdi.jsx} chia nhóm theo {@code tepkemtheo}).
+     */
+    private void copyAllFilesOf(UUID sourceDocumentId, String senderSegment, String datePath,
+            List<VbdiDeliveryFileRef> refs, Set<String> attachedNames) {
+        List<FileMetadataEntity> sourceFiles = fileMetadataRepo.findAllByDocumentId(sourceDocumentId);
         for (FileMetadataEntity source : sourceFiles) {
             try {
-                refs.add(copyOne(source, request.getDocumentId(), senderSegment, datePath));
+                VbdiDeliveryFileRef ref = copyOne(source, sourceDocumentId, senderSegment, datePath);
+                boolean attached = attachedNames == null
+                    || attachedNames.contains(normalizeName(source.getOriginalFilename()));
+                ref.setAttachmentGroup(attached
+                    ? VbdiDeliveryFileRef.GROUP_TEP_KEM_THEO : VbdiDeliveryFileRef.GROUP_TEP_BAN_HANH);
+                refs.add(ref);
             } catch (Exception ex) {
                 // 1 tep loi (vd MinIO tam thoi khong san sang) KHONG duoc lam hong ca lot gui hoac
                 // cac tep khac - bo qua tep nay, ghi log de phat hien, tiep tuc voi cac tep con lai
                 // (xem javadoc interface).
                 log.error("Khong the copy tep dinh kem {} (document {}) sang vi tri luu tru rieng cho "
                         + "lot gui vbdi - BO QUA tep nay, van ban den se thieu dung tep nay",
-                    source.getOriginalFilename(), request.getDocumentId(), ex);
+                    source.getOriginalFilename(), sourceDocumentId, ex);
             }
         }
-        return Result.success(refs);
     }
 
     private VbdiDeliveryFileRef copyOne(FileMetadataEntity source, UUID documentId, String senderSegment, String datePath) {
@@ -125,6 +163,23 @@ public class PrepareVbdiDeliveryFilesUseCaseImpl implements PrepareVbdiDeliveryF
             .contentType(source.getContentType())
             .fileExtension(source.getFileExtension())
             .build();
+    }
+
+    private static Set<String> normalizeNames(List<String> names) {
+        Set<String> result = new HashSet<>();
+        if (names != null) {
+            for (String name : names) {
+                String normalized = normalizeName(name);
+                if (!normalized.isEmpty()) {
+                    result.add(normalized);
+                }
+            }
+        }
+        return result;
+    }
+
+    private static String normalizeName(String name) {
+        return name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
     }
 
     private String safeSegment(String value) {

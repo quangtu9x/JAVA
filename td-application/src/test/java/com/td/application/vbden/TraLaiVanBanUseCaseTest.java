@@ -52,6 +52,8 @@ class TraLaiVanBanUseCaseTest {
     private ProcessDiagramService processDiagramService;
     @Mock
     private com.td.application.documents.AuthorAclFieldsService authorAclFieldsService;
+    @Mock
+    private com.td.application.sharedcore.UserFullNameResolver userFullNameResolver;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
     private TraLaiVanBanUseCase useCase;
@@ -61,7 +63,9 @@ class TraLaiVanBanUseCaseTest {
         useCase = new TraLaiVanBanUseCase(
             documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, resolveIdentifierByLevelUseCase,
-            processDiagramService, authorAclFieldsService);
+            processDiagramService, authorAclFieldsService, userFullNameResolver);
+        lenient().when(userFullNameResolver.resolveForWrite(any(), any()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
     }
@@ -195,6 +199,26 @@ class TraLaiVanBanUseCaseTest {
         assertThat(childRequest.getFields()).containsEntry("identifier", "H05.01");
         String snapshot = childRequest.getFields().get("user_process_obj");
         assertThat(snapshot).contains("\"username\":\"lpha\"").contains("\"name\":\"Le Phu Ha\"");
+    }
+
+    // 30/09/2026: cột "Người thực hiện" (creator) = TÊN ĐẦY ĐỦ, tài khoản giữ ở nguoi_thuc_hien.
+    @Test
+    void execute_shouldStoreFullNameAsCreatorAndUsernameAsNguoiThucHien() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"demo2\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo2"));
+        when(userFullNameResolver.resolveForWrite("demo2", null)).thenReturn("Nguyen Van Demo");
+
+        var request = new TraLaiVanBanRequest();
+        request.setParentid(parent.getId());
+        request.setUserProcess("lpha");
+        useCase.execute(request);
+
+        ArgumentCaptor<AddDynamicDocumentRequest> captor = ArgumentCaptor.forClass(AddDynamicDocumentRequest.class);
+        verify(addVbdenResDocumentUseCase).execute(captor.capture());
+        assertThat(captor.getValue().getFields())
+            .containsEntry("creator", "Nguyen Van Demo")
+            .containsEntry("nguoi_thuc_hien", "demo2");
     }
 
     @Test

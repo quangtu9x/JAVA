@@ -371,6 +371,9 @@ public class GetVbdenDetailUseCase {
         VbdenOrgViewFilter filter = VbdenOrgViewFilter.builder()
             .orgFieldNames(List.of(IDENTIFIER_CREATOR_FIELD))
             .includeFieldValues(Map.of(PARENT_ID_FIELD, List.of(idvbden.toString())))
+            // 30/09/2026: tra cuu chi tiet (khong phai danh sach) - van ban da bi thu hoi (mo tu thung
+            // rac "Bi thu hoi") van phai lay duoc ban ghi so - xem VbdenOrgViewFilter#includeRevoked.
+            .includeRevoked(true)
             .build();
         filter.setOrgValue(flatIdentifier);
         Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(

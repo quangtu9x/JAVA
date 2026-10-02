@@ -56,7 +56,9 @@ public class GetGroupPeopleForIdentifierUseCase {
 
         List<Map<String, Object>> nodes = categories.stream()
             .map(this::toNode)
-            .sorted(Comparator.comparingInt(node -> asInt(node.get("sort_order"))))
+            // 25/09/2026 (quy ước "Thứ tự hiển thị"): thứ tự tăng dần, trùng số thì theo tên A-Z.
+            .sorted(Comparator.<Map<String, Object>>comparingInt(node -> asInt(node.get("sort_order")))
+                .thenComparing(node -> String.valueOf(node.getOrDefault("name", "")), java.text.Collator.getInstance(new java.util.Locale("vi", "VN"))))
             .toList();
 
         return Result.success(nodes);

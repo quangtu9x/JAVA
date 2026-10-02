@@ -27,4 +27,12 @@ public class OnlyOfficeEditorConfigRequest {
      * tầng web) để giữ đúng ranh giới kiến trúc hiện có.
      */
     private String fallbackCallbackBaseUrl;
+
+    /**
+     * Bổ sung 30/09/2026 (yêu cầu người dùng: "Đọc tệp đính kèm" mở Word/Excel bằng OnlyOffice CHỈ
+     * XEM): {@code true} = {@code editorConfig.mode="view"}, {@code permissions.edit=false}, KHÔNG có
+     * callbackUrl (không bao giờ lưu), key riêng (không nhập vào phiên đang sửa). Mặc định {@code false}
+     * giữ nguyên hành vi sửa trực tuyến cũ.
+     */
+    private boolean viewOnly;
 }

@@ -48,17 +48,29 @@ public class SearchCategoriesUseCase {
         }
     }
 
+    // 24/09/2026 (yêu cầu người dùng, cùng quy ước "Người dùng" - SearchAppUsersUseCase): ưu tiên
+    // "Thứ tự hiển thị" tăng dần, sau đó Tên A-Z, cuối cùng Mã (chỉ để phân trang ổn định khi trùng cả 2).
+    // sortBy caller truyền vào làm tiêu chí CHÍNH, các tiêu chí mặc định còn lại nối sau làm tiêu chí phụ.
+    private static final List<String> DEFAULT_SORT_CHAIN = List.of("sortOrder", "name", "code");
+
     private Pageable buildPageable(SearchCategoriesRequest req) {
         String sortBy = (req.getSortBy() == null || req.getSortBy().isBlank())
-            ? "sortOrder" : req.getSortBy();
+            ? "sortOrder" : req.getSortBy().trim();
 
         Sort.Direction direction = "desc".equalsIgnoreCase(req.getSortDirection())
             ? Sort.Direction.DESC : Sort.Direction.ASC;
 
+        Sort sort = Sort.by(direction, sortBy);
+        for (String secondary : DEFAULT_SORT_CHAIN) {
+            if (!secondary.equals(sortBy)) {
+                sort = sort.and(Sort.by(Sort.Direction.ASC, secondary));
+            }
+        }
+
         return PageRequest.of(
             Math.max(0, req.getPageNumber()),
             Math.min(Math.max(1, req.getPageSize()), 200),
-            Sort.by(direction, sortBy)
+            sort
         );
     }
 }

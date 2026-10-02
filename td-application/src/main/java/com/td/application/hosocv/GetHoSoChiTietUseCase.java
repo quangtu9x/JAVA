@@ -59,6 +59,8 @@ public class GetHoSoChiTietUseCase {
     private final DuThaoDocumentRepository duThaoDocumentRepository;
     private final VbdiDocumentRepository vbdiDocumentRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    // 02/10/2026: van_ban_lien_quan gom thêm "văn bản khác" của hồ sơ - xem LuuVanBanKhacUseCase.
+    private final HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
     public Result<Map<String, Object>> execute(GetHoSoChiTietRequest request) {
         UUID id = parseUuid(request == null ? null : request.getId());
@@ -83,7 +85,10 @@ public class GetHoSoChiTietUseCase {
         Map<String, Object> dynamicFields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
         allFields.putAll(dynamicFields);
 
-        allFields.put("van_ban_lien_quan", collectLinkedVanBan(dynamicFields));
+        List<Map<String, Object>> vanBanLienQuan = collectLinkedVanBan(dynamicFields);
+        hoSoVanBanKhacFinder.findByHoSo(document.getId()).forEach(vanBanKhac -> vanBanLienQuan.add(
+            vanBanSummary(vanBanKhac.getDocumentType(), vanBanKhac.getId(), vanBanKhac.getTitle(), vanBanKhac.getStatus())));
+        allFields.put("van_ban_lien_quan", vanBanLienQuan);
         allFields.put("lich_su_xu_ly", collectProcessHistory(document.getId()));
 
         return Result.success(allFields);

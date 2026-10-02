@@ -86,35 +86,52 @@ public class BuildOnlyOfficeEditorConfigUseCaseImpl implements BuildOnlyOfficeEd
                     + "(địa chỉ Document Server dùng để gọi ngược vào Backend)");
         }
 
+        boolean viewOnly = request.isViewOnly();
         String contentToken = accessTokenService.issue(
                 OnlyOfficeAccessTokenService.PURPOSE_CONTENT, tenantId, documentId, request.getFileId(),
                 username, Duration.ofMinutes(onlyOfficeProperties.getContentTokenTtlMinutes()));
-        String callbackToken = accessTokenService.issue(
-                OnlyOfficeAccessTokenService.PURPOSE_CALLBACK, tenantId, documentId, request.getFileId(),
-                username, Duration.ofMinutes(onlyOfficeProperties.getCallbackTokenTtlMinutes()));
 
         String documentUrl = baseUrl + "/api/v1/onlyoffice/content?token=" + urlEncode(contentToken);
-        String callbackUrl = baseUrl + "/api/v1/onlyoffice/callback?token=" + urlEncode(callbackToken);
 
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("title", displayName);
         document.put("url", documentUrl);
         document.put("fileType", extension);
-        document.put("key", buildDocumentKey(file));
-        document.put("permissions", Map.of("edit", true, "download", true, "print", true));
+        // 30/09/2026: chế độ chỉ xem dùng key RIÊNG — không nhập vào phiên đồng soạn thảo đang mở của
+        // cùng tệp (xem javadoc OnlyOfficeEditorConfigRequest#viewOnly).
+        document.put("key", viewOnly ? buildViewDocumentKey(file) : buildDocumentKey(file));
+        document.put("permissions", viewOnly
+                ? Map.of("edit", false, "download", true, "print", true, "comment", false, "chat", false)
+                : Map.of("edit", true, "download", true, "print", true));
 
         Map<String, Object> user = new LinkedHashMap<>();
         user.put("id", username);
         user.put("name", username);
 
         Map<String, Object> customization = new LinkedHashMap<>();
-        customization.put("forcesave", true);
+        if (!viewOnly) {
+            customization.put("forcesave", true);
+        } else {
+            // 30/09/2026 (yêu cầu người dùng, ảnh chụp): chế độ xem ẩn thanh menu (Tệp/Xem/Plugin/AI),
+            // cột trái (tìm kiếm/bình luận/chat/điều hướng/thông tin), thanh trạng thái và plugin (gồm AI).
+            customization.put("layout", Map.of(
+                    "toolbar", false,
+                    "leftMenu", false,
+                    "rightMenu", false,
+                    "statusBar", false));
+            customization.put("plugins", false);
+        }
         customization.put("close", Map.of("visible", true, "text", "Đóng"));
 
         Map<String, Object> editorConfig = new LinkedHashMap<>();
-        editorConfig.put("mode", "edit");
+        editorConfig.put("mode", viewOnly ? "view" : "edit");
         editorConfig.put("lang", "vi");
-        editorConfig.put("callbackUrl", callbackUrl);
+        if (!viewOnly) {
+            String callbackToken = accessTokenService.issue(
+                    OnlyOfficeAccessTokenService.PURPOSE_CALLBACK, tenantId, documentId, request.getFileId(),
+                    username, Duration.ofMinutes(onlyOfficeProperties.getCallbackTokenTtlMinutes()));
+            editorConfig.put("callbackUrl", baseUrl + "/api/v1/onlyoffice/callback?token=" + urlEncode(callbackToken));
+        }
         editorConfig.put("user", user);
         editorConfig.put("customization", customization);
 
@@ -168,11 +185,27 @@ public class BuildOnlyOfficeEditorConfigUseCaseImpl implements BuildOnlyOfficeEd
         return null;
     }
 
-    /** Đổi key mỗi khi nội dung tệp thay đổi (uploadedAt) để Document Server không dùng cache cũ. */
+    /**
+     * Đổi key mỗi khi nội dung tệp thay đổi (uploadedAt) để Document Server không dùng cache cũ.
+     *
+     * <p>Bổ sung 25/09/2026: từ khi bản sửa lưu thành TỆP MỚI (tệp gốc không còn đổi uploadedAt), key
+     * thêm hậu tố = số tệp đã sửa ra từ tệp gốc này — sau mỗi lần 1 phiên sửa lưu xong, lần mở tiếp theo
+     * có key MỚI (phiên mới, tạo tệp mới khác), không dùng lại phiên/cache đã đóng. Những người mở CÙNG
+     * lúc (chưa ai lưu) vẫn cùng key -> vẫn cùng phiên đồng soạn thảo như trước.</p>
+     */
     private String buildDocumentKey(FileMetadataEntity file) {
         String version = file.getUploadedAt() != null ? file.getUploadedAt().toString() : String.valueOf(System.currentTimeMillis());
-        String raw = "oo_" + file.getId() + "_" + version;
+        long editedCount = fileMetadataRepository.countBySourceFileId(file.getId());
+        String raw = "oo_" + file.getId() + "_" + version + "_e" + editedCount;
         String sanitized = raw.replaceAll("[^a-zA-Z0-9_-]", "_");
+        return sanitized.length() > 128 ? sanitized.substring(0, 128) : sanitized;
+    }
+
+    // 30/09/2026: key chế độ chỉ xem — theo phiên bản nội dung tệp (uploadedAt), không kèm số bản đã sửa
+    // (tệp gốc không đổi nội dung), tiền tố khác "oo_" để không trùng phiên sửa.
+    private String buildViewDocumentKey(FileMetadataEntity file) {
+        String version = file.getUploadedAt() != null ? file.getUploadedAt().toString() : String.valueOf(System.currentTimeMillis());
+        String sanitized = ("oov_" + file.getId() + "_" + version).replaceAll("[^a-zA-Z0-9_-]", "_");
         return sanitized.length() > 128 ? sanitized.substring(0, 128) : sanitized;
     }
 

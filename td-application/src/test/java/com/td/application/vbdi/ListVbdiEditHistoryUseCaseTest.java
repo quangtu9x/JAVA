@@ -32,12 +32,15 @@ class ListVbdiEditHistoryUseCaseTest {
 
     @Mock
     private VbdiEditHistoryDocumentRepository repository;
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private com.td.application.sharedcore.AppUserRepository appUserRepository;
 
     private ListVbdiEditHistoryUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new ListVbdiEditHistoryUseCase(repository);
+        useCase = new ListVbdiEditHistoryUseCase(
+            new com.td.application.sharedcore.UserFullNameResolver(appUserRepository), repository);
     }
 
     @Test
@@ -48,7 +51,7 @@ class ListVbdiEditHistoryUseCaseTest {
         var e2 = new VbdiEditHistoryDocument(parentId, "vbdi",
             "{\"priority\":{\"oldvalue\":\"Thường\",\"newvalue\":\"Khẩn\"}}", "Nguyen Van A", "skhcn");
 
-        when(repository.findByParentIdAsc(eq(parentId), any(Pageable.class)))
+        when(repository.findByParentIdNewestFirst(eq(parentId), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of(e1, e2), PageRequest.of(0, 20), 2));
 
         var request = new ListVbdiEditHistoryRequest();
@@ -70,7 +73,7 @@ class ListVbdiEditHistoryUseCaseTest {
         assertThat(response.getItems().get(0).get("created")).asString().matches("\\d{2}/\\d{2}/\\d{4} \\d{2}:\\d{2}:\\d{2}");
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(repository).findByParentIdAsc(eq(parentId), pageableCaptor.capture());
+        verify(repository).findByParentIdNewestFirst(eq(parentId), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageNumber()).isZero();
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(20);
     }
@@ -78,7 +81,7 @@ class ListVbdiEditHistoryUseCaseTest {
     @Test
     void execute_shouldClampPageSizeAboveMax() {
         UUID parentId = UUID.randomUUID();
-        when(repository.findByParentIdAsc(eq(parentId), any(Pageable.class)))
+        when(repository.findByParentIdNewestFirst(eq(parentId), any(Pageable.class)))
             .thenReturn(new PageImpl<>(List.of()));
 
         var request = new ListVbdiEditHistoryRequest();
@@ -89,7 +92,7 @@ class ListVbdiEditHistoryUseCaseTest {
         useCase.execute(request);
 
         ArgumentCaptor<Pageable> pageableCaptor = ArgumentCaptor.forClass(Pageable.class);
-        verify(repository).findByParentIdAsc(eq(parentId), pageableCaptor.capture());
+        verify(repository).findByParentIdNewestFirst(eq(parentId), pageableCaptor.capture());
         assertThat(pageableCaptor.getValue().getPageNumber()).isEqualTo(2); // 3-1
         assertThat(pageableCaptor.getValue().getPageSize()).isEqualTo(200); // MAX_PAGE_SIZE
     }

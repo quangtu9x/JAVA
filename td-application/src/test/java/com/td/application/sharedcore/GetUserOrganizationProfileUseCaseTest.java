@@ -96,6 +96,10 @@ class GetUserOrganizationProfileUseCaseTest {
         // vì mã định danh mnemonic) — tương đương vai trò UNID Domino.
         assertThat(dto.getParentIds()).isEqualTo(
             department.getId() + ";" + unit.getId() + ";" + agency.getId() + ";" + agencyLevel.getId() + ";");
+        // Bổ sung 25/09/2026: "parents" — chuỗi TÊN tổ tiên, cùng thứ tự với parentids (FE
+        // getTenDonvi_by_level/find_tendonvi đọc field này).
+        assertThat(dto.getParents()).isEqualTo(
+            "Tổ Hành chính;Phòng Kế hoạch - Tài chính;Văn phòng Bộ;Tỉnh A;");
     }
 
     @Test
@@ -113,6 +117,7 @@ class GetUserOrganizationProfileUseCaseTest {
         assertThat(dto.getCapLanhDao()).isEmpty();
         assertThat(dto.getIdentifiers()).isEmpty();
         assertThat(dto.getParentIds()).isEmpty();
+        assertThat(dto.getParents()).isEmpty();
     }
 
     // BL-118: "Kiêm nhiệm" — user_other_obj thật (đối chiếu BE_THANHHOA

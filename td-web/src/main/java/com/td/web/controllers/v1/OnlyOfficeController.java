@@ -51,7 +51,8 @@ import java.util.UUID;
  * BTEAdapter, xem {@code tdeditor.js#TDSuaTepDinhKem} và icon mới ở FE {@code duthaofile.jsx}).
  * Độc lập hoàn toàn với {@link DocumentsController}/{@link DuThaoController} — chỉ ĐỌC dữ liệu qua
  * {@link GetFileUseCase} (dùng lại, không sửa) và ghi qua {@link SaveOnlyOfficeCallbackUseCase}
- * (mới, ghi ĐÈ đúng vị trí MinIO hiện có — xem javadoc use case đó).
+ * (từ 25/09/2026 lưu bản sửa thành TỆP MỚI, không ghi đè tệp gốc — xem javadoc
+ * {@link SaveOnlyOfficeCallbackRequest}).
  *
  * <p>3 endpoint, 2 mô hình xác thực KHÁC NHAU (xem {@code docs/architecture} nếu cần, hoặc javadoc
  * {@code OnlyOfficeAccessTokenService}):</p>
@@ -72,6 +73,8 @@ public class OnlyOfficeController extends BaseController {
 
     private final BuildOnlyOfficeEditorConfigUseCase buildOnlyOfficeEditorConfigUseCase;
     private final SaveOnlyOfficeCallbackUseCase saveOnlyOfficeCallbackUseCase;
+    private final com.td.application.onlyoffice.GetOnlyOfficeEditedFileUseCase getOnlyOfficeEditedFileUseCase;
+    private final com.td.application.onlyoffice.LinkOnlyOfficeEditedFileToProcessUseCase linkOnlyOfficeEditedFileToProcessUseCase;
     private final GetFileUseCase getFileUseCase;
     private final MinioService minioService;
     private final OnlyOfficeAccessTokenService accessTokenService;
@@ -90,14 +93,49 @@ public class OnlyOfficeController extends BaseController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> getEditorConfig(
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @Parameter(description = "File ID", required = true) @PathVariable UUID fileId,
+            @Parameter(description = "\"view\" = chỉ xem (không sửa/lưu); bỏ trống = sửa trực tuyến")
+            @RequestParam(name = "mode", required = false) String mode,
             HttpServletRequest servletRequest) {
         var request = OnlyOfficeEditorConfigRequest.builder()
                 .documentId(documentId)
                 .fileId(fileId)
                 .fallbackCallbackBaseUrl(resolveFallbackBaseUrl(servletRequest))
+                .viewOnly("view".equalsIgnoreCase(mode))
                 .build();
         var result = buildOnlyOfficeEditorConfigUseCase.execute(request);
         return ok(result);
+    }
+
+    // Yêu cầu người dùng 25/09/2026 (OnlyOffice lưu bản sửa thành TỆP MỚI): FE hỏi phiên soạn thảo vừa
+    // đóng đã lưu ra tệp mới nào — xem javadoc GetOnlyOfficeEditedFileUseCase. data = null khi chưa có.
+    @GetMapping("/files/{fileId}/edited-file")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Tệp mới do 1 phiên sửa trực tuyến (OnlyOffice) lưu ra từ tệp gốc",
+            description = "key = document.key của editor-config phiên đó. Trả data=null nếu phiên chưa lưu ra tệp nào.")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getEditedFile(
+            @Parameter(description = "File ID tệp gốc", required = true) @PathVariable UUID fileId,
+            @Parameter(description = "document.key của phiên soạn thảo", required = true) @RequestParam String key) {
+        return ResponseEntity.ok(ApiResponse.success(getOnlyOfficeEditedFileUseCase.execute(fileId, key).orElse(null)));
+    }
+
+    // Yêu cầu người dùng 25/09/2026: gắn tệp mới (do sửa trực tuyến tạo ra) vào dòng "Quá trình xử lý" vừa
+    // ghi — để tệp hiện ngay dưới vết "Đã sửa". Xem javadoc LinkOnlyOfficeEditedFileToProcessUseCase.
+    @PostMapping("/files/{fileId}/link-process")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Gắn tệp đã sửa trực tuyến (OnlyOffice) vào 1 dòng quá trình xử lý dự thảo")
+    public ResponseEntity<ApiResponse<Void>> linkEditedFileToProcess(
+            @Parameter(description = "File ID tệp MỚI (đã sửa)", required = true) @PathVariable UUID fileId,
+            @RequestBody Map<String, Object> body) {
+        // body: {processId, description} — description = chuỗi chi tiết sửa từ tệp nào/thay bằng tệp nào
+        // (lưu vào file_metadata.description, cùng cách luồng ký số tdsignJavaFile.js).
+        UUID processId;
+        try {
+            processId = body == null || body.get("processId") == null ? null : UUID.fromString(String.valueOf(body.get("processId")));
+        } catch (IllegalArgumentException ex) {
+            processId = null;
+        }
+        String description = body == null || body.get("description") == null ? null : String.valueOf(body.get("description"));
+        return ok(linkOnlyOfficeEditedFileToProcessUseCase.execute(fileId, processId, description));
     }
 
     @GetMapping("/content")
@@ -186,6 +224,10 @@ public class OnlyOfficeController extends BaseController {
                                 .fileId(claims.fileId())
                                 .content(new ByteArrayInputStream(content))
                                 .contentLength(content.length)
+                                // 25/09/2026: lưu thành TỆP MỚI theo phiên (document.key) — xem javadoc
+                                // SaveOnlyOfficeCallbackRequest.
+                                .editSessionKey(payload.get("key") instanceof String key ? key : null)
+                                .username(claims.username())
                                 .build()));
                 if (!saveResult.isSuccess()) {
                     log.error("OnlyOffice /callback: luu tep that bai - {}", saveResult.getError());

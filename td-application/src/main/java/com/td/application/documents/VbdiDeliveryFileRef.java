@@ -29,4 +29,16 @@ public class VbdiDeliveryFileRef {
     private String contentType;
     /** Phần mở rộng ngắn (vd "pdf") - khớp {@code FileMetadataEntity#fileExtension}, dùng cho hiển thị. */
     private String fileExtension;
+
+    /** Nhóm hiển thị phía nơi nhận: {@value #GROUP_TEP_BAN_HANH} hoặc {@value #GROUP_TEP_KEM_THEO}. */
+    public static final String GROUP_TEP_BAN_HANH = "tepbanhanh";
+    public static final String GROUP_TEP_KEM_THEO = "tepkemtheo";
+
+    /**
+     * Bổ sung 30/09/2026 (yêu cầu người dùng: văn bản đến nhận được phải chia "Tệp ban hành"/"Tệp kèm
+     * theo" như chi tiết văn bản đi; tệp từ "Phát hành kèm tệp văn bản đến" vào "Tệp kèm theo") — tên
+     * field động phía nơi nhận mà tệp này thuộc về. Worker ghi tên tệp vào field cùng tên trên văn bản
+     * đến vừa tạo. {@code null} (message cũ trước bản vá) = không phân nhóm.
+     */
+    private String attachmentGroup;
 }

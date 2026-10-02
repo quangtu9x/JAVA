@@ -15,6 +15,8 @@ public class PostgresDocumentRepository extends DocumentRepository {
 	private static final String USER_PROCESS_FIELD = "user_process";
 	private static final String USER_PROCESSED_FIELD = "user_processed";
 	private static final String PARENT_ID_FIELD = "parentid";
+	// 01/10/2026: dinh danh field dong an toan de noi vao SQL (xem appendKeywordPredicate).
+	private static final java.util.regex.Pattern SAFE_FIELD_NAME = java.util.regex.Pattern.compile("^[A-Za-z0-9_]{1,100}$");
 
 	public PostgresDocumentRepository(DocumentJpaRepository jpaRepository) {
 		super(jpaRepository);
@@ -34,7 +36,10 @@ public class PostgresDocumentRepository extends DocumentRepository {
 
 	@Override
 	protected void appendPendingForUserPredicate(StringBuilder sql, Map<String, Object> parameters, String username) {
-		sql.append(" AND d.dynamic_fields @> CAST(:userProcessFilter AS jsonb)");
+		// 27/09/2026: + khop thanh vien chuoi "a;b" - xem javadoc DelimitedMemberSql.
+		sql.append(" AND (d.dynamic_fields @> CAST(:userProcessFilter AS jsonb)");
+		DelimitedMemberSql.appendOrMember(sql, parameters, USER_PROCESS_FIELD, username, "userProcessMember");
+		sql.append(")");
 		parameters.put("userProcessFilter", buildUserProcessFilter(username));
 	}
 
@@ -48,7 +53,9 @@ public class PostgresDocumentRepository extends DocumentRepository {
 
 	@Override
 	protected void appendProcessedForUserPredicate(StringBuilder sql, Map<String, Object> parameters, String username) {
-		sql.append(" AND d.dynamic_fields @> CAST(:userProcessedFilter AS jsonb)");
+		sql.append(" AND (d.dynamic_fields @> CAST(:userProcessedFilter AS jsonb)");
+		DelimitedMemberSql.appendOrMember(sql, parameters, USER_PROCESSED_FIELD, username, "userProcessedMember");
+		sql.append(")");
 		parameters.put("userProcessedFilter", buildUserProcessedFilter(username));
 	}
 
@@ -120,7 +127,10 @@ public class PostgresDocumentRepository extends DocumentRepository {
 			String fieldName = fieldNames.get(index);
 			sql.append("(d.dynamic_fields @> CAST(:").append(containsParam).append(" AS jsonb)")
 				.append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-				.append(scalarParam).append(")");
+				.append(scalarParam);
+			// 27/09/2026: + khop thanh vien chuoi "a;b" (vd author) - xem javadoc DelimitedMemberSql.
+			DelimitedMemberSql.appendOrMember(sql, parameters, fieldName, value, "containsFieldMember" + index);
+			sql.append(")");
 			parameters.put(containsParam, buildContainsFilter(fieldName, value));
 			parameters.put(scalarParam, value == null ? "" : value);
 		}
@@ -166,7 +176,10 @@ public class PostgresDocumentRepository extends DocumentRepository {
 				String scalarParam = "anyValScalar" + fieldIndex + "_" + valueIndex;
 				sql.append("(d.dynamic_fields @> CAST(:").append(containsParam).append(" AS jsonb)")
 					.append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-					.append(scalarParam).append(")");
+					.append(scalarParam);
+				DelimitedMemberSql.appendOrMember(
+					sql, parameters, fieldName, value, "anyValMember" + fieldIndex + "_" + valueIndex);
+				sql.append(")");
 				parameters.put(containsParam, buildContainsFilter(fieldName, value));
 				parameters.put(scalarParam, value);
 			}
@@ -222,17 +235,16 @@ public class PostgresDocumentRepository extends DocumentRepository {
 	@Override
 	protected void appendReceivedDateInRangePredicate(
 			StringBuilder sql, Map<String, Object> parameters, LocalDate minReceivedDate, LocalDate maxReceivedDate) {
-		sql.append(" AND (d.dynamic_fields->>'").append(RECEIVED_DATE_FIELD).append("') ~ :receivedDateFormat");
-		parameters.put("receivedDateFormat", DD_MM_YYYY_REGEX);
-
+		// 02/10/2026: dung chung bieu thuc sort "date" (doc ca 3 dang that cua received_date) - truoc
+		// day guard regex dd/MM/yyyy$ loai het VB co gio/ISO (h05_01_sokhcn: chi khop 31/102 VB den).
+		// Gia tri khong doc duoc -> NULL -> so sanh NULL -> khong khop, khong can guard rieng.
+		String receivedDate = dynamicSortExpression(RECEIVED_DATE_FIELD, "date");
 		if (minReceivedDate != null) {
-			sql.append(" AND TO_DATE(d.dynamic_fields->>'").append(RECEIVED_DATE_FIELD)
-				.append("', 'DD/MM/YYYY') >= :minReceivedDate");
+			sql.append(" AND ").append(receivedDate).append(" >= :minReceivedDate");
 			parameters.put("minReceivedDate", java.sql.Date.valueOf(minReceivedDate));
 		}
 		if (maxReceivedDate != null) {
-			sql.append(" AND TO_DATE(d.dynamic_fields->>'").append(RECEIVED_DATE_FIELD)
-				.append("', 'DD/MM/YYYY') <= :maxReceivedDate");
+			sql.append(" AND ").append(receivedDate).append(" <= :maxReceivedDate");
 			parameters.put("maxReceivedDate", java.sql.Date.valueOf(maxReceivedDate));
 		}
 	}
@@ -286,18 +298,48 @@ public class PostgresDocumentRepository extends DocumentRepository {
 		if (keyword == null || keyword.isBlank() || keywordColumns == null || keywordColumns.isEmpty()) {
 			return;
 		}
+		// 01/10/2026: ten cot den TU CLIENT (request.columns) va bi noi thang vao SQL -> chi nhan dinh danh
+		// an toan [a-zA-Z0-9_], bo qua phan con lai (truoc day khong chan - nguy co SQL injection).
+		List<String> safeColumns = keywordColumns.stream()
+			.filter(column -> column != null && SAFE_FIELD_NAME.matcher(column).matches())
+			.toList();
+		if (safeColumns.isEmpty()) {
+			return;
+		}
+		keywordColumns = safeColumns;
 		String likeValue = "%" + keyword.trim().toLowerCase() + "%";
-		sql.append(" AND (");
+		for (int index = 0; index < keywordColumns.size(); index++) {
+			parameters.put("keyword" + index, likeValue);
+		}
+		// Bugfix 01/10/2026 (bao loi nguoi dung "tim kiem trong danh sach van ban den chua ra ket qua, vd
+		// vbden/thungrac/thungrac"): 2 nguyen nhan, sua tap trung o day cho MOI danh sach vbden:
+		// (1) trich yeu luu o COT TINH title (TiepNhanVbdenUseCase), dynamic_fields.subject gan nhu luon
+		//     vang mat (do DB that skhcn: 4/100) -> cot "subject"/"title" khop them d.title.
+		// (2) ban ghi so "vbden_so" (thung rac/bi thu hoi/so van ban) CHI co document_number/received_date
+		//     - so ky hieu/trich yeu/co quan ban hanh/loai VB nam o VAN BAN GOC (parentid) -> khop them
+		//     van ban goc qua EXISTS.
+		sql.append(" AND (").append(keywordMatch("d", keywordColumns))
+			.append(" OR (d.document_type = 'vbden_so' AND EXISTS (SELECT 1 FROM documents p")
+			.append(" WHERE CAST(p.id AS text) = d.dynamic_fields->>'parentid' AND (")
+			.append(keywordMatch("p", keywordColumns)).append("))))");
+	}
+
+	// Package-private cho unit test SQL builder.
+	static String keywordMatch(String alias, List<String> keywordColumns) {
+		StringBuilder match = new StringBuilder();
 		for (int index = 0; index < keywordColumns.size(); index++) {
 			if (index > 0) {
-				sql.append(" OR ");
+				match.append(" OR ");
 			}
-			String parameterName = "keyword" + index;
-			sql.append("LOWER(COALESCE(d.dynamic_fields->>'").append(keywordColumns.get(index)).append("', ''))")
-				.append(" LIKE :").append(parameterName);
-			parameters.put(parameterName, likeValue);
+			String column = keywordColumns.get(index);
+			String parameterName = ":keyword" + index;
+			match.append("LOWER(COALESCE(").append(alias).append(".dynamic_fields->>'").append(column).append("', ''))")
+				.append(" LIKE ").append(parameterName);
+			if ("subject".equalsIgnoreCase(column) || "title".equalsIgnoreCase(column)) {
+				match.append(" OR LOWER(COALESCE(").append(alias).append(".title, '')) LIKE ").append(parameterName);
+			}
 		}
-		sql.append(")");
+		return match.toString();
 	}
 
 	// N05-style nguoc lai appendFieldEmptyPredicate: field dong PHAI khac rong/vang mat.
@@ -351,9 +393,28 @@ public class PostgresDocumentRepository extends DocumentRepository {
 		if ("integer".equals(sortType)) {
 			return "CAST(CAST(NULLIF(" + path + ", '') AS numeric) AS integer)";
 		}
+		// 02/10/2026: "date" doc ca 3 dang received_date (xem "datetime" ben duoi) nhung CHI lay phan
+		// ngay - sovanban sap ngay den roi so den, gio den khong duoc lam lech thu tu so trong ngay.
+		// Truoc day chi nhan dung "dd/MM/yyyy" - 2 dang con lai tra NULL, bi day xuong cuoi.
 		if ("date".equals(sortType)) {
-			return "(CASE WHEN NULLIF(" + path + ", '') ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'"
-				+ " THEN TO_DATE(" + path + ", 'DD/MM/YYYY') ELSE NULL END)";
+			return "(CASE WHEN " + path + " ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'"
+				+ " THEN TO_DATE(SUBSTRING(" + path + " FROM 1 FOR 10), 'DD/MM/YYYY')"
+				+ " WHEN " + path + " ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'"
+				+ " THEN TO_DATE(SUBSTRING(" + path + " FROM 1 FOR 10), 'YYYY-MM-DD')"
+				+ " ELSE NULL END)";
+		}
+		// 02/10/2026 (theodoi): received_date that co 3 dang - "dd/MM/yyyy HH:mm:ss", "dd/MM/yyyy",
+		// "yyyy-MM-dd" (khao sat h05_01_sokhcn) - "date" chi nhan dang thu 2. Khong dung ky tu ":"
+		// trong SQL (Hibernate hieu nham la parameter): format "HH24 MI SS" - dau cach trong template
+		// TO_TIMESTAMP khop moi ky tu phan cach.
+		if ("datetime".equals(sortType)) {
+			return "(CASE WHEN " + path + " ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4} [0-9]{2}.[0-9]{2}.[0-9]{2}'"
+				+ " THEN TO_TIMESTAMP(SUBSTRING(" + path + " FROM 1 FOR 19), 'DD/MM/YYYY HH24 MI SS')"
+				+ " WHEN " + path + " ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'"
+				+ " THEN TO_TIMESTAMP(SUBSTRING(" + path + " FROM 1 FOR 10), 'DD/MM/YYYY')"
+				+ " WHEN " + path + " ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'"
+				+ " THEN TO_TIMESTAMP(SUBSTRING(" + path + " FROM 1 FOR 10), 'YYYY-MM-DD')"
+				+ " ELSE NULL END)";
 		}
 		return path;
 	}

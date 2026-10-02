@@ -28,6 +28,8 @@ import com.td.application.vbdi.AddVbdiEditHistoryRequest;
 import com.td.application.vbdi.AddVbdiEditHistoryUseCase;
 import com.td.application.vbdi.AddVbdiSeenDocumentRequest;
 import com.td.application.vbdi.AddVbdiSeenDocumentUseCase;
+import com.td.application.vbdi.AddVbdiImportantDocumentRequest;
+import com.td.application.vbdi.AddVbdiImportantDocumentUseCase;
 import com.td.application.vbdi.ChuyenXemDeBietVbdiRequest;
 import com.td.application.vbdi.ChuyenXemDeBietVbdiUseCase;
 import com.td.application.vbdi.AddVbdiUserActionLogRequest;
@@ -126,6 +128,7 @@ public class VbdiController extends BaseController {
     private final AddVbdiUserActionLogUseCase addVbdiUserActionLogUseCase;
     private final ListVbdiUserActionLogUseCase listVbdiUserActionLogUseCase;
     private final AddVbdiSeenDocumentUseCase addVbdiSeenDocumentUseCase;
+    private final AddVbdiImportantDocumentUseCase addVbdiImportantDocumentUseCase;
     private final ChuyenXemDeBietVbdiUseCase chuyenXemDeBietVbdiUseCase;
 
     @PostMapping("/SoanThao")
@@ -297,10 +300,12 @@ public class VbdiController extends BaseController {
                     content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE))
             @RequestParam("file") MultipartFile file,
             @Parameter(description = "Ký cơ quan (dakycoquan)") @RequestParam(value = "coQuan", defaultValue = "false") boolean coQuan) {
-        try {
+        // try-with-resources: đóng stream sau khi upload xong — stream còn mở giữ khoá tệp tạm multipart
+        // trên Windows, Tomcat không xoá được ("Failed to deleted temporary file used for part [file]").
+        try (java.io.InputStream fileStream = file.getInputStream()) {
             var request = new KySoVbdiRequest();
             request.setId(id);
-            request.setFileContent(file.getInputStream());
+            request.setFileContent(fileStream);
             request.setFileName(file.getOriginalFilename());
             request.setMimeType(file.getContentType());
             request.setFileSize(file.getSize());
@@ -495,6 +500,20 @@ public class VbdiController extends BaseController {
             + "hành động nghiệp vụ độc lập)")
     public ResponseEntity<ApiResponse<UUID>> seenDocument(@Valid @RequestBody AddVbdiSeenDocumentRequest request) {
         return ok(addVbdiSeenDocumentUseCase.execute(request));
+    }
+
+    @PostMapping("/AddImportant")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Đánh dấu/bỏ đánh dấu văn bản đi quan trọng - gắn sao (21/09/2026)",
+        description = "Port qlvb/vbdi/addimportant?databasetype=vbdi "
+            + "(DocumentOutProcesses.java#HandleAddImportant) - flag RIÊNG CHO TỪNG NGƯỜI DÙNG "
+            + "(field multivalue MarkImportant trên văn bản, xem javadoc "
+            + "AddVbdiImportantDocumentUseCase). username SERVER-AUTHORITATIVE qua "
+            + "CurrentUserProvider. Không yêu cầu role cập nhật vbdi - hành động cá nhân, không phải "
+            + "sửa nội dung văn bản.")
+    public ResponseEntity<ApiResponse<UUID>> addImportant(
+            @Valid @RequestBody AddVbdiImportantDocumentRequest request) {
+        return ok(addVbdiImportantDocumentUseCase.execute(request));
     }
 
     @PostMapping("/ChuyenXemDeBiet")

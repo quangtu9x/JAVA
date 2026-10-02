@@ -131,7 +131,10 @@ public class PostgresHoSoLuuTruDocumentRepository implements HoSoLuuTruDocumentR
             String fieldName = fieldNames.get(index);
             sql.append("(d.dynamic_fields @> CAST(:").append(containsParam).append(" AS jsonb)")
                 .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-                .append(scalarParam).append(")");
+                .append(scalarParam);
+            // 27/09/2026: + khop thanh vien chuoi "a;b" - xem javadoc DelimitedMemberSql.
+            DelimitedMemberSql.appendOrMember(sql, parameters, fieldName, value, "containsFieldMember" + index);
+            sql.append(")");
             parameters.put(containsParam, buildContainsFilter(fieldName, value));
             parameters.put(scalarParam, value == null ? "" : value);
         }

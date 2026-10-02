@@ -221,10 +221,12 @@ public class CategoriesController extends BaseController {
                     content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE))
             @RequestParam("file") MultipartFile file,
             @Parameter(description = "Mô tả tệp") @RequestParam(value = "description", required = false) String description) {
-        try {
+        // try-with-resources: đóng stream sau khi upload xong — stream còn mở giữ khoá tệp tạm multipart
+        // trên Windows, Tomcat không xoá được ("Failed to deleted temporary file used for part [file]").
+        try (java.io.InputStream fileStream = file.getInputStream()) {
             var request = UploadCategoryFileRequest.builder()
                     .categoryId(id)
-                    .fileContent(file.getInputStream())
+                    .fileContent(fileStream)
                     .fileName(file.getOriginalFilename())
                     .mimeType(file.getContentType())
                     .fileSize(file.getSize())

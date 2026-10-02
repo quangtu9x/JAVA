@@ -148,6 +148,16 @@ class VbdenIncomingDocumentWriterTest {
         assertThat(fields).doesNotContainKey("documentoutrevoke");
     }
 
+    // 29/09/2026: FE (VBDenButtonActionXuLy.jsx) chi hien nut xu ly khi form = "DocumentIn".
+    @Test
+    void buildDynamicFieldsJson_shouldAlwaysWriteFormDocumentIn() throws Exception {
+        var p = payload("senddocument", "0", null);
+        String json = VbdenIncomingDocumentWriter.buildDynamicFieldsJson(
+            objectMapper, p, List.of(), "0", List.of());
+        Map<String, Object> fields = objectMapper.readValue(json, Map.class);
+        assertThat(fields.get("form")).isEqualTo("DocumentIn");
+    }
+
     @Test
     void buildDynamicFieldsJson_capNhatWithTarget_shouldWriteBothFields() throws Exception {
         var p = payload("resenddocument", "0", null);
@@ -170,5 +180,31 @@ class VbdenIncomingDocumentWriterTest {
         Map<String, Object> fields = objectMapper.readValue(json, Map.class);
         assertThat(fields.get("bussiness_doc_type")).isEqualTo("4");
         assertThat(fields).doesNotContainKey("documentoutrevoke");
+    }
+
+    private VbdenIncomingDocumentWriter.PreparedFile file(String name, String group) {
+        return new VbdenIncomingDocumentWriter.PreparedFile(UUID.randomUUID(), "k/" + name, "b", name,
+            1L, "application/pdf", "pdf", group);
+    }
+
+    // 30/09/2026: van ban den nhan duoc chia "Tep ban hanh"/"Tep kem theo" nhu van ban di.
+    @Test
+    void buildDynamicFieldsJson_withGroupedFiles_shouldWriteTepBanHanhAndTepKemTheo() throws Exception {
+        var p = payload("senddocument", "0", null);
+        String json = VbdenIncomingDocumentWriter.buildDynamicFieldsJson(objectMapper, p,
+            List.of(file("qd.pdf", "tepbanhanh"), file("pl.pdf", "tepkemtheo"), file("vbden.pdf", "tepkemtheo")),
+            "0", List.of());
+        Map<String, Object> fields = objectMapper.readValue(json, Map.class);
+        assertThat(fields.get("tepbanhanh")).isEqualTo("qd.pdf;");
+        assertThat(fields.get("tepkemtheo")).isEqualTo("pl.pdf;vbden.pdf;");
+    }
+
+    @Test
+    void buildDynamicFieldsJson_withoutGroup_shouldNotWriteGroupFields() throws Exception {
+        var p = payload("senddocument", "0", null);
+        String json = VbdenIncomingDocumentWriter.buildDynamicFieldsJson(objectMapper, p,
+            List.of(file("qd.pdf", null)), "0", List.of());
+        Map<String, Object> fields = objectMapper.readValue(json, Map.class);
+        assertThat(fields).doesNotContainKeys("tepbanhanh", "tepkemtheo");
     }
 }

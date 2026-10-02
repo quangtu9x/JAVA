@@ -24,6 +24,8 @@ import com.td.application.tenant.ResolveUserTenantUseCase;
 import com.td.application.viewquery.ViewQueryService;
 import com.td.infrastructure.security.ApiResponseAccessDeniedHandler;
 import com.td.infrastructure.security.ApiResponseAuthenticationEntryPoint;
+import com.td.infrastructure.security.AccountProvisioningChecker;
+import com.td.infrastructure.security.AccountProvisioningFilter;
 import com.td.infrastructure.security.CorsProperties;
 import com.td.infrastructure.security.KeycloakJwtConverter;
 import com.td.infrastructure.security.KeycloakProperties;
@@ -35,6 +37,7 @@ import com.td.infrastructure.tenant.TenantActiveRegistry;
 import com.td.infrastructure.tenant.TenantFilter;
 import com.td.infrastructure.tenant.TenantProperties;
 import com.td.infrastructure.tenant.TenantResolver;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -77,7 +80,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     TenantProperties.class,
     TenantActiveRegistry.class,
     TenantResolver.class,
-    TenantFilter.class
+    TenantFilter.class,
+    AccountProvisioningFilter.class
 })
 @TestPropertySource(properties = "app.security.tdtoken.secret=sec-01-integration-test-secret-please-ignore")
 class VbdiPermissionIntegrationTest {
@@ -86,6 +90,11 @@ class VbdiPermissionIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @BeforeEach
+    void stubAccountProvisioningChecker() {
+        when(accountProvisioningChecker.isProvisioned(any(), any())).thenReturn(true);
+    }
 
     // BL-118 (20/08/2026): KeycloakJwtConverter nay inject them use case nay de tra cuu quyen Nhom
     // vai tro theo username Keycloak — @WebMvcTest phai mock de context khoi dong duoc.
@@ -96,6 +105,13 @@ class VbdiPermissionIntegrationTest {
     // cuu tenant that cua username - @WebMvcTest phai mock de context khoi dong duoc.
     @MockBean
     private ResolveUserTenantUseCase resolveUserTenantUseCase;
+
+    // "Khoa triet de" (22/09/2026): AccountProvisioningFilter (chan MOI request tu tai khoan chua
+    // khai bao) nay la 1 phan cua SecurityConfig filter chain - @WebMvcTest phai mock de context
+    // khoi dong duoc. Stub mac dinh true (@BeforeEach duoi) vi cac test trong file nay kiem tra
+    // PHAN QUYEN theo role, khong phai provisioning - khong duoc de gate moi nay chan nham.
+    @MockBean
+    private AccountProvisioningChecker accountProvisioningChecker;
 
     @MockBean
     private SoanThaoVbdiUseCase soanThaoVbdiUseCase;
@@ -135,6 +151,8 @@ class VbdiPermissionIntegrationTest {
     private com.td.application.vbdi.ListVbdiUserActionLogUseCase listVbdiUserActionLogUseCase;
     @MockBean
     private com.td.application.vbdi.AddVbdiSeenDocumentUseCase addVbdiSeenDocumentUseCase;
+    @MockBean
+    private com.td.application.vbdi.AddVbdiImportantDocumentUseCase addVbdiImportantDocumentUseCase;
     @MockBean
     private com.td.application.vbdi.ChuyenXemDeBietVbdiUseCase chuyenXemDeBietVbdiUseCase;
     // Bo sung 13/09/2026 - cung nhom pre-existing gap voi CapNhatVanBanDiUseCase o tren.

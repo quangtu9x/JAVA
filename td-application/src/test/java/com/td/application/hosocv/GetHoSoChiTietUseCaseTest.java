@@ -40,6 +40,8 @@ class GetHoSoChiTietUseCaseTest {
     private DuThaoDocumentRepository duThaoDocumentRepository;
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
+    @Mock
+    private HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
     private GetHoSoChiTietUseCase useCase;
@@ -48,7 +50,7 @@ class GetHoSoChiTietUseCaseTest {
     void setUp() {
         useCase = new GetHoSoChiTietUseCase(
             hoSoCVDocumentRepository, hoSoCVProcessDocumentRepository, documentRepository,
-            duThaoDocumentRepository, vbdiDocumentRepository, dynamicDocumentFieldsService);
+            duThaoDocumentRepository, vbdiDocumentRepository, dynamicDocumentFieldsService, hoSoVanBanKhacFinder);
     }
 
     @Test
@@ -105,6 +107,27 @@ class GetHoSoChiTietUseCaseTest {
         List<Map<String, Object>> lichSu = (List<Map<String, Object>>) result.getData().get("lich_su_xu_ly");
         assertThat(lichSu).hasSize(1);
         assertThat(lichSu.get(0).get("process_type")).isEqualTo("trinhduyet");
+    }
+
+    // 02/10/2026: van_ban_lien_quan gom them "van ban khac" cua ho so.
+    @Test
+    void execute_shouldIncludeVanBanKhacInLinkedVanBan() {
+        UUID id = UUID.randomUUID();
+        HoSoCVDocument hosocv = newHoSoCVDocument(id, "hosocv", "{}");
+        HoSoCVDocument vanBanKhac = newHoSoCVDocument(UUID.randomUUID(), LuuVanBanKhacUseCase.DOCUMENT_TYPE, "{}");
+        when(hoSoCVDocumentRepository.findById(id)).thenReturn(Optional.of(hosocv));
+        when(hoSoVanBanKhacFinder.findByHoSo(id)).thenReturn(List.of(vanBanKhac));
+        var request = new GetHoSoChiTietRequest();
+        request.setId(id.toString());
+
+        var result = useCase.execute(request);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> vanBanLienQuan = (List<Map<String, Object>>) result.getData().get("van_ban_lien_quan");
+        assertThat(vanBanLienQuan).singleElement().satisfies(item -> {
+            assertThat(item.get("databasetype")).isEqualTo(LuuVanBanKhacUseCase.DOCUMENT_TYPE);
+            assertThat(item.get("document_id")).isEqualTo(vanBanKhac.getId());
+        });
     }
 
     private HoSoCVDocument newHoSoCVDocument(UUID id, String documentType, String dynamicFieldsJson) {

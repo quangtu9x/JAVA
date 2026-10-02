@@ -7,8 +7,10 @@ import com.td.application.duthao.DuThaoDaBanHanhUseCase;
 import com.td.application.duthao.DuThaoVanThuKhongBanHanhUseCase;
 import com.td.application.duthao.TraLaiDuThaoChoLanhDaoUseCase;
 import com.td.application.duthao.TraLaiDuThaoChoNguoiSoanThaoUseCase;
+import com.td.application.duthao.TraLaiDuThaoChoNguoiTrinhUseCase;
 import com.td.application.duthao.AddDuThaoEditHistoryUseCase;
 import com.td.application.duthao.ListDuThaoEditHistoryUseCase;
+import com.td.application.duthao.AddDuThaoSeenDocumentUseCase;
 import com.td.application.duthao.GanKemTepDuThaoUseCase;
 import com.td.application.duthao.GanVanBanLienQuanDuThaoUseCase;
 import com.td.application.duthao.XoaTraLoiVanBanDenDuThaoUseCase;
@@ -79,6 +81,8 @@ class DuThaoControllerTest {
     @MockBean
     private TraLaiDuThaoChoNguoiSoanThaoUseCase traLaiDuThaoChoNguoiSoanThaoUseCase;
     @MockBean
+    private TraLaiDuThaoChoNguoiTrinhUseCase traLaiDuThaoChoNguoiTrinhUseCase;
+    @MockBean
     private ThuHoiVanBanDiUseCase thuHoiVanBanDiUseCase;
     @MockBean
     private XuLyDuThaoUseCase xuLyDuThaoUseCase;
@@ -88,6 +92,9 @@ class DuThaoControllerTest {
     private AddDuThaoEditHistoryUseCase addDuThaoEditHistoryUseCase;
     @MockBean
     private ListDuThaoEditHistoryUseCase listDuThaoEditHistoryUseCase;
+
+    @MockBean
+    private AddDuThaoSeenDocumentUseCase addDuThaoSeenDocumentUseCase;
     @MockBean
     private TraLoiVanBanDenDuThaoUseCase traLoiVanBanDenDuThaoUseCase;
     @MockBean

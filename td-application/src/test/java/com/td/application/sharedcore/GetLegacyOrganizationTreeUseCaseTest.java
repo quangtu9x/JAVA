@@ -64,6 +64,25 @@ class GetLegacyOrganizationTreeUseCaseTest {
         assertThat(unitNode.getData()).containsEntry("clerical", "true");
     }
 
+    // 30/09/2026: "Mã định danh khác" thật (dynamicFields.identifier_other) ra key RIÊNG
+    // identifier_other_org — KHÔNG đổi "identifier_other" cũ của node agency (vẫn "").
+    @Test
+    void execute_shouldExposeConfiguredIdentifierOtherAsSeparateKey() {
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+
+        Organization root = newAgencyLevel("UBND thanh pho");
+        Organization vanPhong = newAgency("Van phong UBND thanh pho", root.getId());
+        vanPhong.replaceDynamicFields("{\"identifier_other\":\"G10\"}");
+        when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(root, vanPhong)));
+
+        List<LegacyOrganizationTreeNode> tree = useCase.execute(null, false).getData();
+
+        LegacyOrganizationTreeNode vanPhongNode = tree.get(0).getChildren().get(0);
+        assertThat(vanPhongNode.getData()).containsEntry("identifier_other_org", "G10");
+        assertThat(vanPhongNode.getData()).containsEntry("identifier_other", "");
+        assertThat(tree.get(0).getData()).containsEntry("identifier_other_org", "");
+    }
+
     @Test
     void execute_withoutDynamicFields_shouldDefaultToEmptyString() {
         useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);

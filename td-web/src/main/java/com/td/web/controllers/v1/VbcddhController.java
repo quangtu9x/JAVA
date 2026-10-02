@@ -50,8 +50,13 @@ public class VbcddhController extends BaseController {
     // SEC-01: role tìm thấy trực tiếp gate nút "Giao chuyên viên" (hành động phân công) trong FE
     // thật (docs/frontend/08-vbcddh.md mục "Quyền" — QPhanPhoi/QPhanCong, cùng họ role đã dùng cho
     // ChuyenXuLy vbden ở BL-211/SEC-01) — không suy diễn role mới, tái dùng nguyên các hằng đã có.
+    // Bổ sung (24/09/2026, bugfix, đồng bộ VbdenController#PHAN_CONG_CHUYEN_TIEP_ROLES): thêm 3
+    // biến thể phạm vi đơn vị/phòng ban (QPhanCongDV/QPhanPhoiDV/QPhanCongPhong) đã có sẵn trong
+    // catalog app_permissions nhưng trước đây chưa được gate nào dùng tới.
     private static final String PHAN_CONG_ROLES =
         "hasAnyRole('ADMIN', '" + QlvbRoles.PHAN_CONG + "', '" + QlvbRoles.PHAN_PHOI + "', '"
+            + QlvbRoles.PHAN_CONG_DV + "', '" + QlvbRoles.PHAN_PHOI_DV + "', '"
+            + QlvbRoles.PHAN_CONG_PHONG + "', '"
             + QlvbRoles.QUAN_TRI + "')";
 
     private final PhanCongNhiemVuUseCase phanCongNhiemVuUseCase;

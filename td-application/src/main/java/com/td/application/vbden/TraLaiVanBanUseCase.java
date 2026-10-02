@@ -92,6 +92,7 @@ public class TraLaiVanBanUseCase {
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final ProcessDiagramService processDiagramService;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final com.td.application.sharedcore.UserFullNameResolver userFullNameResolver;
 
     public Result<UUID> execute(TraLaiVanBanRequest request) {
         if (request == null || request.getParentid() == null || isBlank(request.getUserProcess())) {
@@ -163,8 +164,11 @@ public class TraLaiVanBanUseCase {
         Map<String, String> childFields = new LinkedHashMap<>();
         childFields.put("parentid", request.getParentid().toString());
         childFields.put("action", ACTION_TRA_LAI);
+        // "nguoi_thuc_hien" = TÀI KHOẢN (lưu ẩn, nguồn tra cứu). 30/09/2026 (yêu cầu người dùng: cột "Người
+        // thực hiện" ở Quá trình xử lý hiện tài khoản khi Trả lại): "creator" = TÊN ĐẦY ĐỦ tra từ hồ sơ,
+        // đồng nhất các hành động khác (ChuyenXuLyVbdenUseCase...); không tra được thì giữ tài khoản.
         childFields.put("nguoi_thuc_hien", actingUsername);
-        childFields.put("creator", actingUsername);
+        childFields.put("creator", userFullNameResolver.resolveForWrite(actingUsername, null));
         if (request.getOpinion() != null && !request.getOpinion().isBlank()) {
             childFields.put("opinion", request.getOpinion());
         }

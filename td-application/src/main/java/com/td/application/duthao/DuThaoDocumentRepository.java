@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * BL-230 (DuThao Core), yêu cầu người dùng 24/08/2026: port RIÊNG cho bảng vật lý ĐỘC LẬP
@@ -48,4 +49,14 @@ public interface DuThaoDocumentRepository extends IRepository<DuThaoDocument> {
             String documentType, String fieldWithoutStatus, String fieldWithStatus,
             List<String> doneStatuses, String value, String keyword, List<String> keywordColumns,
             Pageable pageable);
+
+    /**
+     * 01/10/2026 — view gộp "Văn thư trả lại" (Java-only, xem {@code ViewQueryService#VIEW_DUTHAO_VANTHU_TRALAI}):
+     * dự thảo văn thư trả lại CHO CHÍNH {@code username} ({@code return_document_out_for_user}), còn
+     * đúng trạng thái của lần trả lại đó — mỗi cặp ({@code return_document_out_for} → {@code status})
+     * trong {@code statusByReturnFor} là 1 nhánh OR (vd "1"→"1", "2"→"2", "3"→"2").
+     */
+    Page<DuThaoDocument> findReturnedByClerkForUser(
+            String documentType, Map<String, String> statusByReturnFor, String username,
+            String keyword, List<String> keywordColumns, Pageable pageable);
 }

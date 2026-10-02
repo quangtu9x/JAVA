@@ -144,9 +144,15 @@ public class VbdenController extends BaseController {
             + "', '" + QlvbRoles.CAP_NHAT_VBDEN_PB + "', '" + QlvbRoles.QUAN_TRI + "')";
 
     // BL-211: quyền y hệt các role đã xác nhận gate hành vi phân công/chuyển tiếp trong
-    // ChuyenXuLy.java thật (dòng ~436/480/486 — QPhanCong/QPhanPhoi/QCapNhatVBDen).
+    // ChuyenXuLy.java thật (dòng ~436/480/486 — QPhanCong/QPhanPhoi/QCapNhatVBDen). Bổ sung
+    // (24/09/2026, bugfix): thiếu 3 biến thể phạm vi đơn vị/phòng ban đã có sẵn trong catalog
+    // app_permissions (QPhanCongDV/QPhanPhoiDV/QPhanCongPhong, V1.0.18) nhưng chưa từng được đưa
+    // vào gate này — user chỉ được gán 1 trong 3 quyền phạm vi hẹp này (không có quyền
+    // QPhanCong/QPhanPhoi toàn cơ quan) vẫn bị 403 khi gọi ChuyenXuLy.
     private static final String PHAN_CONG_CHUYEN_TIEP_ROLES =
         "hasAnyRole('ADMIN', '" + QlvbRoles.PHAN_CONG + "', '" + QlvbRoles.PHAN_PHOI + "', '"
+            + QlvbRoles.PHAN_CONG_DV + "', '" + QlvbRoles.PHAN_PHOI_DV + "', '"
+            + QlvbRoles.PHAN_CONG_PHONG + "', '"
             + QlvbRoles.CAP_NHAT_VBDEN + "', '" + QlvbRoles.CAP_NHAT_VBDEN_DV + "', '"
             + QlvbRoles.CAP_NHAT_VBDEN_PB + "', '" + QlvbRoles.QUAN_TRI + "')";
 
@@ -181,6 +187,7 @@ public class VbdenController extends BaseController {
     private final GetSoLuongCanXuLyUseCase getSoLuongCanXuLyUseCase;
     private final AddVbdenEditHistoryUseCase addVbdenEditHistoryUseCase;
     private final ListVbdenEditHistoryUseCase listVbdenEditHistoryUseCase;
+    private final com.td.application.vbden.ListVbdenUpdateHistoryUseCase listVbdenUpdateHistoryUseCase;
     private final XoaVanBanDenUseCase xoaVanBanDenUseCase;
     private final PhucHoiVanBanDenUseCase phucHoiVanBanDenUseCase;
     private final GetNguoiTraLaiUseCase getNguoiTraLaiUseCase;
@@ -427,10 +434,12 @@ public class VbdenController extends BaseController {
             @Parameter(description = "File PDF đã ký số", required = true,
                     content = @Content(mediaType = MediaType.APPLICATION_OCTET_STREAM_VALUE))
             @RequestParam("file") MultipartFile file) {
-        try {
+        // try-with-resources: đóng stream sau khi upload xong — stream còn mở giữ khoá tệp tạm multipart
+        // trên Windows, Tomcat không xoá được ("Failed to deleted temporary file used for part [file]").
+        try (java.io.InputStream fileStream = file.getInputStream()) {
             var request = new KySoVbdenRequest();
             request.setId(id);
-            request.setFileContent(file.getInputStream());
+            request.setFileContent(fileStream);
             request.setFileName(file.getOriginalFilename());
             request.setMimeType(file.getContentType());
             request.setFileSize(file.getSize());
@@ -645,6 +654,20 @@ public class VbdenController extends BaseController {
         // Khong dung BaseController.ok(...): overload ok(PaginationResponse) tra
         // ApiResponse<List<T>>, trong khi FE doc data.items - can giu ApiResponse<PaginationResponse>.
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // Yeu cau nguoi dung 24/09/2026 ("luu lai vet ngay gio cap nhat, co lien ket toi van ban da cap nhat,
+    // the hien tep cu da cap nhat nhung khong cho tai, chi hien thi ten") - xem javadoc
+    // ListVbdenUpdateHistoryUseCase. Ghi do CapNhatVanBanThayTheThuHoiUseCase tu lam (khong co endpoint ghi).
+    @PostMapping("/LichSuCapNhat")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Lịch sử cập nhật văn bản đến từ bản gửi lại/thay thế (nút Cập nhật VB)",
+        description = "Mới nhất trước; mỗi item {id,parent_id,source_document_id,action,update_obj,creator,"
+            + "user_creator,created}. update_obj.superseded_files chỉ mang tên/kích thước tệp cũ đã bị thay "
+            + "thế (tệp đã bị ẩn, không tải được)")
+    public ResponseEntity<ApiResponse<PaginationResponse<Map<String, Object>>>> lichSuCapNhat(
+            @Valid @RequestBody com.td.application.vbden.ListVbdenUpdateHistoryRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(listVbdenUpdateHistoryUseCase.execute(request)));
     }
 
     // Yeu cau nguoi dung 18/09/2026 ("them vet audit cua van ban den, tham khao van ban di da lam va

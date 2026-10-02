@@ -37,6 +37,8 @@ class AddDuThaoEditHistoryUseCaseTest {
     private CurrentUserProvider currentUserProvider;
     @Mock
     private DocumentLogService documentLogService;
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private com.td.application.sharedcore.AppUserRepository appUserRepository;
 
     private AddDuThaoEditHistoryUseCase useCase;
 
@@ -45,7 +47,8 @@ class AddDuThaoEditHistoryUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new AddDuThaoEditHistoryUseCase(
-            editHistoryRepository, duThaoDocumentRepository, currentUserProvider, documentLogService);
+            editHistoryRepository, duThaoDocumentRepository, currentUserProvider, documentLogService,
+            new com.td.application.sharedcore.UserFullNameResolver(appUserRepository));
         // lenient(): không phải test nào cũng chạm tới stamp người dùng
         org.mockito.Mockito.lenient().when(currentUserProvider.currentUsername())
             .thenReturn(Optional.of("demo1"));
@@ -93,6 +96,27 @@ class AddDuThaoEditHistoryUseCaseTest {
         assertThat(entity.getEditObjJson()).contains("\"subject\"").contains("\"newvalue\":\"Moi\"");
         org.mockito.Mockito.verify(documentLogService)
             .logCreate(org.mockito.ArgumentMatchers.eq(saved.getId()), org.mockito.ArgumentMatchers.anyMap());
+    }
+
+    /** 25/09/2026: tên hiển thị do server tra theo tài khoản đăng nhập, không phụ thuộc client gửi. */
+    @Test
+    void execute_shouldPreferServerResolvedFullName_overClientName() {
+        var draft = existingDraft("duthao");
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(editHistoryRepository.save(org.mockito.ArgumentMatchers.any()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("demo1"))
+            .thenReturn(Optional.of(new com.td.domain.sharedcore.AppUser(
+                "kc", "demo1", "Chuyên viên 1", null, null, null, true)));
+
+        var req = request(draft.getId(), Map.of("subject", Map.of("oldvalue", "", "newvalue", "x")));
+        req.setCreatorName(null); // đường ghi vết phụ (gắn tệp, ký số) không gửi tên
+        useCase.execute(req);
+
+        ArgumentCaptor<DuThaoEditHistoryDocument> captor = ArgumentCaptor.forClass(DuThaoEditHistoryDocument.class);
+        verify(editHistoryRepository).save(captor.capture());
+        assertThat(captor.getValue().getCreatorName()).isEqualTo("Chuyên viên 1");
+        assertThat(captor.getValue().getUserCreator()).isEqualTo("demo1");
     }
 
     @Test

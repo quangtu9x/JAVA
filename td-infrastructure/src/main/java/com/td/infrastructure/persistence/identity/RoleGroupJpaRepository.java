@@ -18,4 +18,6 @@ public interface RoleGroupJpaRepository extends BaseRepository<RoleGroup> {
 
     @Query("SELECT g FROM RoleGroup g WHERE g.id = :id AND g.deletedOn IS NULL")
     Optional<RoleGroup> findByIdAndDeletedOnIsNull(@Param("id") UUID id);
+
+    java.util.List<RoleGroup> findAllByIdInAndDeletedOnIsNull(java.util.Collection<UUID> ids);
 }

@@ -15,6 +15,7 @@ import com.td.application.common.models.Result;
 import com.td.application.sharedcore.CreateOrganizationUseCase;
 import com.td.application.sharedcore.DeleteOrganizationUseCase;
 import com.td.application.sharedcore.GetCapBanHanhOptionsUseCase;
+import com.td.application.sharedcore.GetKyThuaLenhSignersUseCase;
 import com.td.application.sharedcore.GetLegacyOrganizationFlatListUseCase;
 import com.td.application.sharedcore.GetLegacyOrganizationTreeUseCase;
 import com.td.application.sharedcore.GetLegacyOrgLookupForDungChungUseCase;
@@ -86,6 +87,8 @@ class LegacyDanhMucControllerTest {
     private DeleteOrganizationUseCase deleteOrganizationUseCase;
     @MockBean
     private GetCapBanHanhOptionsUseCase getCapBanHanhOptionsUseCase;
+    @MockBean
+    private GetKyThuaLenhSignersUseCase getKyThuaLenhSignersUseCase;
     @MockBean
     private CreateCategoryUseCase createCategoryUseCase;
     @MockBean
@@ -221,9 +224,24 @@ class LegacyDanhMucControllerTest {
     void publish_withUnsupportedGet_shouldReturn400() throws Exception {
         mockMvc.perform(post("/api/v1/danhmuc/publish")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"get\":\"kythualenh\"}"))
+                .content("{\"get\":\"kyuyquyen\"}"))
             .andExpect(status().isBadRequest());
 
+        verify(getCapBanHanhOptionsUseCase, never()).execute(any());
+    }
+
+    // 01/10/2026: get=kythualenh da port (GetKyThuaLenhSignersUseCase) - chuyen capbanhanhid xuong.
+    @Test
+    void publish_kythualenh_shouldDelegateWithCapBanHanhId() throws Exception {
+        when(getKyThuaLenhSignersUseCase.execute("org-1"))
+            .thenReturn(Result.success(List.of(Map.of("username", "demo5"))));
+
+        mockMvc.perform(post("/api/v1/danhmuc/publish")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"get\":\"kythualenh\",\"capbanhanhid\":\"org-1\"}"))
+            .andExpect(status().isOk());
+
+        verify(getKyThuaLenhSignersUseCase).execute("org-1");
         verify(getCapBanHanhOptionsUseCase, never()).execute(any());
     }
 

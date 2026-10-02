@@ -278,6 +278,9 @@ public class GetSoLuongCanXuLyUseCase {
         counts.put("drafting_user_return_submiting", countByView(DB_DUTHAO, "vwuser_return_draft", username));
         counts.put("draft_signer_documentout_return",
             countByView(DB_DUTHAO, "vwsigner_documentout_return", username));
+        // 01/10/2026: route gop "Van thu tra lai" (ca 3 nhanh lanh dao/chuyen vien/nguoi trinh) -
+        // Java-only, xem ViewQueryService#VIEW_DUTHAO_VANTHU_TRALAI.
+        counts.put("draft_vanthu_tralai", countByView(DB_DUTHAO, "vwvanthu_tralai", username));
         counts.put("drafting_user_other_process_handler",
             countByView(DB_DUTHAO, "vwuser_other_process_handler_submit", username));
         counts.put("drafting_user_processed_handler_submit",

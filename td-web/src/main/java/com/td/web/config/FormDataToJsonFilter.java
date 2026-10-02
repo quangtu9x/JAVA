@@ -63,8 +63,26 @@ public class FormDataToJsonFilter extends OncePerRequestFilter {
      * URI segments của các endpoint upload file thực sự.
      * Những request này giữ nguyên multipart/form-data để Spring/controller
      * xử lý {@code @RequestParam MultipartFile}.
+     *
+     * <p><b>BUG THẬT đã gặp (22/09/2026):</b> {@code SimPkiSignController} (proxy TDSimPki,
+     * {@code /api/v1/simpki/convert} và {@code /api/v1/simpki/sign}) nhận {@code MultipartFile}
+     * nhưng KHÔNG có "/files" hay "/upload" trong path — filter này coi request là form text-only,
+     * đọc hết {@code getParts()} rồi BỎ QUA part có {@code filename=} (đúng là part chứa file PDF/
+     * Office cần chuyển đổi/ký!), tạo JSON RỖNG rồi đổi Content-Type sang {@code application/json} —
+     * khiến `consumes = MULTIPART_FORM_DATA_VALUE` của controller không khớp nữa,
+     * {@code HttpMediaTypeNotSupportedException} → HTTP 415 "Dinh dang noi dung khong duoc ho tro",
+     * dù Content-Type request gửi lên hoàn toàn đúng chuẩn (đã verify qua DevTools + curl trực tiếp
+     * vào server thật). MỌI endpoint multipart-file-upload MỚI phải thêm segment ở đây, không chỉ
+     * "/files"/"/upload" - đây là danh sách thủ công, KHÔNG tự suy luận từ annotation controller.
      */
-    private static final Set<String> FILE_UPLOAD_SEGMENTS = Set.of("/files", "/upload");
+    // "/signature-images" (22/09/2026): SharedCoreUsersController#uploadSignatureImage
+    // (POST /api/v1/shared-core/users/{id}/signature-images, multipart) - cung bay y het SimPki o
+    // tren, path khong chua "/files" hay "/upload".
+    // "/simpki/locate-signatures" (29/09/2026): SimPkiSignController#locateSignatures (multipart PDF +
+    // signerName) - tu dat chu ky theo ten nguoi ky o modal Ky SIM, cung bay voi /simpki/sign.
+    private static final Set<String> FILE_UPLOAD_SEGMENTS =
+        Set.of("/files", "/upload", "/simpki/convert", "/simpki/sign", "/simpki/locate-signatures",
+            "/signature-images");
 
     private final ObjectMapper objectMapper;
 
@@ -149,8 +167,12 @@ public class FormDataToJsonFilter extends OncePerRequestFilter {
                     continue;
                 }
                 String name = part.getName();
-                String value = new String(
-                        part.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                String value;
+                // Đóng stream ngay (try-with-resources): trên Windows, stream còn mở giữ khoá tệp tạm
+                // của part -> Tomcat không xoá được ("Failed to deleted temporary file used for part").
+                try (var in = part.getInputStream()) {
+                    value = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                }
                 if (!value.isBlank()) {
                     params.put(name, coerce(value));
                 }

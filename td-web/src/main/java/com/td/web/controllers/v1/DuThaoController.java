@@ -3,6 +3,8 @@ package com.td.web.controllers.v1;
 import com.td.application.common.models.ApiResponse;
 import com.td.application.common.models.PaginationResponse;
 import com.td.application.duthao.AddDuThaoEditHistoryRequest;
+import com.td.application.duthao.AddDuThaoSeenDocumentRequest;
+import com.td.application.duthao.AddDuThaoSeenDocumentUseCase;
 import com.td.application.duthao.AddDuThaoEditHistoryUseCase;
 import com.td.application.duthao.ListDuThaoEditHistoryRequest;
 import com.td.application.duthao.ListDuThaoEditHistoryUseCase;
@@ -15,6 +17,7 @@ import com.td.application.duthao.DuThaoVanThuKhongBanHanhUseCase;
 import com.td.application.duthao.TraLaiDuThaoRequest;
 import com.td.application.duthao.TraLaiDuThaoChoLanhDaoUseCase;
 import com.td.application.duthao.TraLaiDuThaoChoNguoiSoanThaoUseCase;
+import com.td.application.duthao.TraLaiDuThaoChoNguoiTrinhUseCase;
 import com.td.application.duthao.TraLoiVanBanDenDuThaoRequest;
 import com.td.application.duthao.TraLoiVanBanDenDuThaoUseCase;
 import com.td.application.duthao.XoaTraLoiVanBanDenDuThaoRequest;
@@ -88,6 +91,7 @@ public class DuThaoController extends BaseController {
     private final DuThaoVanThuKhongBanHanhUseCase duThaoVanThuKhongBanHanhUseCase;
     private final TraLaiDuThaoChoLanhDaoUseCase traLaiDuThaoChoLanhDaoUseCase;
     private final TraLaiDuThaoChoNguoiSoanThaoUseCase traLaiDuThaoChoNguoiSoanThaoUseCase;
+    private final TraLaiDuThaoChoNguoiTrinhUseCase traLaiDuThaoChoNguoiTrinhUseCase;
     private final XuLyDuThaoUseCase xuLyDuThaoUseCase;
     private final GanKemTepDuThaoUseCase ganKemTepDuThaoUseCase;
     private final TraLoiVanBanDenDuThaoUseCase traLoiVanBanDenDuThaoUseCase;
@@ -97,6 +101,7 @@ public class DuThaoController extends BaseController {
     private final ViewQueryService viewQueryService;
     private final AddDuThaoEditHistoryUseCase addDuThaoEditHistoryUseCase;
     private final ListDuThaoEditHistoryUseCase listDuThaoEditHistoryUseCase;
+    private final AddDuThaoSeenDocumentUseCase addDuThaoSeenDocumentUseCase;
 
     @PostMapping("/TaoDuThao")
     @PreAuthorize("isAuthenticated()")
@@ -238,6 +243,16 @@ public class DuThaoController extends BaseController {
         return ok(traLaiDuThaoChoNguoiSoanThaoUseCase.execute(request));
     }
 
+    @PostMapping("/TraLaiChoNguoiTrinh")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Trả lại dự thảo cho người trình ký (01/10/2026)",
+        description = "Người trình = người thực hiện vết chuyenkyduyet gần nhất. Cập nhật dự thảo "
+            + "(return_document_out_for=3, status=RETURNED) + ghi vết draft_process "
+            + "(action_type=vttranguoitrinh) + đánh dấu văn bản đi bị văn thư trả lại")
+    public ResponseEntity<ApiResponse<UUID>> traLaiChoNguoiTrinh(@Valid @RequestBody TraLaiDuThaoRequest request) {
+        return ok(traLaiDuThaoChoNguoiTrinhUseCase.execute(request));
+    }
+
     @PostMapping("/XuLyDuThao")
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Xử lý chuyển trạng thái dự thảo (DT-001, tương thích qlvb/duthao/xulyduthao)",
@@ -326,6 +341,15 @@ public class DuThaoController extends BaseController {
             + "chọn. edit_obj bắt buộc khác rỗng — khớp Domino: không có thay đổi thì không sinh vết")
     public ResponseEntity<ApiResponse<UUID>> luuVetHieuChinh(@Valid @RequestBody AddDuThaoEditHistoryRequest request) {
         return created(addDuThaoEditHistoryUseCase.execute(request));
+    }
+
+    @PostMapping("/SeenDocument")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Ghi nhật ký đã xem dự thảo (25/09/2026, mirror vbdi/SeenDocument)",
+        description = "Người gọi (server-authoritative) được thêm vào log_seen_document và "
+            + "log_seen_document_detail {username,name,unit,created,lastSeen} — FE LogSeenDocument.jsx")
+    public ResponseEntity<ApiResponse<UUID>> seenDocument(@Valid @RequestBody AddDuThaoSeenDocumentRequest request) {
+        return ok(addDuThaoSeenDocumentUseCase.execute(request));
     }
 
     @PostMapping("/VetHieuChinh")

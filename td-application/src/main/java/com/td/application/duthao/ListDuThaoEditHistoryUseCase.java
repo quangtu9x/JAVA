@@ -2,6 +2,7 @@ package com.td.application.duthao;
 
 import com.td.application.common.models.PaginationResponse;
 import com.td.domain.duthao.DuThaoEditHistoryDocument;
+import com.td.application.sharedcore.UserFullNameResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -36,6 +37,7 @@ public class ListDuThaoEditHistoryUseCase {
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 200;
 
+    private final UserFullNameResolver userFullNameResolver;
     private final DuThaoEditHistoryDocumentRepository duThaoEditHistoryDocumentRepository;
 
     public PaginationResponse<Map<String, Object>> execute(ListDuThaoEditHistoryRequest request) {
@@ -47,22 +49,26 @@ public class ListDuThaoEditHistoryUseCase {
         UUID parentId = request == null ? null : request.getParentId();
         Page<DuThaoEditHistoryDocument> page = parentId == null
             ? Page.empty()
-            : duThaoEditHistoryDocumentRepository.findByParentIdAsc(parentId, PageRequest.of(pageNumber - 1, pageSize));
+            : duThaoEditHistoryDocumentRepository.findByParentIdNewestFirst(parentId, PageRequest.of(pageNumber - 1, pageSize));
 
-        var items = page.getContent().stream().map(this::toLegacyFields).toList();
+        // 25/09/2026: dòng vết cũ thiếu tên (creator_name rỗng/bằng username) được tra bù tên đầy đủ
+        // theo user_creator — hiển thị thống nhất "tên đầy đủ" cho mọi tài khoản.
+        var nameLookup = userFullNameResolver.displayNameLookup();
+        var items = page.getContent().stream().map(doc -> toLegacyFields(doc, nameLookup)).toList();
         return new PaginationResponse<>(items, pageNumber, pageSize,
             page.getTotalElements(), page.getTotalPages(), page.isFirst(), page.isLast());
     }
 
-    private Map<String, Object> toLegacyFields(DuThaoEditHistoryDocument document) {
+    private Map<String, Object> toLegacyFields(DuThaoEditHistoryDocument document,
+            java.util.function.Function<UserFullNameResolver.RowName, String> nameLookup) {
         Map<String, Object> item = new LinkedHashMap<>();
         item.put("id", document.getId());
         item.put("parentid", document.getParentId() == null ? "" : document.getParentId().toString());
         item.put("form", FORM_VALUE);
         item.put("form_edit", document.getFormEdit());
         item.put("edit_obj", document.getEditObjJson() == null ? "{}" : document.getEditObjJson());
-        String displayName = document.getCreatorName() != null && !document.getCreatorName().isBlank()
-            ? document.getCreatorName() : document.getUserCreator();
+        String displayName = nameLookup.apply(
+            new UserFullNameResolver.RowName(document.getCreatorName(), document.getUserCreator()));
         item.put("creator", displayName);
         item.put("user_creator", document.getUserCreator());
         item.put("created", formatCreated(document.getCreatedOn()));

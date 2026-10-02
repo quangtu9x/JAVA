@@ -206,6 +206,16 @@ app:
     callback-base-url: ${ONLYOFFICE_CALLBACK_BASE_URL:}
     content-token-ttl-minutes: ${ONLYOFFICE_CONTENT_TOKEN_TTL_MINUTES:240}
     callback-token-ttl-minutes: ${ONLYOFFICE_CALLBACK_TOKEN_TTL_MINUTES:240}
+  simpki:
+    # Proxy AN TOAN toi TDSimPki (C:\code_projects\HSCV\TDSimPki) - ky PDF qua SIM-PKI + chuyen doi
+    # Office sang PDF, xem SimPkiSignController + TdSimPkiClient. API key giu O DAY, KHONG BAO GIO
+    # dat vao bien VITE_* phia FE. Mac dinh tat cho toi khi co base-url/api-key that.
+    enabled: ${SIMPKI_ENABLED:false}
+    base-url: ${SIMPKI_BASE_URL:}
+    api-key: ${SIMPKI_API_KEY:}
+    tenant-id: ${SIMPKI_TENANT_ID:default}
+    connect-timeout-seconds: ${SIMPKI_CONNECT_TIMEOUT_SECONDS:15}
+    request-timeout-seconds: ${SIMPKI_REQUEST_TIMEOUT_SECONDS:30}
   messaging:
     # Yeu cau nguoi dung 04/09/2026: switch RabbitMQ/Kafka QUA CAU HINH (khong sua code) - chi 1
     # MessagePublisher bean active theo gia tri nay (xem RabbitMessagePublisher/KafkaMessagePublisher,

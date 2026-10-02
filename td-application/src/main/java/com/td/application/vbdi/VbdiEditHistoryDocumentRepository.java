@@ -19,6 +19,7 @@ public interface VbdiEditHistoryDocumentRepository {
      * Danh sách vết hiệu chỉnh theo văn bản đi cha. Thứ tự TẠO TĂNG DẦN (created_on ASC — insert
      * order): khớp response Domino {@code GetRes} mà {@code VetHieuChinh.jsx} đang REVERSE trước
      * khi render (để hiện mới nhất trên cùng) — giữ nguyên thứ tự nguồn để UI không đổi hành vi.
+     // 25/09/2026: MỚI NHẤT TRƯỚC (created_on DESC) — FE VetHieuChinh.jsx không còn reverse; javadoc trên mô tả hành vi cũ.
      */
-    Page<VbdiEditHistoryDocument> findByParentIdAsc(UUID parentId, Pageable pageable);
+    Page<VbdiEditHistoryDocument> findByParentIdNewestFirst(UUID parentId, Pageable pageable);
 }

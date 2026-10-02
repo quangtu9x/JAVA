@@ -485,10 +485,12 @@ public class DocumentsController extends BaseController {
             @Parameter(description = "Id vết xử lý (DT-007, tuỳ chọn — vd draft_process_documents.id) "
                 + "nếu tệp được đính kèm cùng lúc với 1 lần xử lý cụ thể")
             @RequestParam(value = "processId", required = false) UUID processId) {
-        try {
+        // try-with-resources: đóng stream sau khi upload xong — stream còn mở giữ khoá tệp tạm multipart
+        // trên Windows, Tomcat không xoá được ("Failed to deleted temporary file used for part [file]").
+        try (java.io.InputStream fileStream = file.getInputStream()) {
             var request = UploadFileRequest.builder()
                     .documentId(documentId)
-                    .fileContent(file.getInputStream())
+                    .fileContent(fileStream)
                     .fileName(file.getOriginalFilename())
                     .mimeType(file.getContentType())
                     .fileSize(file.getSize())
@@ -600,14 +602,15 @@ public class DocumentsController extends BaseController {
             @RequestParam(value = "file", required = false) MultipartFile file,
             @Parameter(description = "Đánh dấu tệp là chính") @RequestParam(value = "isPrimaryFile", defaultValue = "false") Boolean isPrimaryFile,
             @Parameter(description = "Mô tả tệp tin") @RequestParam(value = "fileDescription", required = false) String fileDescription) {
-        try {
-            InputStream fileContent = null;
+        boolean hasFile = file != null && !file.isEmpty();
+        // try-with-resources (resource null khi không có tệp — hợp lệ, bỏ qua close): đóng stream sau khi
+        // xử lý — stream còn mở giữ khoá tệp tạm multipart trên Windows, Tomcat không xoá được.
+        try (InputStream fileContent = hasFile ? file.getInputStream() : null) {
             String fileName = null;
             String mimeType = null;
             Long fileSize = null;
 
-            if (file != null && !file.isEmpty()) {
-                fileContent = file.getInputStream();
+            if (hasFile) {
                 fileName = file.getOriginalFilename();
                 mimeType = file.getContentType();
                 fileSize = file.getSize();

@@ -14,6 +14,7 @@ import com.td.domain.duthao.DuThaoDocument;
 import com.td.domain.vbdi.VbdiDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -78,6 +79,8 @@ class TraLaiDuThaoSupport {
     private static final String PROCESS_OPINION_FIELD = "opinion";
     private static final String PROCESS_CREATOR_FIELD = "creator";
     private static final String FALLBACK_USERNAME = "system";
+    private static final String ACTION_CHUYEN_KY_DUYET = "chuyenkyduyet";
+    private static final int PROCESS_LOOKUP_PAGE_SIZE = 500;
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
@@ -88,6 +91,10 @@ class TraLaiDuThaoSupport {
     private final CurrentUserProvider currentUserProvider;
     private final DocumentLogService documentLogService;
     private final DocumentCacheService documentCacheService;
+    // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
+    private final DraftProcessActorFields draftProcessActorFields;
+    // 01/10/2026: tra nguoi trinh (vet chuyenkyduyet gan nhat) cho dich NGUOI_TRINH.
+    private final DraftProcessDocumentRepository draftProcessDocumentRepository;
 
     Result<UUID> execute(TraLaiDuThaoRequest request, TraLaiDuThaoTarget target) {
         if (request == null || request.getVbdiId() == null) {
@@ -121,11 +128,52 @@ class TraLaiDuThaoSupport {
             : request.getOpinion().trim();
         String actingUsername = currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME);
 
-        UUID savedDraftId = updateDraft(draft, target, actingUsername);
-        writeProcessTrail(draft, target, opinion, actingUsername);
+        Receiver receiver = resolveReceiver(draft, target);
+        // 2 dich goc giu dung Domino (khong chan khi field rong); chi NGUOI_TRINH bat buoc tim duoc nguoi.
+        if (target == TraLaiDuThaoTarget.NGUOI_TRINH
+                && (receiver.username() == null || receiver.username().isBlank())) {
+            return Result.failure("Không xác định được người trình ký của dự thảo");
+        }
+
+        UUID savedDraftId = updateDraft(draft, target, receiver);
+        writeProcessTrail(draft, target, receiver, opinion, actingUsername);
         updateVbdi(vbdi, vbdiFields, opinion, actingUsername);
 
         return Result.success(savedDraftId);
+    }
+
+    record Receiver(String name, String username) {
+    }
+
+    /**
+     * 2 đích gốc: đọc {@code target.receiverField}/{@code receiverUsernameField} trên chính dự thảo
+     * (đúng Domino). {@link TraLaiDuThaoTarget#NGUOI_TRINH}: người thực hiện vết {@code chuyenkyduyet}
+     * MỚI NHẤT ({@code findByParentId} trả mới nhất trước). Vết tạo trước 25/09/2026 không có
+     * {@code user_creator} — khi đó {@code creator} còn là tài khoản (xem {@link DraftProcessActorFields}).
+     */
+    Receiver resolveReceiver(DuThaoDocument draft, TraLaiDuThaoTarget target) {
+        if (target.receiverUsernameField != null) {
+            Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson());
+            return new Receiver(asString(fields.get(target.receiverField)),
+                asString(fields.get(target.receiverUsernameField)));
+        }
+        var processes = draftProcessDocumentRepository.findByParentId(
+            draft.getId().toString(), PageRequest.of(0, PROCESS_LOOKUP_PAGE_SIZE));
+        for (var process : processes.getContent()) {
+            Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(process.getDynamicFieldsJson());
+            if (!ACTION_CHUYEN_KY_DUYET.equalsIgnoreCase(String.valueOf(fields.get(PROCESS_ACTION_FIELD)).trim())) {
+                continue;
+            }
+            String username = asString(fields.get(DraftProcessActorFields.USER_CREATOR_FIELD));
+            if (username == null || username.isBlank()) {
+                username = asString(fields.get(PROCESS_CREATOR_FIELD));
+            }
+            if (username != null && !username.isBlank()) {
+                username = username.trim();
+                return new Receiver(draftProcessActorFields.displayName(username), username);
+            }
+        }
+        return new Receiver(null, null);
     }
 
     // Domino dong 204-207/319-322: iddt rong thi tu doc draft_id tren chinh van ban di.
@@ -144,14 +192,13 @@ class TraLaiDuThaoSupport {
         }
     }
 
-    private UUID updateDraft(DuThaoDocument draft, TraLaiDuThaoTarget target, String actingUsername) {
+    private UUID updateDraft(DuThaoDocument draft, TraLaiDuThaoTarget target, Receiver receiver) {
         var before = buildSnapshot(draft);
         Map<String, Object> fields = new LinkedHashMap<>(
             dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson()));
 
-        String receiverUsernameValue = asString(fields.get(target.receiverUsernameField));
         fields.put(RETURN_DOCUMENT_OUT_FOR_FIELD, target.returnDocumentOutForValue);
-        fields.put(RETURN_DOCUMENT_OUT_FOR_USER_FIELD, receiverUsernameValue);
+        fields.put(RETURN_DOCUMENT_OUT_FOR_USER_FIELD, receiver.username());
         fields.put(STATUS_PRE_FIELD, draft.getStatus());
         fields.put(DRAFT_END_FIELD, "0");
 
@@ -184,11 +231,11 @@ class TraLaiDuThaoSupport {
 
     // Loi ghi vet KHONG duoc lam hong nghiep vu chinh - dung nguyen tac da ap dung cho
     // ChuyenThanhVanBanDiUseCase#writeProcessTrail.
-    private void writeProcessTrail(DuThaoDocument draft, TraLaiDuThaoTarget target, String opinion, String actingUsername) {
+    private void writeProcessTrail(DuThaoDocument draft, TraLaiDuThaoTarget target, Receiver receiver,
+                                   String opinion, String actingUsername) {
         try {
-            Map<String, Object> draftFields = dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson());
-            String receiverValue = asString(draftFields.get(target.receiverField));
-            String receiverUsernameValue = asString(draftFields.get(target.receiverUsernameField));
+            String receiverValue = receiver.name();
+            String receiverUsernameValue = receiver.username();
 
             var processRequest = new AddDynamicDocumentRequest();
             processRequest.setTitle("Xử lý dự thảo: " + target.actionType);
@@ -198,7 +245,7 @@ class TraLaiDuThaoSupport {
             putIfNotBlank(processFields, PROCESS_RECEIVER_FIELD, receiverValue);
             putIfNotBlank(processFields, PROCESS_RECEIVER_USERNAME_FIELD, receiverUsernameValue);
             processFields.put(PROCESS_OPINION_FIELD, opinion);
-            processFields.put(PROCESS_CREATOR_FIELD, actingUsername);
+            draftProcessActorFields.put(processFields, actingUsername);
             processRequest.setFields(processFields);
 
             addDraftProcessDocumentUseCase.execute(processRequest);

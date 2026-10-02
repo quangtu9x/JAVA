@@ -39,7 +39,8 @@ class GanKemTepDuThaoUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new GanKemTepDuThaoUseCase(
-            duThaoDocumentRepository, addDraftProcessDocumentUseCase, currentUserProvider);
+            duThaoDocumentRepository, addDraftProcessDocumentUseCase, currentUserProvider,
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
     }
 
     @Test

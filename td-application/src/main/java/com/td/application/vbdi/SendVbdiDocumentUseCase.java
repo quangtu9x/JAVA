@@ -125,6 +125,15 @@ public class SendVbdiDocumentUseCase {
         VbdiSendType.GUI_LAI_TOAN_BO, VbdiSendType.UNIT_REVOKE);
 
     /**
+     * 21/09/2026 (yêu cầu người dùng: "Lấy lại văn bản" phải xoá thông tin CÁ NHÂN khỏi danh sách cá
+     * nhân liên quan của người đó, giống cơ chế "xem để biết"): 3 sendType họ "THU HỒI/LẤY LẠI" —
+     * TRÁI DẤU với {@link #SEND_FAMILY_TYPES} (thêm nơi nhận), nhóm này GỠ nơi nhận khỏi field hiển
+     * thị/theo dõi — xem {@link #applyRevokeSideEffects}.
+     */
+    private static final Set<String> REVOKE_FAMILY_TYPES = Set.of(
+        VbdiSendType.THU_HOI_VAN_BAN, VbdiSendType.LAY_LAI_VAN_BAN, VbdiSendType.THU_HOI_TOAN_BO);
+
+    /**
      * 29/08/2026 (cùng phát hiện trên): field ĐỘNG (không phải cột riêng — dùng chung Dynamic Data
      * Engine BL-101 sẵn có, giống {@code document_replace_retrieve}) đánh dấu văn bản ĐÃ được gửi
      * tới ít nhất 1 nơi nhận — port {@code SendDocument.java} dòng ~494
@@ -141,6 +150,35 @@ public class SendVbdiDocumentUseCase {
     private static final String SEND_AGENT_FIELD = "send_agent";
     /** {@code vbdi_documents.dynamic_fields} - đơn vị ban hành (xem {@code AddVbdiSendLogUseCase}). */
     private static final String UNIT_PUBLISH_IDENTIFIER_FIELD = "unit_publish_identifier";
+
+    /**
+     * 21/09/2026 (yêu cầu người dùng, xem javadoc {@link #applySendSideEffects}/
+     * {@link #applyRevokeSideEffects}): 3 field Domino gốc quyết định 1 văn bản có hiện trong "danh
+     * sách cá nhân liên quan" của MỘT NGƯỜI cụ thể hay không — {@code coordinator_hide_rtext} (đã
+     * TỪNG gửi cho ai, dùng bởi {@code ViewQueryService.VIEW_VBDI_USER_ALL} — "toàn bộ liên quan tới
+     * tôi") / {@code coordinator_hide_not_seen_rtext} (chưa xem) / {@code coordinator_hide_seen_rtext}
+     * (đã xem, ghi bởi {@link AddVbdiSeenDocumentUseCase} khi mở xem chi tiết). 3 field này TỪNG chỉ
+     * được ghi bởi {@link ChuyenXemDeBietVbdiUseCase} ("Chuyển xem để biết" — hành động RIÊNG) — "Gửi
+     * văn bản"/"Gửi bổ sung" tới nhóm {@code coordinator} (lớp NÀY) chưa từng ghi field này, nên trước
+     * bản vá này, gửi văn bản cho 1 cá nhân KHÔNG khiến văn bản xuất hiện ở BẤT KỲ danh sách cá nhân
+     * nào của họ — "Lấy lại" vì vậy cũng không có gì để gỡ. Lưu username (KHÔNG phải identifier —
+     * {@code ViewQueryService} lọc 3 field này qua {@code resolveUsernameToken}, đúng quy ước
+     * {@code ChuyenXemDeBietVbdiUseCase#processRecipient} cho nhóm coordinator).
+     *
+     * <p>CHỈ áp dụng cho nhóm {@code coordinator} — {@code internal_unit} đã có cơ chế hiển thị RIÊNG
+     * (bản ghi "văn bản đến" thật tạo bởi {@code VbdiDeliveryTaskHandler}, xem
+     * [vbdi-phat-hanh-internal-unit-completion]) — thêm field này cho internal_unit sẽ trùng lặp,
+     * không có view nào đọc {@code coordinator_hide_rtext} riêng cho internal_unit cần thêm.</p>
+     */
+    private static final String COORDINATOR_HIDE_FIELD = "coordinator_hide_rtext";
+    private static final String COORDINATOR_HIDE_NOT_SEEN_FIELD = "coordinator_hide_not_seen_rtext";
+    private static final String COORDINATOR_HIDE_SEEN_FIELD = "coordinator_hide_seen_rtext";
+    /** Checkbox FE "Phát hành kèm văn bản đến" — xem javadoc {@link #resolvePhatHanhKemVbdenIds}. */
+    private static final String PHAT_HANH_KEM_VBDEN_FIELD = "phathanhkemvbden";
+    /** {@code TraLoiVanBanDenUseCase#DOCUMENT_IN_FIELD} — lặp lại GIÁ TRỊ, không import (module khác). */
+    private static final String DOCUMENT_IN_OBJ_FIELD = "documentin_obj";
+    /** Tên tệp "Tệp kèm theo" của văn bản đi ("a.pdf;b.docx;") — xem {@link #resolveAttachedFilenames}. */
+    private static final String TEP_KEM_THEO_FIELD = "tepkemtheo";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final VbdiDocumentRepository vbdiDocumentRepository;
@@ -172,27 +210,45 @@ public class SendVbdiDocumentUseCase {
 
         // Bo sung 07/09/2026 (yeu cau nguoi dung: "khong muon nhan tep dinh kem... anh xa doc truc
         // tiep... khi phat hanh se gui them 'files'"): copy DUNG 1 LAN cho CA LUOT gui (khong phai
-        // theo tung nhom/tung noi nhan) - xem javadoc prepareDeliveryFiles(). Chi can khi co it nhat
-        // 1 nguoi nhan contact_unit (nhom DUY NHAT dang tao van ban den that o td-woker hien nay -
-        // xem VbdiDeliveryTaskHandler) - tranh copy vo ich khi chi gui coordinator/internal_unit.
-        List<VbdiDeliveryFileRef> deliveryFiles = isEmpty(request.getContactUnit())
+        // theo tung nhom/tung noi nhan) - xem javadoc prepareDeliveryFiles().
+        // Bugfix 21/09/2026 (phat hien khi ra soat "Phat hanh kem van ban den" - xem javadoc addendum
+        // duoi day): dieu kien cu CHI kiem tra contact_unit ("nhom DUY NHAT dang tao van ban den that")
+        // - dung LUC VIET (07/09) nhung da LOI THOI tu 18/09/2026 khi internal_unit CUNG bat dau tao
+        // van ban den that (xem VbdiDeliveryTaskHandler#createDocument) - gui CHI internal_unit (khong
+        // co contact_unit) truoc ban vay se KHONG chuan bi file nao, van ban den tao ra cho internal_unit
+        // se LUON THIEU tep dinh kem du van ban di co tep - mo rong dieu kien sang ca internal_unit.
+        List<VbdiDeliveryFileRef> deliveryFiles = (isEmpty(request.getContactUnit()) && isEmpty(request.getInternalUnit()))
             ? List.of() : prepareDeliveryFiles(document);
 
+        // Bo sung 21/09/2026 (nguoi dung bao "Gui bo sung xong, tab Phat hanh khong thay thong tin
+        // don vi vua gui bo sung"): NGUYEN NHAN - tab "Phat hanh" (ChiTietModal.jsx, nhanh daSent=true)
+        // hien thi TRUC TIEP field "*_rtext" (coordinator_rtext/internal_unit_rtext/contact_unit_rtext/
+        // external_unit_rtext) tren CHINH van ban - field nay CHI duoc set 1 LAN luc Soan thao/Ban hanh
+        // (qua ModalPhatHanhVanBan, FE), sendToGroup() ben duoi CHI ghi vet vao bang
+        // vbdi_send_log_documents (Nhat ky gui nhan), KHONG BAO GIO cap nhat lai field nay - nguoi
+        // nhan moi qua "Gui bo sung" chi xuat hien o tab "Nhat ky gui nhan", khong bao gio len tab
+        // "Phat hanh". Domino goc CO lam dieu nay (SendDocument.java#processSentDocument, dong ~923:
+        // "docDocument.replaceItemValue(fieldName, v3)" - v3 = danh sach ten CU + ten MOI, dedup theo
+        // chuoi con khong phan biet hoa/thuong) - port lai DUNG hanh vi do, thu thap nguoi nhan GHI
+        // THANH CONG theo effectiveGroup (xem reclassifyIfOwnAgency) de gop vao field "<group>_rtext".
+        Map<String, List<VbdiSendRecipientRequest>> writtenRecipientsByGroup = new LinkedHashMap<>();
         int written = 0;
         written += sendToGroup(request.getDocumentId(), VbdiSendRecipientGroup.COORDINATOR,
-            request.getCoordinator(), sendType, statusLabel, content, deliveryFiles);
+            request.getCoordinator(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup);
         written += sendToGroup(request.getDocumentId(), VbdiSendRecipientGroup.INTERNAL_UNIT,
-            request.getInternalUnit(), sendType, statusLabel, content, deliveryFiles);
+            request.getInternalUnit(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup);
         written += sendToGroup(request.getDocumentId(), VbdiSendRecipientGroup.CONTACT_UNIT,
-            request.getContactUnit(), sendType, statusLabel, content, deliveryFiles);
+            request.getContactUnit(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup);
         written += sendToGroup(request.getDocumentId(), VbdiSendRecipientGroup.EXTERNAL_UNIT,
-            request.getExternalUnit(), sendType, statusLabel, content, deliveryFiles);
+            request.getExternalUnit(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup);
 
         if (written == 0 && isEveryGroupEmpty(request)) {
             return Result.failure(NO_RECIPIENT_MESSAGE);
         }
         if (SEND_FAMILY_TYPES.contains(sendType)) {
-            markSendAgent(document);
+            applySendSideEffects(document, writtenRecipientsByGroup);
+        } else if (REVOKE_FAMILY_TYPES.contains(sendType)) {
+            applyRevokeSideEffects(document, writtenRecipientsByGroup);
         }
         return Result.success(written);
     }
@@ -205,6 +261,12 @@ public class SendVbdiDocumentUseCase {
      * phụ, giống publish outbox message ở {@code AddVbdiSendLogUseCase}) — trả về rỗng, văn bản đến
      * vẫn được tạo, chỉ thiếu tệp đính kèm (có thể bổ sung thủ công sau), CÒN HƠN không gửi được văn
      * bản.
+     *
+     * <p>Bổ sung 21/09/2026 (yêu cầu người dùng: "nếu check vào phát hành kèm văn bản đến thì khi gửi
+     * phải gửi tất cả những file đính kèm của văn bản đến theo" — port
+     * {@code TDUlties.phat_hanh_kem_van_ban_den()}, Domino): khi field {@code phathanhkemvbden} trên
+     * văn bản đi = "1", CŨNG copy tệp của MỌI văn bản đến tham chiếu trong {@code documentin_obj} —
+     * xem {@link #resolvePhatHanhKemVbdenIds}.</p>
      */
     private List<VbdiDeliveryFileRef> prepareDeliveryFiles(VbdiDocument document) {
         try {
@@ -214,6 +276,8 @@ public class SendVbdiDocumentUseCase {
             var request = new PrepareVbdiDeliveryFilesRequest();
             request.setDocumentId(document.getId());
             request.setSenderIdentifier(senderIdentifier == null ? null : senderIdentifier.toString());
+            request.setAdditionalSourceDocumentIds(resolvePhatHanhKemVbdenIds(fields));
+            request.setAttachedFilenames(resolveAttachedFilenames(fields));
 
             var result = prepareVbdiDeliveryFilesUseCase.execute(request);
             if (!result.isSuccess()) {
@@ -229,15 +293,241 @@ public class SendVbdiDocumentUseCase {
         }
     }
 
-    private void markSendAgent(VbdiDocument document) {
+    /**
+     * 21/09/2026 (xem javadoc {@link #prepareDeliveryFiles}): "Phát hành kèm văn bản đến" — CHỈ áp
+     * dụng khi {@value #PHAT_HANH_KEM_VBDEN_FIELD} = "1" (checkbox FE, {@code SubFormThongTinCoBan.jsx}
+     * — CHỈ hiện khi văn bản đi có ít nhất 1 văn bản đến trong {@value #DOCUMENT_IN_OBJ_FIELD}, xem
+     * {@link TraLoiVanBanDenUseCase} — field ghi bởi tính năng "Trả lời văn bản đến"). Đọc lại field
+     * {@code documentin_obj} (JSON array {@code {id,...}}, đã parse sẵn thành {@code List<Map>} bởi
+     * {@code FieldTypeInferrer} hậu tố {@code "_obj"}) — lấy MỌI {@code id} hợp lệ (UUID), bỏ qua
+     * phần tử lỗi/thiếu {@code id} (không suy đoán). <b>KHÔNG dùng field {@code documentin_id}</b>
+     * (fallback Domino gốc khi {@code documentin_obj} rỗng/lỗi parse) — field này CHƯA từng được BẤT
+     * KỲ use case Java nào ghi (đã rà soát toàn bộ {@code td-application}), luôn rỗng cho văn bản
+     * Java-native nên fallback đó không có ý nghĩa ở đây.
+     */
+    private List<java.util.UUID> resolvePhatHanhKemVbdenIds(Map<String, Object> fields) {
+        if (!"1".equals(String.valueOf(fields.get(PHAT_HANH_KEM_VBDEN_FIELD)))) {
+            return List.of();
+        }
+        Object raw = fields.get(DOCUMENT_IN_OBJ_FIELD);
+        if (!(raw instanceof List<?> list)) {
+            return List.of();
+        }
+        List<java.util.UUID> ids = new java.util.ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof Map<?, ?> map && map.get("id") != null) {
+                try {
+                    ids.add(java.util.UUID.fromString(map.get("id").toString().trim()));
+                } catch (IllegalArgumentException ex) {
+                    log.warn("documentin_obj co id khong hop le (khong phai UUID), bo qua: {}", map.get("id"));
+                }
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * Bổ sung 30/09/2026 (yêu cầu người dùng: văn bản đến nhận được phải chia "Tệp ban hành"/"Tệp kèm
+     * theo" như chi tiết văn bản đi) — tên tệp trong {@value #TEP_KEM_THEO_FIELD} của văn bản đi, để
+     * {@code PrepareVbdiDeliveryFilesUseCase} gán nhóm cho từng tệp. Nhận cả chuỗi phân tách ";" (quy
+     * ước FE) lẫn mảng.
+     */
+    private List<String> resolveAttachedFilenames(Map<String, Object> fields) {
+        Object raw = fields.get(TEP_KEM_THEO_FIELD);
+        if (raw == null) {
+            return List.of();
+        }
+        List<String> names = new java.util.ArrayList<>();
+        if (raw instanceof List<?> list) {
+            list.forEach(item -> { if (item != null) names.add(item.toString()); });
+        } else {
+            names.addAll(java.util.Arrays.asList(raw.toString().split(";")));
+        }
+        return names.stream().map(String::trim).filter(s -> !s.isEmpty()).toList();
+    }
+
+    /**
+     * Bổ sung 21/09/2026 (xem javadoc addendum ở {@link #execute}): gộp 2 side-effect ghi lên CHÍNH
+     * field động của văn bản vào 1 lần parse + 1 lần save duy nhất — (1) {@code send_agent="1"}
+     * (hành vi cũ, xem {@code markSendAgent} trước đây), (2) gộp TÊN người nhận vừa ghi log THÀNH
+     * CÔNG vào field {@code "<group>_rtext"} tương ứng, dedup theo chuỗi con không phân biệt hoa/
+     * thường — ĐÚNG {@code SendDocument.java#processSentDocument} (Domino, dòng ~881-924:
+     * {@code v3.add(name)} rồi {@code replaceItemValue(fieldName, v3)}). CHỈ field {@code "_rtext"}
+     * (hiển thị thuần, tab "Phát hành") — KHÔNG đụng {@code "_obj_rtext"}/{@code "_obj_log_rtext"}
+     * (đã có cơ chế riêng qua {@code vbdi_send_log_documents}/{@code fetchVbdiCurrentRecipientsJava},
+     * xem javadoc lớp — ngoài phạm vi gap này).
+     *
+     * <p>Bổ sung 21/09/2026 (xem javadoc {@link #COORDINATOR_HIDE_FIELD}): với nhóm
+     * {@code coordinator}, CŨNG gộp username vào {@code coordinator_hide_rtext}/
+     * {@code coordinator_hide_not_seen_rtext} — để văn bản bắt đầu xuất hiện ở "danh sách cá nhân
+     * liên quan" của người nhận (view {@code VIEW_VBDI_USER_ALL}/{@code VIEW_VBDI_NHANDEBIET_UNSEEN})
+     * — tiền đề để {@link #applyRevokeSideEffects} có gì đó để GỠ khi "Lấy lại".</p>
+     */
+    private void applySendSideEffects(
+            VbdiDocument document, Map<String, List<VbdiSendRecipientRequest>> writtenRecipientsByGroup) {
         Map<String, Object> fields = new LinkedHashMap<>(
             dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
-        if ("1".equals(String.valueOf(fields.get(SEND_AGENT_FIELD)))) {
-            return; // Da danh dau tu lan gui truoc - khong ghi/save thua.
+        boolean changed = false;
+        if (!"1".equals(String.valueOf(fields.get(SEND_AGENT_FIELD)))) {
+            fields.put(SEND_AGENT_FIELD, "1");
+            changed = true;
         }
-        fields.put(SEND_AGENT_FIELD, "1");
-        document.replaceDynamicFields(toJson(fields));
-        vbdiDocumentRepository.save(document);
+        for (Map.Entry<String, List<VbdiSendRecipientRequest>> entry : writtenRecipientsByGroup.entrySet()) {
+            String group = entry.getKey();
+            List<VbdiSendRecipientRequest> recipients = entry.getValue();
+            if (mergeRecipientNamesIntoField(fields, group + "_rtext", recipients)) {
+                changed = true;
+            }
+            if (VbdiSendRecipientGroup.COORDINATOR.equals(group)) {
+                List<String> usernames = coordinatorUsernames(recipients);
+                if (mergeValuesIntoSemicolonField(fields, COORDINATOR_HIDE_FIELD, usernames)) {
+                    changed = true;
+                }
+                if (mergeValuesIntoSemicolonField(fields, COORDINATOR_HIDE_NOT_SEEN_FIELD, usernames)) {
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            document.replaceDynamicFields(toJson(fields));
+            vbdiDocumentRepository.save(document);
+        }
+    }
+
+    /**
+     * 21/09/2026 (xem javadoc {@link #REVOKE_FAMILY_TYPES}): đối xứng với {@link #applySendSideEffects}
+     * nhưng GỠ thay vì THÊM — port {@code RevokeDocumentOut.java#RemoveFullNameInFiled} (Domino, xoá
+     * tên khỏi {@code "<group>_rtext"}, áp dụng cho CẢ 4 nhóm — xem dòng ~113/117/121-123/131 file đó)
+     * cộng {@code RemoveFullNameInFiled("coordinator_hide_*_rtext", ...)} CHỈ cho nhóm
+     * {@code coordinator} (đúng nhánh Domino {@code if(unit_revoke.contains("coordinator")...)}).
+     * KHÔNG gọi {@code markSendAgent}/set {@code send_agent} — "thu hồi/lấy lại" KHÔNG thuộc họ GỬI
+     * (xem javadoc {@link #SEND_FAMILY_TYPES} — Domino gốc CŨNG không set field này ở
+     * {@code RevokeDocumentOut.java}/{@code RevokeAllDocumentOut.java}).
+     */
+    private void applyRevokeSideEffects(
+            VbdiDocument document, Map<String, List<VbdiSendRecipientRequest>> revokedRecipientsByGroup) {
+        if (revokedRecipientsByGroup.isEmpty()) {
+            return;
+        }
+        Map<String, Object> fields = new LinkedHashMap<>(
+            dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
+        boolean changed = false;
+        for (Map.Entry<String, List<VbdiSendRecipientRequest>> entry : revokedRecipientsByGroup.entrySet()) {
+            String group = entry.getKey();
+            List<VbdiSendRecipientRequest> recipients = entry.getValue();
+            // 30/09/2026 (yêu cầu người dùng: "Lấy lại văn bản -> tab Phát hành đang xoá mất thông tin đơn vị
+            // lấy lại, đề nghị giữ lại"): KHÔNG còn gỡ tên khỏi "<group>_rtext" (khác Domino
+            // RemoveFullNameInFiled) — tab Phát hành luôn giữ nơi đã phát hành; trạng thái "Lấy lại"/"Thu hồi"
+            // xem ở Nhật ký gửi nhận. Việc làm văn bản biến mất khỏi danh sách cá nhân (coordinator_hide_*)
+            // GIỮ NGUYÊN bên dưới.
+            if (VbdiSendRecipientGroup.COORDINATOR.equals(group)) {
+                List<String> usernames = coordinatorUsernames(recipients);
+                if (removeValuesFromSemicolonField(fields, COORDINATOR_HIDE_FIELD, usernames)) {
+                    changed = true;
+                }
+                if (removeValuesFromSemicolonField(fields, COORDINATOR_HIDE_NOT_SEEN_FIELD, usernames)) {
+                    changed = true;
+                }
+                if (removeValuesFromSemicolonField(fields, COORDINATOR_HIDE_SEEN_FIELD, usernames)) {
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            document.replaceDynamicFields(toJson(fields));
+            vbdiDocumentRepository.save(document);
+        }
+    }
+
+    private List<String> coordinatorUsernames(List<VbdiSendRecipientRequest> recipients) {
+        List<String> usernames = new java.util.ArrayList<>();
+        for (VbdiSendRecipientRequest recipient : recipients) {
+            String username = recipient == null ? null : firstNonBlank(recipient.getUsername(), recipient.getIdentifier());
+            if (username != null) {
+                usernames.add(username);
+            }
+        }
+        return usernames;
+    }
+
+    /** Thêm giá trị (username/identifier, khớp CHÍNH XÁC — không phải chuỗi con) chưa có vào field {@code ";"}-joined. */
+    private boolean mergeValuesIntoSemicolonField(Map<String, Object> fields, String fieldName, List<String> values) {
+        if (values.isEmpty()) {
+            return false;
+        }
+        List<String> current = splitSemicolonValues(fields.get(fieldName));
+        boolean changed = false;
+        for (String value : values) {
+            if (current.stream().noneMatch(existing -> existing.equalsIgnoreCase(value))) {
+                current.add(value);
+                changed = true;
+            }
+        }
+        if (changed) {
+            fields.put(fieldName, String.join(";", current));
+        }
+        return changed;
+    }
+
+    /** Gỡ giá trị (khớp CHÍNH XÁC, không phân biệt hoa/thường) khỏi field {@code ";"}-joined. */
+    private boolean removeValuesFromSemicolonField(Map<String, Object> fields, String fieldName, List<String> values) {
+        if (values.isEmpty()) {
+            return false;
+        }
+        List<String> current = splitSemicolonValues(fields.get(fieldName));
+        int sizeBefore = current.size();
+        current.removeIf(existing -> values.stream().anyMatch(existing::equalsIgnoreCase));
+        if (current.size() == sizeBefore) {
+            return false;
+        }
+        fields.put(fieldName, String.join(";", current));
+        return true;
+    }
+
+    private List<String> splitSemicolonValues(Object rawValue) {
+        List<String> values = new java.util.ArrayList<>();
+        String text = rawValue == null ? "" : String.valueOf(rawValue);
+        for (String part : text.split(";")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                values.add(trimmed);
+            }
+        }
+        return values;
+    }
+
+    // 30/09/2026: đã bỏ removeRecipientNamesFromField (port RevokeDocumentOut#RemoveFullNameInFiled) — "Lấy
+    // lại"/"Thu hồi" giữ tên ở tab Phát hành theo yêu cầu người dùng, xem applyRevokeSideEffects.
+
+    private boolean mergeRecipientNamesIntoField(
+            Map<String, Object> fields, String fieldName, List<VbdiSendRecipientRequest> recipients) {
+        if (recipients == null || recipients.isEmpty()) {
+            return false;
+        }
+        Object existingValue = fields.get(fieldName);
+        String existing = existingValue == null ? "" : String.valueOf(existingValue);
+        List<String> names = new java.util.ArrayList<>();
+        for (String part : existing.split(";")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                names.add(trimmed);
+            }
+        }
+        String existingLower = existing.toLowerCase();
+        boolean changed = false;
+        for (VbdiSendRecipientRequest recipient : recipients) {
+            String name = recipient == null || recipient.getName() == null ? null : recipient.getName().trim();
+            if (name == null || name.isEmpty() || existingLower.contains(name.toLowerCase())) {
+                continue;
+            }
+            names.add(name);
+            existingLower = existingLower + ";" + name.toLowerCase();
+            changed = true;
+        }
+        if (changed) {
+            fields.put(fieldName, String.join("; ", names));
+        }
+        return changed;
     }
 
     private String toJson(Map<String, Object> value) {
@@ -249,7 +539,8 @@ public class SendVbdiDocumentUseCase {
     }
 
     private int sendToGroup(java.util.UUID documentId, String group, List<VbdiSendRecipientRequest> recipients,
-            String sendType, String statusLabel, String content, List<VbdiDeliveryFileRef> deliveryFiles) {
+            String sendType, String statusLabel, String content, List<VbdiDeliveryFileRef> deliveryFiles,
+            Map<String, List<VbdiSendRecipientRequest>> writtenRecipientsByGroup) {
         if (recipients == null || recipients.isEmpty()) {
             return 0;
         }
@@ -289,6 +580,8 @@ public class SendVbdiDocumentUseCase {
             Result<java.util.UUID> result = addVbdiSendLogUseCase.execute(logRequest);
             if (result.isSuccess()) {
                 written++;
+                writtenRecipientsByGroup.computeIfAbsent(effectiveGroup, key -> new java.util.ArrayList<>())
+                    .add(recipient);
             } else {
                 log.warn("Ghi vet gui nhan that bai (group={}, identifier={}): {}", effectiveGroup, identifier, result.getError());
             }

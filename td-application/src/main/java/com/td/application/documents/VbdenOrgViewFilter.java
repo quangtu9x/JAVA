@@ -149,6 +149,30 @@ public class VbdenOrgViewFilter {
     private boolean sortDescending = true;
 
     /**
+     * 02/10/2026 ({@code theodoi_sort_thoihan}: hạn xử lý TĂNG, ngày đến GIẢM): chiều riêng cho
+     * {@code secondarySortField}. {@code null} = cùng chiều {@link #sortDescending}.
+     */
+    private Boolean secondarySortDescending;
+
+    /**
+     * 01/10/2026 (yêu cầu người dùng "vbden/xuly/quamangnoibo — sắp xếp mới nhất lên trên"): {@code true}
+     * = {@code ORDER BY created_on DESC} (mới ĐẾN nhất trước) thay vì {@code last_modified_on} mặc định
+     * (văn bản cũ chỉ cần bị sửa là nhảy lên đầu). Dùng cho 5 view màn "Chờ vào sổ" — văn bản nhận qua
+     * mạng có {@code created_on} = lúc đến ({@code received_date} lẫn 2 dạng có/không giờ nên không
+     * sort theo field đó được, xem {@code dynamicSortExpression}). Bị bỏ qua khi có {@code primarySortField}.
+     */
+    @Builder.Default
+    private boolean newestCreatedFirst = false;
+
+    /**
+     * 01/10/2026 (hồ sơ "Tìm kiếm nâng cao" → Trạng thái phối hợp = "Chưa phối hợp", Domino
+     * {@code fieldnot_X}: {@code !@Contains(X; value)}): field → giá trị mà field KHÔNG được chứa
+     * (không là phần tử mảng JSON, không bằng scalar, không là thành viên chuỗi {@code "a;b"}). Hiện
+     * chỉ {@code PostgresHoSoCVDocumentRepository} áp dụng.
+     */
+    private Map<String, List<String>> excludeMemberFieldValues;
+
+    /**
      * Bổ sung 14/09/2026 (port route {@code vbden/thungrac/thungrac} — chuyển {@code qlvb/vbden/
      * GetViewColl} về dùng chung {@code GetView}, xem javadoc {@code ViewQueryService#VIEW_VBDEN_TRASH}):
      * {@code true} = đảo ngược điều kiện mặc định — chỉ lấy bản ghi ĐÃ soft-delete
@@ -157,4 +181,16 @@ public class VbdenOrgViewFilter {
      */
     @Builder.Default
     private boolean deletedOnly = false;
+
+    /**
+     * Bổ sung 30/09/2026 (báo lỗi người dùng: "Lấy lại văn bản" — văn bản đến đã mất khỏi danh sách
+     * văn thư nhưng vẫn hiện ở {@code vbden/xuly/dencoquan}): mặc định {@code false} = LOẠI văn bản
+     * đã thu hồi ({@code is_revoke="1"}) — tương đương Domino đổi {@code Form} sang
+     * {@code DocumentIn_Deleted} khi thu hồi/lấy lại, khiến văn bản rơi khỏi MỌI view
+     * {@code Form="DocumentIn"}. {@code true} chỉ dùng cho tra cứu KHÔNG phải danh sách (vd mở chi
+     * tiết văn bản đã bị thu hồi). Filter có {@code includeFieldValues} chứa {@code is_revoke} (view
+     * "Bị thu hồi") tự động không bị loại.
+     */
+    @Builder.Default
+    private boolean includeRevoked = false;
 }

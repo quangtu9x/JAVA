@@ -72,6 +72,7 @@ public class GetCapBanHanhOptionsUseCase {
     private static final String DATABASE_TYPE_VBDI = "vbdi";
     private static final String IDENTIFIER_OTHER_FIELD = "identifier_other";
     private static final String MAILIN_FIELD = "mailin";
+    private static final String FORM_AGENCY = "agency";
 
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
@@ -132,12 +133,43 @@ public class GetCapBanHanhOptionsUseCase {
         // Domino reverse() dataList (LÁ->GỐC thành GỐC->LÁ) trước khi lặp — ở đây đơn giản hơn: lặp
         // ngược danh sách LÁ->GỐC đã có sẵn, cho ĐÚNG thứ tự GỐC->LÁ (agency_level trước, don_vi
         // cua chinh user sau cung) ma khong can allocate list moi.
+        List<Organization> options = new ArrayList<>();
         for (int i = ancestryLeafToRoot.size() - 1; i >= 0; i--) {
             Organization org = ancestryLeafToRoot.get(i);
             if (org.getIdentifier() == null || org.getIdentifier().isBlank()) {
                 continue; // Domino: bo qua to tien khong co identifier
             }
-            result.add(toLegacyNode(org));
+            options.add(org);
+        }
+        // 01/10/2026 (thay nhanh HĐND gan cung o FE): co quan cau hinh "bo sung don vi con" -> them cac
+        // don vi con TRUC TIEP cua co quan; to chuc cau hinh "an khoi cap ban hanh" -> bo ra. Xem
+        // OrganizationConfigKeys.
+        ancestryLeafToRoot.stream()
+            .filter(org -> FORM_AGENCY.equals(org.getNodeType()))
+            .findFirst()
+            .filter(agency -> isFlagOn(agency, OrganizationConfigKeys.CAP_BAN_HANH_INCLUDE_CHILDREN))
+            .ifPresent(agency -> organizationRepository.findByParentIdAndDeletedOnIsNull(agency.getId()).stream()
+                .filter(child -> child.getIdentifier() != null && !child.getIdentifier().isBlank())
+                .filter(child -> options.stream().noneMatch(existing -> existing.getId().equals(child.getId())))
+                .sorted(java.util.Comparator.comparingInt(Organization::getSortOrder)
+                    .thenComparing(child -> child.getName() == null ? "" : child.getName()))
+                .forEach(options::add));
+        for (Organization org : options) {
+            if (!isFlagOn(org, OrganizationConfigKeys.HIDE_FROM_CAP_BAN_HANH)) {
+                result.add(toLegacyNode(org));
+            }
+        }
+        // 01/10/2026 (yêu cầu người dùng "dự thảo -> tạo mới, chọn cấp ban hành chỉ lấy từ phòng, đơn
+        // vị, cơ quan của người dùng thay vì hiển thị cả cấp 1"): databasetype=duthao bỏ cấp 1
+        // (agency_level/Tỉnh). Ngoại lệ: user gắn thẳng vào cấp 1 (không có cấp thấp hơn) thì giữ lại
+        // để dropdown không trống. Cùng ngày mở rộng cho vbdi (yêu cầu "làm luôn với văn bản đi").
+        if (DATABASE_TYPE_DUTHAO.equalsIgnoreCase(databasetype) || DATABASE_TYPE_VBDI.equalsIgnoreCase(databasetype)) {
+            List<Map<String, Object>> withoutLevel1 = result.stream()
+                .filter(node -> !OrganizationHierarchyRules.AGENCY_LEVEL.equals(node.get("form")))
+                .toList();
+            if (!withoutLevel1.isEmpty()) {
+                result = new ArrayList<>(withoutLevel1);
+            }
         }
         if (result.isEmpty()) {
             log.warn("Cap ban hanh (databasetype={}): user {} co {} to chuc to tien (tu {} den goc) nhung TAT CA "
@@ -146,6 +178,12 @@ public class GetCapBanHanhOptionsUseCase {
                 ancestryLeafToRoot.stream().map(Organization::getId).toList());
         }
         return Result.success(result);
+    }
+
+    // 01/10/2026: co cau hinh "1" trong dynamic_fields cua to chuc (xem OrganizationConfigKeys).
+    private boolean isFlagOn(Organization org, String key) {
+        Object value = dynamicDocumentFieldsService.parseDynamicFields(org.getDynamicFieldsJson()).get(key);
+        return value != null && "1".equals(String.valueOf(value).trim());
     }
 
     // Tuong duong doc "parentids_obj" cua user hien tai (GetUserOrganizationProfileUseCase da co

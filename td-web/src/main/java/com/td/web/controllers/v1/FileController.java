@@ -52,11 +52,13 @@ public class FileController extends BaseController {
             @Parameter(description = "Document ID", required = true) @PathVariable UUID documentId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "description", required = false) String description) {
-        try {
+        // try-with-resources: đóng stream sau khi upload xong — stream còn mở giữ khoá tệp tạm multipart
+        // trên Windows, Tomcat không xoá được ("Failed to deleted temporary file used for part [file]").
+        try (java.io.InputStream fileStream = file.getInputStream()) {
             var request = UploadFileRequest.builder()
                     .documentId(documentId)
                     .fileName(file.getOriginalFilename())
-                    .fileContent(file.getInputStream())
+                    .fileContent(fileStream)
                     .fileSize(file.getSize())
                     .mimeType(file.getContentType())
                     .description(description)

@@ -40,6 +40,7 @@ com\td\domain\vbdi\VbdiDocument.class
 com\td\domain\messaging\OutboxEvent.class
 com\td\domain\common\contracts\AuditCurrentUserHolder.class
 com\td\domain\common\contracts\Repository.class
+com\td\domain\sharedcore\IdentityFileMetadata$IdentityFileMetadataBuilder.class
 com\td\domain\sharedcore\RolePermission.class
 com\td\domain\common\events\EntityDeletedEvent.class
 com\td\domain\common\contracts\AbstractEntity.class
@@ -56,6 +57,8 @@ com\td\domain\documents\DocumentLog.class
 com\td\domain\hosoluutru\HoSoLuuTruProcessDocument.class
 com\td\domain\sharedcore\AppRole.class
 com\td\domain\hosoluutru\HoSoLuuTruPhieuYeuCauDocument.class
+com\td\domain\vbden\VbdenUpdateHistoryDocument.class
+com\td\domain\sharedcore\IdentityFileMetadata.class
 template\department\domain\Department.class
 com\td\domain\common\contracts\IAggregateRoot.class
 com\td\domain\documents\BusinessDocument.class

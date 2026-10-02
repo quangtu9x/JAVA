@@ -95,6 +95,8 @@ class VbdiControllerTest {
     @MockBean
     private com.td.application.vbdi.AddVbdiSeenDocumentUseCase addVbdiSeenDocumentUseCase;
     @MockBean
+    private com.td.application.vbdi.AddVbdiImportantDocumentUseCase addVbdiImportantDocumentUseCase;
+    @MockBean
     private com.td.application.vbdi.ChuyenXemDeBietVbdiUseCase chuyenXemDeBietVbdiUseCase;
     // Bo sung 13/09/2026 - cung nhom pre-existing gap voi CapNhatVanBanDiUseCase o tren (VbdiController
     // da co san cac tham so nay tu truoc, test file chua duoc cap nhat theo).

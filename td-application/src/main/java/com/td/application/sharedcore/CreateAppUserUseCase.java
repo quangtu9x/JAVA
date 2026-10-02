@@ -81,7 +81,7 @@ public class CreateAppUserUseCase {
                 request.getPositionId(),
                 request.getIsActive() == null || request.getIsActive(),
                 request.getLevel(),
-                request.getSortOrder() == null ? 0 : request.getSortOrder(),
+                request.getSortOrder() == null ? CreateAppUserRequest.DEFAULT_SORT_ORDER : request.getSortOrder(),
                 TextNormalizer.normalize(request.getPhoneNumber()),
                 TextNormalizer.normalize(request.getGender()),
                 request.getBirthdayDate(),

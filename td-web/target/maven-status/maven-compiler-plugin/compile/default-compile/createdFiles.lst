@@ -10,6 +10,7 @@ com\td\web\controllers\v1\SharedCoreOrganizationsController.class
 com\td\web\controllers\v1\SharedCoreDataScopesController.class
 com\td\web\controllers\v1\SharedCoreRolesController.class
 com\td\web\controllers\v1\QLVBCompatAuthController$ResolvedAgency.class
+com\td\web\controllers\v1\IdentityDocumentsController.class
 com\td\web\controllers\v1\LegacyDanhMucController.class
 com\td\web\controllers\v1\PlatformDbServersController.class
 com\td\web\controllers\v1\VbdenController.class
@@ -27,8 +28,10 @@ com\td\web\controllers\v1\DocumentRegistersController.class
 com\td\web\config\StringNormalizationConfig.class
 com\td\web\controllers\v1\OnlyOfficeController.class
 com\td\web\controllers\v1\SharedCoreUsersController.class
+com\td\web\controllers\v1\SimPkiSignController.class
 com\td\web\controllers\v1\VbdiController.class
 com\td\web\controllers\v1\HoSoLuuTruController.class
+com\td\web\controllers\v1\SimPkiSignController$1.class
 com\td\web\controllers\v1\PrivateCategoriesController.class
 com\td\web\controllers\SwaggerOAuthConfigController.class
 com\td\web\config\StringNormalizationConfig$StringNormalizationAdvice.class
@@ -42,4 +45,5 @@ com\td\web\controllers\v1\HoSoCVController.class
 com\td\web\controllers\v1\PlatformTenantsController.class
 com\td\web\TdWebApiApplication.class
 com\td\web\controllers\v1\PhieuTrinhTdController.class
+com\td\web\controllers\v1\SimPkiSignController$2.class
 com\td\web\controllers\SwaggerUiController.class

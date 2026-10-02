@@ -51,7 +51,8 @@ class XinYKienPhoiHopUseCaseTest {
     void setUp() {
         useCase = new XinYKienPhoiHopUseCase(
             duThaoDocumentRepository, addDraftProcessDocumentUseCase, dynamicDocumentFieldsService,
-            currentUserProvider, documentLogService, documentCacheService, authorAclFieldsService);
+            currentUserProvider, documentLogService, documentCacheService, authorAclFieldsService,
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
     }
 
     @Test
@@ -105,6 +106,7 @@ class XinYKienPhoiHopUseCaseTest {
         when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
         when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
+        when(addDraftProcessDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
 
         var request = new XinYKienPhoiHopRequest();
         request.setId(draft.getId());
@@ -116,6 +118,46 @@ class XinYKienPhoiHopUseCaseTest {
         assertThat(fields.get("user_coordinator")).asList().containsExactly("tranvanb");
         assertThat(fields.get("user_coordinated")).asList().containsExactly("nguyenvana");
         verify(documentLogService).logUpdate(any(), any(), any());
+    }
+
+    // 26/09/2026: FE ghi user_coordinator dang chuoi scalar "a;b" qua Luu (DB that tenant skhcn) -
+    // truoc day bi coi la rong (khong phan hoi duoc, con ghi de thanh []).
+    @Test
+    void execute_whenCoordinatorStoredAsDelimitedString_shouldMoveUserAndKeepStringShape() {
+        DuThaoDocument draft = newDraft("duthao", "{\"user_coordinator\":\"nguyenvana;tranvanb\"}");
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
+        UUID childId = UUID.randomUUID();
+        when(addDraftProcessDocumentUseCase.execute(any())).thenReturn(Result.success(childId));
+
+        var request = new XinYKienPhoiHopRequest();
+        request.setId(draft.getId());
+
+        var result = useCase.execute(request);
+
+        assertThat(result.getData()).isEqualTo(childId);
+        Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson());
+        assertThat(fields.get("user_coordinator")).isEqualTo("tranvanb");
+        assertThat(fields.get("user_coordinated")).isEqualTo("nguyenvana");
+        ArgumentCaptor<AddDynamicDocumentRequest> captor = ArgumentCaptor.forClass(AddDynamicDocumentRequest.class);
+        verify(addDraftProcessDocumentUseCase).execute(captor.capture());
+        assertThat(captor.getValue().getFields()).containsEntry("opinion", "Đã phối hợp");
+    }
+
+    @Test
+    void execute_whenOpinionRecordFails_shouldReturnFailure() {
+        DuThaoDocument draft = newDraft("duthao", "{\"user_coordinator\":\"nguyenvana\"}");
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
+        when(addDraftProcessDocumentUseCase.execute(any())).thenReturn(Result.failure("loi"));
+
+        var request = new XinYKienPhoiHopRequest();
+        request.setId(draft.getId());
+        request.setOpinion("Y kien");
+
+        assertThat(useCase.execute(request).isSuccess()).isFalse();
     }
 
     @Test
@@ -142,7 +184,7 @@ class XinYKienPhoiHopUseCaseTest {
         // do caller dat - AddDraftProcessDocumentUseCase tu ep 'draft_process'; field theo chuan
         // draft_process (parentid/action/receiver_username/opinion/creator).
         assertThat(captor.getValue().getFields()).containsEntry("parentid", draft.getId().toString());
-        assertThat(captor.getValue().getFields()).containsEntry("action_type", "chuyenphoihop");
+        assertThat(captor.getValue().getFields()).containsEntry("action_type", "ykienphoihop");
         assertThat(captor.getValue().getFields()).containsEntry("receiver_username", "nguyenvana");
         assertThat(captor.getValue().getFields()).containsEntry("opinion", "Dong y voi noi dung du thao");
         assertThat(captor.getValue().getFields()).containsEntry("creator", "nguyenvana");

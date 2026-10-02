@@ -42,6 +42,12 @@ public class CopyDocumentFilesUseCaseImpl implements CopyDocumentFilesUseCase {
 
     private final MinioService minioService;
     private final FileMetadataJpaRepository fileMetadataRepo;
+    // Bugfix 28/09/2026 (bao loi nguoi dung "vbdi/xuly/chocapkyso chua hien thi tep dinh kem o ngoai
+    // danh sach"): danh sach vbdi/vbden doc "files" tu dynamic_fields (xem javadoc VbdiFilesJsonbSync)
+    // - truoc day chi Upload/Delete/Rename dong bo, luong copy nay (Chuyen van thu du thao -> vbdi,
+    // Cap nhat VB thay the vbden) bo sot nen van ban dich co tep that nhung danh sach trong.
+    private final VbdiFilesJsonbSync vbdiFilesJsonbSync;
+    private final VbdenFilesJsonbSync vbdenFilesJsonbSync;
 
     @Override
     public Result<Integer> execute(CopyDocumentFilesRequest request) {
@@ -56,6 +62,10 @@ public class CopyDocumentFilesUseCaseImpl implements CopyDocumentFilesUseCase {
             }
             copyOne(source, request);
             copied++;
+        }
+        if (copied > 0) {
+            vbdiFilesJsonbSync.syncIfVbdiDocument(request.getTargetDocumentId());
+            vbdenFilesJsonbSync.syncIfVbdenDocument(request.getTargetDocumentId());
         }
         log.info("Copied {} file(s) from document {} to {}",
                 copied, request.getSourceDocumentId(), request.getTargetDocumentId());

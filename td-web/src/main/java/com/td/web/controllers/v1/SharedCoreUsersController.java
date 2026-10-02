@@ -11,6 +11,7 @@ import com.td.application.sharedcore.GetAppUserUseCase;
 import com.td.application.sharedcore.GetKiemNhiemPendingCountUseCase;
 import com.td.application.sharedcore.GetUserOrganizationProfileUseCase;
 import com.td.application.sharedcore.GetUserRoleGroupConfigUseCase;
+import com.td.application.sharedcore.GetUserSignatureImagesUseCase;
 import com.td.application.sharedcore.ListUserDirectoryUseCase;
 import com.td.application.sharedcore.LockAppUsersUseCase;
 import com.td.application.sharedcore.SearchAppUsersRequest;
@@ -22,9 +23,14 @@ import com.td.application.sharedcore.TransferAppUsersUseCase;
 import com.td.application.sharedcore.UnlockAppUsersUseCase;
 import com.td.application.sharedcore.UpdateAppUserRequest;
 import com.td.application.sharedcore.UpdateAppUserUseCase;
+import com.td.application.sharedcore.UploadUserSignatureImageRequest;
+import com.td.application.sharedcore.UploadUserSignatureImageUseCase;
 import com.td.application.sharedcore.UserDirectoryEntryDto;
 import com.td.application.sharedcore.UserOrganizationProfileDto;
 import com.td.application.sharedcore.UserRoleGroupConfigDto;
+import com.td.application.sharedcore.UserSignatureImageType;
+import com.td.application.sharedcore.UserSignatureImagesDto;
+import com.td.application.common.models.Result;
 import com.td.infrastructure.security.AuthenticatedUser;
 import com.td.infrastructure.security.TdTokenService;
 import com.td.web.controllers.BaseController;
@@ -37,6 +43,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -50,6 +57,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -86,6 +94,11 @@ public class SharedCoreUsersController extends BaseController {
     private final ListUserDirectoryUseCase listUserDirectoryUseCase;
     private final GetKiemNhiemPendingCountUseCase getKiemNhiemPendingCountUseCase;
 
+    // Hoàn thiện "gắn hình ảnh chữ ký" người dùng (2 loại — xem javadoc UserSignatureImageType),
+    // trước đây bị ẩn có chủ đích ở ChiTietModalNguoiDung.jsx (FE) vì backend chưa có chỗ lưu.
+    private final UploadUserSignatureImageUseCase uploadUserSignatureImageUseCase;
+    private final GetUserSignatureImagesUseCase getUserSignatureImagesUseCase;
+
     // TDSwitchUser (docs/analysis/19-checklist-port-tdswitchuser-domino-sang-java.md)
     private final SwitchUserUseCase switchUserUseCase;
     private final GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
@@ -111,7 +124,7 @@ public class SharedCoreUsersController extends BaseController {
     public ResponseEntity<ApiResponse<List<AppUserDto>>> listUsers(
             @RequestParam(defaultValue = "0") int pageNumber,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(defaultValue = "fullName") String sortBy,
+            @RequestParam(defaultValue = SearchAppUsersRequest.DEFAULT_SORT_BY) String sortBy,
             @RequestParam(defaultValue = "asc") String sortDirection,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) UUID organizationId,
@@ -156,6 +169,53 @@ public class SharedCoreUsersController extends BaseController {
             @Parameter(description = "User ID", required = true)
             @PathVariable UUID id) {
         return ok(getAppUserUseCase.execute(id));
+    }
+
+    // ================= Ảnh chữ ký người dùng (chữ ký chính/chữ ký nháy) =================
+
+    @PostMapping(value = "/{id}/signature-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Gắn ảnh chữ ký cho người dùng",
+        description = "type=OFFICIAL tương ứng field Domino cũ \"anhkyso\" (chữ ký số/chữ ký chính), "
+            + "type=DRAFT tương ứng \"anhkynhay\" (chữ ký nháy/tắt). Ảnh mới thay thế ảnh hiện hành "
+            + "cùng loại (ảnh cũ không bị xoá, chỉ không còn là ảnh hiện hành). Giới hạn 1MB, chỉ "
+            + "nhận tệp hình ảnh.")
+    public ResponseEntity<ApiResponse<UUID>> uploadSignatureImage(
+            @Parameter(description = "User ID", required = true) @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file,
+            @Parameter(description = "Loại ảnh chữ ký: OFFICIAL (anhkyso) hoặc DRAFT (anhkynhay)", required = true)
+            @RequestParam("type") String type) {
+        UserSignatureImageType parsedType;
+        try {
+            parsedType = UserSignatureImageType.valueOf(type == null ? "" : type.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return badRequest(Result.failure("Loại ảnh chữ ký không hợp lệ (chỉ nhận OFFICIAL hoặc DRAFT)"));
+        }
+        // try-with-resources: đóng stream sau khi upload xong — stream còn mở giữ khoá tệp tạm multipart
+        // trên Windows, Tomcat không xoá được ("Failed to deleted temporary file used for part [file]").
+        try (java.io.InputStream fileStream = file.getInputStream()) {
+            var request = UploadUserSignatureImageRequest.builder()
+                .userId(id)
+                .type(parsedType)
+                .fileContent(fileStream)
+                .fileName(file.getOriginalFilename())
+                .mimeType(file.getContentType())
+                .fileSize(file.getSize())
+                .build();
+            return ok(uploadUserSignatureImageUseCase.execute(request));
+        } catch (Exception e) {
+            return badRequest(Result.failure("Lỗi tải ảnh chữ ký: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/signature-images")
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Lấy ảnh chữ ký hiện hành (chính + nháy) của người dùng",
+        description = "Trả kèm documentId của mỗi ảnh — dùng lại NGUYÊN endpoint xem/tải/xoá tệp chung "
+            + "đã có (api/v1/documents/{documentId}/files/{fileId}/...). null nghĩa là chưa gắn ảnh loại đó.")
+    public ResponseEntity<ApiResponse<UserSignatureImagesDto>> getSignatureImages(
+            @Parameter(description = "User ID", required = true) @PathVariable UUID id) {
+        return ok(getUserSignatureImagesUseCase.execute(id));
     }
 
     // ================= BL-108: User Management — Core CRUD =================

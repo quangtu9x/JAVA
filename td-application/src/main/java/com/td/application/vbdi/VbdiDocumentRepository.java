@@ -26,7 +26,8 @@ public interface VbdiDocumentRepository extends IRepository<VbdiDocument> {
      * (không phải field động JSONB) của {@code documentType} cho trước — dùng cho 2 view
      * {@code vwvandi_chobanhanh}/{@code vwvandi_dabanhanh} (BL-220 DoD 4).
      */
-    Page<VbdiDocument> findByStatus(String documentType, String status, Pageable pageable);
+    // 01/10/2026: + filter (keyword/keywordColumns) - "tim trong danh sach" truoc day bi bo qua.
+    Page<VbdiDocument> findByStatus(String documentType, String status, VbdiDocumentOutFilter filter, Pageable pageable);
 
     /**
      * 27/08/2026 (port route FE "vbdi/xuly/chocapkyso", view Domino thật {@code vwCreator_Drafting}
@@ -37,8 +38,9 @@ public interface VbdiDocumentRepository extends IRepository<VbdiDocument> {
      * Method riêng (không tái dùng {@link #findByStatus}) vì cần thêm điều kiện field động, khác hẳn
      * predicate chỉ-cột-tĩnh của method đó.
      */
+    // 01/10/2026: + filter (keyword/keywordColumns) - route chocapkyso/chobanhanh truoc day bo qua tu khoa.
     Page<VbdiDocument> findWaitingForRegistrationByIdentifier(
-        String documentType, String status, String identifier, Pageable pageable);
+        String documentType, String status, String identifier, VbdiDocumentOutFilter filter, Pageable pageable);
 
     /**
      * 28/08/2026 (port route FE "vbdi/xuly/cq_toanboso" + 3 route anh em cùng dom_view_name

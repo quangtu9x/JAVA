@@ -51,6 +51,8 @@ public class GanKemTepDuThaoUseCase {
     private final DuThaoDocumentRepository duThaoDocumentRepository;
     private final AddDraftProcessDocumentUseCase addDraftProcessDocumentUseCase;
     private final CurrentUserProvider currentUserProvider;
+    // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
+    private final DraftProcessActorFields draftProcessActorFields;
 
     public Result<UUID> execute(GanKemTepDuThaoRequest request) {
         var draftOptional = duThaoDocumentRepository.findById(request.getId());
@@ -69,7 +71,7 @@ public class GanKemTepDuThaoUseCase {
         if (request.getOpinion() != null && !request.getOpinion().isBlank()) {
             fields.put(OPINION_FIELD, request.getOpinion());
         }
-        fields.put(CREATOR_FIELD, actingUsername);
+        draftProcessActorFields.put(fields, actingUsername);
         processRequest.setFields(fields);
 
         return addDraftProcessDocumentUseCase.execute(processRequest);

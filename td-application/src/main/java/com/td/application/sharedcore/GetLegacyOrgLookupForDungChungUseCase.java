@@ -65,6 +65,37 @@ public class GetLegacyOrgLookupForDungChungUseCase {
             .toList();
     }
 
+    // viewname=vwcocautochuc_cay (27/09/2026, yeu cau nguoi dung "van ban di -> don vi soan thao: van
+    // thu co quan thay toan bo don vi trong co quan, van thu don vi thay don vi + cac phong"): CHINH
+    // node key (depth=0) + MOI hau due, thu tu cay (pre-order), anh em sap theo sortOrder roi ten -
+    // moi dong kem "depth" de FE thut le. Khac vwcocautochuc (chi con truc tiep, giu nguyen).
+    public List<Map<String, Object>> getOrganizationSubtree(String rootIdRaw) {
+        UUID rootId = parseUuid(rootIdRaw);
+        if (rootId == null) {
+            return List.of();
+        }
+        var root = organizationRepository.findByIdAndDeletedOnIsNull(rootId);
+        if (root.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> result = new ArrayList<>();
+        appendSubtree(root.get(), 0, result, new HashSet<>());
+        return result;
+    }
+
+    private void appendSubtree(Organization node, int depth, List<Map<String, Object>> result, Set<UUID> visited) {
+        if (!visited.add(node.getId())) {
+            return;
+        }
+        Map<String, Object> row = toOrganizationRow(node);
+        row.put("depth", depth);
+        result.add(row);
+        organizationRepository.findByParentIdAndDeletedOnIsNull(node.getId()).stream()
+            .sorted(java.util.Comparator.comparingInt(Organization::getSortOrder)
+                .thenComparing(child -> safe(child.getName())))
+            .forEach(child -> appendSubtree(child, depth + 1, result, visited));
+    }
+
     // viewname=user_by_parentid (truc tiep) / users_by_parentids (ca cay con, de quy).
     public List<Map<String, Object>> getOrganizationMembers(String orgIdRaw, boolean recursive) {
         UUID orgId = parseUuid(orgIdRaw);

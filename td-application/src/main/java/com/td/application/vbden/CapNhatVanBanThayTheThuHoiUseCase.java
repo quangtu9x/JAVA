@@ -10,15 +10,22 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.documents.FileDto;
+import com.td.application.documents.ListDocumentFilesUseCase;
+import com.td.application.documents.SupersedeDocumentFilesUseCase;
+import com.td.application.sharedcore.AppUserRepository;
 import com.td.domain.documents.BusinessDocument;
+import com.td.domain.vbden.VbdenUpdateHistoryDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +90,35 @@ import java.util.UUID;
  * UNID chính {@code docDocument}/{@code C} — port VERBATIM (không "sửa" thành tham chiếu
  * {@code docRevoke}, dù có vẻ là 1 quirk của Domino — không đủ căn cứ để khẳng định đó là bug thay
  * vì chủ ý, giữ nguyên hành vi nguồn).</p>
+ *
+ * <p><b>Bugfix 24/09/2026 (báo lỗi người dùng: "đã vào sổ 1 VB đến trong tỉnh, đơn vị phát hành gửi
+ * lại có bổ sung tệp đính kèm, bấm Cập nhật VB nhưng tệp bổ sung không vào VB đã vào sổ")</b> —
+ * đối chiếu dữ liệu thật tenant {@code h05_01_sokhcn} (C={@code 5c041ec1...}, 21/09/2026): nhánh
+ * {@code nghiepvu=="2"} ở trên KHÔNG BAO GIỜ cập nhật được gì trong thực tế, vì 3 lỗi:</p>
+ * <ol>
+ *   <li>Guard {@code docRevoke.bussiness_doc_type == "0"} không khớp văn bản gửi LẦN ĐẦU: Domino
+ *   ({@code SendDocument.java:1787}) LUÔN ghi field này kể cả "0", còn worker Java
+ *   ({@code VbdenIncomingDocumentWriter}) CỐ Ý không ghi khi "0" → field vắng mặt → "" ≠ "0".</li>
+ *   <li>Văn bản ĐÃ VÀO SỔ có thể chính là 1 bản "VB cập nhật" ({@code bussiness_doc_type="2"} — người
+ *   dùng vào sổ thẳng bản gửi lại khi bản gốc chưa vào sổ, đúng dữ liệu thật trên) → guard cũ cũng
+ *   loại. Domino lọc ứng viên bằng VIEW {@code vbden_by_id_documentout_davaoso} (chỉ văn bản ĐÃ VÀO
+ *   SỔ, khoá có {@code identifier} đơn vị đang thao tác); Java trước đây KHÔNG có bước lọc này (worker
+ *   trả mọi văn bản đến cùng {@code parentid_send}, gồm cả các bản gửi lại đang chờ). Sửa: thay guard
+ *   bằng đúng điều kiện của view — {@code docRevoke} phải có bản ghi sổ ({@code vbden_so},
+ *   {@code parentid}=docRevoke, chưa xoá) của ĐƠN VỊ đang thao tác ({@code identifier_creator}), bất kể
+ *   {@code bussiness_doc_type} — xem {@link #isRegisteredByCurrentUnit}.</li>
+ *   <li>Không cập nhật được đích nào mà vẫn trả thành công VÀ đánh {@code C.reply="1"} (loại khỏi mọi
+ *   view "chờ") → văn bản gửi lại BIẾN MẤT khỏi danh sách, không còn cách xử lý tiếp. Sửa: nhánh "2"
+ *   không cập nhật được đích nào → trả lỗi rõ ràng, KHÔNG ghi gì (C còn nguyên để vào sổ như mới).</li>
+ * </ol>
+ * <p><b>Tệp + lịch sử (yêu cầu người dùng 24/09/2026 (2): "tạm tệp cũ chưa xoá, chỉ hiển thị tệp mới
+ * cập nhật; lưu vết ngày giờ cập nhật, có liên kết tới văn bản đã cập nhật, thể hiện tệp cũ nhưng không
+ * cho tải, chỉ hiển thị tên")</b> — cả 2 nhánh gộp nội dung (gửi lại "2" và "1"/"4" đang xử lý dở) đi qua
+ * {@link #mergeIntoTarget}: tệp mới copy sang, tệp trùng hẳn giữ nguyên, tệp cũ không còn trong bộ tệp
+ * mới bị đánh dấu ĐÃ THAY THẾ (ẩn khỏi mọi truy vấn, KHÔNG xoá — tương đương "xoá sạch rồi copy lại" của
+ * Domino về mặt hiển thị, nhưng giữ được dữ liệu gốc), và ghi 1 dòng
+ * {@code vbden_update_history_documents} (thời điểm, người cập nhật, snapshot văn bản nguồn + tệp của
+ * nó để mở xem chỉ đọc, danh sách tệp mới/giữ nguyên/đã thay thế, field đã đổi).</p>
  */
 @Service
 @RequiredArgsConstructor
@@ -98,12 +134,20 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
     private static final String DOCUMENT_OUT_REVOKE_FIELD = "documentoutrevoke";
     private static final String NGHIEPVU_FIELD = "nghiepvu";
     private static final String REPLY_FIELD = "reply";
-    private static final String IS_REVOKE_FIELD = "isRevoke";
+    // 28/09/2026: thong nhat ten co thu hoi ve "is_revoke" - CUNG ten worker (VbdiRevokeTaskHandler/
+    // VbdenForwardUnitRevokeTaskHandler) ghi va ViewQueryService/FE doc. Truoc day "isRevoke" (ghi thang
+    // vao map, khong qua lowercase) nen khong noi nao doc duoc - xem migration V1.0.67.
+    private static final String IS_REVOKE_FIELD = "is_revoke";
     private static final String SUBJECT_FIELD = "subject";
     private static final String INTERNAL_FIELD = "internal";
     private static final String UNIT_PROCESS_FIELD = "unit_process";
     private static final String UNIT_PROCESS_REGISTERED_FIELD = "unit_process_registered";
     private static final String VBDEN_DACAPNHAT_OBJ_FIELD = "vbden_dacapnhat_obj";
+    private static final String REGISTER_ENTRY_DOCUMENT_TYPE = TiepNhanVbdenUseCase.REGISTER_ENTRY_DOCUMENT_TYPE;
+    private static final String IDENTIFIER_CREATOR_FIELD = "identifier_creator";
+    private static final int MAX_REGISTER_ENTRIES_PER_PARENT = 100;
+    static final String NO_REGISTERED_TARGET_MESSAGE = "Không tìm thấy văn bản đến đã vào sổ tương ứng để "
+        + "cập nhật. Vui lòng vào sổ văn bản này như văn bản mới.";
     private static final String STATUS_UPDATE_NOI_DUNG = "2";
     private static final String NGHIEPVU_THU_HOI_THAY_THE = "thuhoi|thaythe";
     private static final String NGHIEPVU_CAP_NHAT = "capnhat";
@@ -124,6 +168,11 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
         "position", "signer", "page_amount", "sector", "creator", "promulgation_date",
         "tepkemtheo", "tepbanhanh");
 
+    /** Field của văn bản nguồn chụp lại vào lịch sử cập nhật ({@code update_obj.source}). */
+    private static final List<String> SOURCE_SNAPSHOT_FIELDS = List.of(
+        "code", "promulgation_date", SUBJECT_FIELD, "unit_in_charge", "document_type", "signer",
+        "received_date", BUSSINESS_DOC_TYPE_FIELD);
+
     private static final DateTimeFormatter ACCEPTED_AT_FORMATTER =
         DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -136,6 +185,10 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
     private final DocumentLogService documentLogService;
     private final DocumentCacheService documentCacheService;
     private final com.td.application.vbdi.PublishVbdiReplyStatusUseCase publishVbdiReplyStatusUseCase;
+    private final ListDocumentFilesUseCase listDocumentFilesUseCase;
+    private final SupersedeDocumentFilesUseCase supersedeDocumentFilesUseCase;
+    private final VbdenUpdateHistoryDocumentRepository vbdenUpdateHistoryDocumentRepository;
+    private final AppUserRepository appUserRepository;
 
     public Result<UUID> execute(CapNhatVanBanThayTheThuHoiRequest request) {
         if (request == null || request.getId() == null) {
@@ -159,12 +212,24 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
         List<String> revokeIds = parseDocumentOutRevokeIds(fields.get(DOCUMENT_OUT_REVOKE_FIELD));
 
         boolean isCapNhat = STATUS_UPDATE_NOI_DUNG.equals(nghiepvu);
+        String currentIdentifier = isCapNhat
+            ? resolveIdentifierByLevelUseCase.resolveForCurrentUser().orElse(null) : null;
+        int updatedCount = 0;
         for (String revokeId : revokeIds) {
             if (isCapNhat) {
-                processCapNhatTarget(revokeId, document, fields, actingUsername);
+                if (processCapNhatTarget(revokeId, document, fields, actingUsername, currentIdentifier)) {
+                    updatedCount++;
+                }
             } else {
                 processRevokeTarget(revokeId, document, fields, actingUsername);
             }
+        }
+        if (isCapNhat && updatedCount == 0) {
+            // Bugfix 24/09/2026 (xem javadoc lop, loi 3): KHONG ghi reply=1 - C phai con trong danh
+            // sach cho de nguoi dung vao so nhu van ban moi.
+            log.warn("Cap nhat van ban den {} (nghiepvu=2): khong co van ban da vao so nao cua don vi {} "
+                + "trong documentoutrevoke={} - tra loi, khong thay doi gi", document.getId(), currentIdentifier, revokeIds);
+            return Result.failure(NO_REGISTERED_TARGET_MESSAGE);
         }
 
         fields.put(REPLY_FIELD, "1");
@@ -223,24 +288,8 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
         }
 
         // status thuoc {1,2,3,4} - da xu ly/dang xu ly do, KHONG huy - chi copy noi dung + tep tu C.
-        for (String fieldName : METADATA_FIELDS_TO_COPY) {
-            if (documentFieldsOfC.containsKey(fieldName)) {
-                revokeFields.put(fieldName, documentFieldsOfC.get(fieldName));
-            }
-        }
-        docRevoke.replaceDynamicFields(toJson(revokeFields));
-        documentRepository.save(docRevoke);
-        documentCacheService.evict(docRevoke.getId());
-
-        var copyResult = copyDocumentFilesUseCase.execute(CopyDocumentFilesRequest.builder()
-            .sourceDocumentId(documentC.getId())
-            .targetDocumentId(docRevoke.getId())
-            .module(COPY_MODULE)
-            .build());
-        if (!copyResult.isSuccess()) {
-            log.warn("Copy tep dinh kem tu van ban den {} sang {} (thay the/thu hoi) that bai: {}",
-                documentC.getId(), docRevoke.getId(), copyResult.getError());
-        }
+        mergeIntoTarget(docRevoke, revokeFields, documentC, documentFieldsOfC, METADATA_FIELDS_TO_COPY,
+            VbdenUpdateHistoryDocument.ACTION_THAY_THE_THU_HOI, actingUsername);
 
         String acceptedSubject = (actingUsername == null || actingUsername.isBlank() ? "Người dùng" : actingUsername)
             + " đã chấp nhận thay thế thu hồi văn bản (" + LocalDateTime.now().format(ACCEPTED_AT_FORMATTER) + ")";
@@ -251,59 +300,40 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
     /**
      * Xử lý 1 {@code docRevoke} (văn bản đến CŨ) khi {@code nghiepvu=="2"} ("cập nhật lại nội dung"
      * — mirror {@code ReplyDocumentOut.java:136-227}, xem javadoc lớp). CHỈ xử lý khi
-     * {@code docRevoke.bussiness_doc_type == "0"} (còn "thuần") — khác giá trị đó thì bỏ qua HOÀN
-     * TOÀN (không copy gì, không huỷ {@code C}), đúng Domino (không có nhánh {@code else} nào khác
-     * trong khối {@code if(nghiepvu.equals("2"))}).
+     * {@code docRevoke} ĐÃ VÀO SỔ bởi đơn vị đang thao tác (bugfix 24/09/2026 — thay guard cũ
+     * {@code bussiness_doc_type == "0"}, xem javadoc lớp); không thoả thì bỏ qua HOÀN TOÀN (không copy
+     * gì, không huỷ {@code C}). Trả {@code true} khi đã cập nhật thật {@code docRevoke}.
      */
-    private void processCapNhatTarget(String revokeId, BusinessDocument documentC,
-            Map<String, Object> documentFieldsOfC, String actingUsername) {
+    private boolean processCapNhatTarget(String revokeId, BusinessDocument documentC,
+            Map<String, Object> documentFieldsOfC, String actingUsername, String currentIdentifier) {
         UUID revokeUuid;
         try {
             revokeUuid = UUID.fromString(revokeId);
         } catch (IllegalArgumentException ex) {
             log.warn("documentoutrevoke cua van ban den {} chua id khong hop le \"{}\" - bo qua",
                 documentC.getId(), revokeId);
-            return;
+            return false;
         }
         var docRevokeOptional = documentRepository.findById(revokeUuid);
         if (docRevokeOptional.isEmpty() || docRevokeOptional.get().isDeleted()
                 || !DOCUMENT_TYPE.equalsIgnoreCase(docRevokeOptional.get().getDocumentType())) {
             log.warn("Khong tim thay van ban den can cap nhat (documentoutrevoke id={}) cho van ban "
                 + "den {} - co the da bi xoa truoc do", revokeId, documentC.getId());
-            return;
+            return false;
         }
         var docRevoke = docRevokeOptional.get();
+        if (docRevoke.getId().equals(documentC.getId())
+                || !isRegisteredByCurrentUnit(docRevoke.getId(), currentIdentifier)) {
+            // = Domino view vbden_by_id_documentout_davaoso: chi van ban DA VAO SO cua don vi dang thao
+            // tac (con lai: ban gui lai dang cho / ban goc chua vao so / cua don vi khac).
+            log.info("Bo qua cap nhat noi dung van ban den {}: van ban den cu {} chua vao so boi don vi {}",
+                documentC.getId(), docRevoke.getId(), currentIdentifier);
+            return false;
+        }
         Map<String, Object> revokeFields = new LinkedHashMap<>(
             dynamicDocumentFieldsService.parseDynamicFields(docRevoke.getDynamicFieldsJson()));
-        String revokeBussinessType = asString(revokeFields.get(BUSSINESS_DOC_TYPE_FIELD));
-        if (!STATUS_MOI.equals(revokeBussinessType)) {
-            // Domino: KHONG co nhanh xu ly nao khac ngoai bussiness_doc_type=="0" trong khoi
-            // nghiepvu=="2" - van ban cu da tung la muc tieu thay the/thu hoi/cap nhat khac thi bo
-            // qua hoan toan, khong suy doan them.
-            log.info("Bo qua cap nhat noi dung van ban den {}: van ban den cu {} co "
-                + "bussiness_doc_type=\"{}\" (chi ho tro khi = \"0\")",
-                documentC.getId(), docRevoke.getId(), revokeBussinessType);
-            return;
-        }
-
-        for (String fieldName : METADATA_FIELDS_TO_COPY_CAP_NHAT) {
-            if (documentFieldsOfC.containsKey(fieldName)) {
-                revokeFields.put(fieldName, documentFieldsOfC.get(fieldName));
-            }
-        }
-        docRevoke.replaceDynamicFields(toJson(revokeFields));
-        documentRepository.save(docRevoke);
-        documentCacheService.evict(docRevoke.getId());
-
-        var copyResult = copyDocumentFilesUseCase.execute(CopyDocumentFilesRequest.builder()
-            .sourceDocumentId(documentC.getId())
-            .targetDocumentId(docRevoke.getId())
-            .module(COPY_MODULE)
-            .build());
-        if (!copyResult.isSuccess()) {
-            log.warn("Copy tep dinh kem tu van ban den {} sang {} (cap nhat noi dung) that bai: {}",
-                documentC.getId(), docRevoke.getId(), copyResult.getError());
-        }
+        mergeIntoTarget(docRevoke, revokeFields, documentC, documentFieldsOfC, METADATA_FIELDS_TO_COPY_CAP_NHAT,
+            VbdenUpdateHistoryDocument.ACTION_CAP_NHAT, actingUsername);
 
         // Ghi vet "da duoc dung lam nguon cap nhat" NGAY TREN C (tu tham chieu id cua chinh no - port
         // VERBATIM theo Domino, xem javadoc lop ve quirk nay).
@@ -330,6 +360,180 @@ public class CapNhatVanBanThayTheThuHoiUseCase {
             // deletedBy=null - xem ghi chu tuong tu o processRevokeTarget.
             documentC.markAsDeleted(null);
         }
+        return true;
+    }
+
+    /**
+     * Bugfix 24/09/2026 — tương đương view Domino {@code vbden_by_id_documentout_davaoso}: văn bản đến
+     * có ít nhất 1 bản ghi sổ ({@code vbden_so}, chưa xoá) của đơn vị đang thao tác. Không xác định được
+     * đơn vị ({@code currentIdentifier} rỗng) thì chấp nhận bản ghi sổ của bất kỳ đơn vị nào.
+     */
+    private boolean isRegisteredByCurrentUnit(UUID docRevokeId, String currentIdentifier) {
+        var page = documentRepository.findByParentId(REGISTER_ENTRY_DOCUMENT_TYPE, docRevokeId.toString(),
+            PageRequest.of(0, MAX_REGISTER_ENTRIES_PER_PARENT));
+        if (page == null) {
+            return false;
+        }
+        boolean anyUnit = currentIdentifier == null || currentIdentifier.isBlank();
+        return page.getContent().stream().anyMatch(entry -> anyUnit || currentIdentifier.equalsIgnoreCase(asString(
+            dynamicDocumentFieldsService.parseDynamicFields(entry.getDynamicFieldsJson()).get(IDENTIFIER_CREATOR_FIELD))));
+    }
+
+    /**
+     * Gộp nội dung + tệp từ {@code C} (bản gửi lại/thay thế) vào {@code docRevoke} (văn bản đích) và
+     * ghi 1 dòng lịch sử cập nhật — dùng chung cho nhánh "2" (gửi lại) và nhánh "1"/"4" (docRevoke đang
+     * xử lý dở).
+     *
+     * <p><b>Tệp</b> (yêu cầu người dùng 24/09/2026: "tạm tệp cũ chưa xoá, chỉ hiển thị tệp mới cập
+     * nhật, tệp cũ chỉ hiển thị tên, không cho tải") — so theo (tên gốc, kích thước):</p>
+     * <ul>
+     *   <li>tệp của C chưa có trên docRevoke → copy sang (tệp mới / tệp cùng tên đã đổi nội dung);</li>
+     *   <li>tệp trùng hẳn → giữ nguyên, không copy lại;</li>
+     *   <li>tệp của docRevoke KHÔNG còn trong bộ tệp của C → đánh dấu ĐÃ THAY THẾ
+     *   ({@link SupersedeDocumentFilesUseCase} — ẩn khỏi mọi truy vấn, KHÔNG xoá). Tên các tệp này chỉ
+     *   còn trong {@code update_obj.superseded_files} của lịch sử.</li>
+     * </ul>
+     * <p>An toàn: C KHÔNG có tệp nào (vd bước chuẩn bị tệp phía gửi lỗi) → KHÔNG thay thế tệp nào của
+     * docRevoke — tránh "ẩn sạch" tệp chỉ vì bản gửi lại thiếu dữ liệu.</p>
+     */
+    private void mergeIntoTarget(BusinessDocument docRevoke, Map<String, Object> revokeFields,
+            BusinessDocument documentC, Map<String, Object> documentFieldsOfC, Set<String> fieldsToCopy,
+            String action, String actingUsername) {
+        Map<String, Object> changedFields = new LinkedHashMap<>();
+        for (String fieldName : fieldsToCopy) {
+            if (!documentFieldsOfC.containsKey(fieldName)) {
+                continue;
+            }
+            Object oldValue = revokeFields.get(fieldName);
+            Object newValue = documentFieldsOfC.get(fieldName);
+            if (!asString(oldValue).equals(asString(newValue))) {
+                Map<String, Object> change = new LinkedHashMap<>();
+                change.put("oldvalue", oldValue);
+                change.put("newvalue", newValue);
+                changedFields.put(fieldName, change);
+            }
+            revokeFields.put(fieldName, newValue);
+        }
+        docRevoke.replaceDynamicFields(toJson(revokeFields));
+        documentRepository.save(docRevoke);
+        documentCacheService.evict(docRevoke.getId());
+
+        List<FileDto> sourceFiles = listFiles(documentC.getId());
+        List<FileDto> targetFiles = listFiles(docRevoke.getId());
+        Set<String> sourceKeys = new HashSet<>();
+        sourceFiles.forEach(f -> sourceKeys.add(fileKey(f)));
+        Set<String> targetKeys = new HashSet<>();
+        targetFiles.forEach(f -> targetKeys.add(fileKey(f)));
+
+        List<Map<String, Object>> newFiles = new ArrayList<>();
+        Set<String> newFilenames = new HashSet<>();
+        for (FileDto f : sourceFiles) {
+            if (f.getOriginalFileName() != null && !targetKeys.contains(fileKey(f))) {
+                newFiles.add(fileRef(f, true));
+                newFilenames.add(f.getOriginalFileName());
+            }
+        }
+        List<Map<String, Object>> keptFiles = new ArrayList<>();
+        List<Map<String, Object>> supersededFiles = new ArrayList<>();
+        List<UUID> supersededIds = new ArrayList<>();
+        for (FileDto f : targetFiles) {
+            if (sourceKeys.contains(fileKey(f))) {
+                keptFiles.add(fileRef(f, false));
+            } else if (!sourceFiles.isEmpty() && f.getFileId() != null) {
+                supersededFiles.add(fileRef(f, true));
+                supersededIds.add(f.getFileId());
+            }
+        }
+
+        if (!newFilenames.isEmpty()) {
+            var copyResult = copyDocumentFilesUseCase.execute(CopyDocumentFilesRequest.builder()
+                .sourceDocumentId(documentC.getId())
+                .targetDocumentId(docRevoke.getId())
+                .module(COPY_MODULE)
+                .filenames(newFilenames)
+                .build());
+            if (!copyResult.isSuccess()) {
+                log.warn("Copy tep dinh kem tu van ban den {} sang {} ({}) that bai: {} - KHONG thay the tep cu",
+                    documentC.getId(), docRevoke.getId(), action, copyResult.getError());
+                // Copy loi: giu nguyen tep cu hien hanh, lich su van ghi nhan dung tinh trang.
+                keptFiles.addAll(supersededFiles);
+                supersededFiles.clear();
+                supersededIds.clear();
+                newFiles.clear();
+            }
+        }
+
+        Map<String, Object> updateObj = new LinkedHashMap<>();
+        updateObj.put("source", buildSourceSnapshot(documentC, documentFieldsOfC));
+        List<Map<String, Object>> sourceFileRefs = new ArrayList<>();
+        sourceFiles.forEach(f -> sourceFileRefs.add(fileRef(f, true)));
+        updateObj.put("source_files", sourceFileRefs);
+        updateObj.put("new_files", stripFileIds(newFiles));
+        updateObj.put("kept_files", keptFiles);
+        updateObj.put("superseded_files", supersededFiles);
+        updateObj.put("changed_fields", changedFields);
+
+        var history = new VbdenUpdateHistoryDocument(docRevoke.getId(), documentC.getId(), action,
+            toJson(updateObj), resolveFullName(actingUsername), actingUsername);
+        if (!supersededIds.isEmpty()) {
+            supersedeDocumentFilesUseCase.execute(docRevoke.getId(), supersededIds, history.getId());
+        }
+        vbdenUpdateHistoryDocumentRepository.save(history);
+    }
+
+    /** Thông tin chính của văn bản nguồn TẠI THỜI ĐIỂM cập nhật (C tự huỷ sau đó ở nhánh "2"). */
+    private Map<String, Object> buildSourceSnapshot(BusinessDocument documentC, Map<String, Object> fieldsOfC) {
+        Map<String, Object> source = new LinkedHashMap<>();
+        source.put("id", documentC.getId());
+        for (String key : SOURCE_SNAPSHOT_FIELDS) {
+            Object value = fieldsOfC.get(key);
+            if (value != null && !asString(value).isBlank()) {
+                source.put(key, value);
+            }
+        }
+        source.putIfAbsent(SUBJECT_FIELD, documentC.getTitle());
+        return source;
+    }
+
+    // file_id CHI giu cho tep con tai duoc (tep cua C - source_files) va de truy vet noi bo (superseded -
+    // FE KHONG dung de tai, file da bi an o BE). new_files chi can ten/kich thuoc (ban sao tren docRevoke
+    // da hien trong danh sach tep chinh).
+    private Map<String, Object> fileRef(FileDto f, boolean withId) {
+        Map<String, Object> ref = new LinkedHashMap<>();
+        if (withId) {
+            ref.put("file_id", f.getFileId());
+        }
+        ref.put("name", f.getOriginalFileName());
+        ref.put("size", f.getFileSize());
+        return ref;
+    }
+
+    private List<Map<String, Object>> stripFileIds(List<Map<String, Object>> refs) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> ref : refs) {
+            Map<String, Object> copy = new LinkedHashMap<>(ref);
+            copy.remove("file_id");
+            result.add(copy);
+        }
+        return result;
+    }
+
+    private String resolveFullName(String username) {
+        if (username == null || username.isBlank()) {
+            return null;
+        }
+        return appUserRepository.findByUsernameAndDeletedOnIsNull(username)
+            .map(com.td.domain.sharedcore.AppUser::getFullName)
+            .orElse(null);
+    }
+
+    private List<FileDto> listFiles(UUID documentId) {
+        var response = listDocumentFilesUseCase.execute(documentId);
+        return response == null || response.getItems() == null ? List.of() : response.getItems();
+    }
+
+    private static String fileKey(FileDto f) {
+        return f.getOriginalFileName() + "|" + f.getFileSize();
     }
 
     /**

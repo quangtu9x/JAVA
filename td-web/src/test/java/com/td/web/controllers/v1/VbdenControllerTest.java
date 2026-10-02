@@ -117,6 +117,8 @@ class VbdenControllerTest {
     @MockBean
     private com.td.application.vbden.ListVbdenEditHistoryUseCase listVbdenEditHistoryUseCase;
     @MockBean
+    private com.td.application.vbden.ListVbdenUpdateHistoryUseCase listVbdenUpdateHistoryUseCase;
+    @MockBean
     private com.td.application.vbden.KhongVaoSoVbdenUseCase khongVaoSoVbdenUseCase;
     @MockBean
     private com.td.application.vbden.CapNhatPhoiHopUseCase capNhatPhoiHopUseCase;
@@ -188,6 +190,21 @@ class VbdenControllerTest {
         ArgumentCaptor<TiepNhanVbdenRequest> captor = ArgumentCaptor.forClass(TiepNhanVbdenRequest.class);
         verify(tiepNhanVbdenUseCase).execute(captor.capture());
         assertThat(captor.getValue().getFields()).containsEntry("document_type", "Công văn");
+    }
+
+    @Test
+    void lichSuCapNhat_shouldReturnPaginationWithItems() throws Exception {
+        // Yeu cau nguoi dung 24/09/2026 - xem javadoc ListVbdenUpdateHistoryUseCase: FE doc data.items.
+        UUID parentId = UUID.randomUUID();
+        Map<String, Object> item = Map.of("action", "capnhat", "created", "24/09/2026 10:00:00");
+        when(listVbdenUpdateHistoryUseCase.execute(any())).thenReturn(
+            new com.td.application.common.models.PaginationResponse<>(java.util.List.of(item), 1, 20, 1L, 1, true, true));
+
+        mockMvc.perform(post("/api/v1/vbden/LichSuCapNhat")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"parentId\":\"" + parentId + "\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.items[0].action").value("capnhat"));
     }
 
     @Test

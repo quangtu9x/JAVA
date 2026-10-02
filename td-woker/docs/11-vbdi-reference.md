@@ -142,7 +142,11 @@ thành công). Xem `docs/architecture/11-rabbitmq-vbdi-worker-phan-hoi-trang-tha
   được triển khai chỉ cần thay nhánh `isExternal()` trong `VbdiDeliveryTaskHandler` — không cần
   đổi Worker Core hay lược đồ envelope.
 - Nhánh `type=="vaoso"` của `ReplyDocumentOut.java` (xử lý văn bản "thay thế"/"thu hồi" khi vào sổ)
-  — tính năng riêng, lớn hơn "Từ chối tiếp nhận" (đã port, xem §4) — CHƯA port.
+  — tính năng riêng, lớn hơn "Từ chối tiếp nhận" (đã port, xem §4). *Cập nhật: đã port 13/09/2026
+  (`CapNhatVanBanThayTheThuHoiUseCase`, td-application). Bugfix 24/09/2026: nhánh gửi lại "2" chưa bao
+  giờ cập nhật được văn bản đã vào sổ, vì worker không ghi `bussiness_doc_type="0"` mà guard lại đòi
+  đúng "0". Xem `docs/architecture/11-rabbitmq-vbdi-worker-phan-hoi-trang-thai.md`, addendum
+  24/09/2026. Worker KHÔNG cần đổi: use case giờ lọc "đã vào sổ" qua `vbden_so`.*
 - `internal_unit` (đơn vị nội bộ của chính cơ quan gửi) và `coordinator` (cá nhân, định danh nhận
   là username) chưa tạo văn bản đến thật như `contact_unit` — `coordinator` cần field cá nhân riêng
   (`user_process`, không phải `contact_unit_identifier`) nếu port sau này; `internal_unit` có thể

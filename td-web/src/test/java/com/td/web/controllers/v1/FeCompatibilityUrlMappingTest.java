@@ -14,6 +14,7 @@ import com.td.application.common.models.PaginationResponse;
 import com.td.application.sharedcore.CreateOrganizationUseCase;
 import com.td.application.sharedcore.DeleteOrganizationUseCase;
 import com.td.application.sharedcore.GetCapBanHanhOptionsUseCase;
+import com.td.application.sharedcore.GetKyThuaLenhSignersUseCase;
 import com.td.application.sharedcore.GetLegacyOrganizationFlatListUseCase;
 import com.td.application.sharedcore.GetLegacyOrganizationTreeUseCase;
 import com.td.application.sharedcore.GetLegacyOrgLookupForDungChungUseCase;
@@ -80,6 +81,8 @@ class FeCompatibilityUrlMappingTest {
     private DeleteOrganizationUseCase deleteOrganizationUseCase;
     @MockBean
     private GetCapBanHanhOptionsUseCase getCapBanHanhOptionsUseCase;
+    @MockBean
+    private GetKyThuaLenhSignersUseCase getKyThuaLenhSignersUseCase;
 
     @MockBean
     private CreateCategoryUseCase createCategoryUseCase;

@@ -47,6 +47,23 @@ import java.util.UUID;
  * ({@code XuLyDuThaoUseCase}), field theo chuẩn draft_process ({@code parentid}/{@code action}/
  * {@code receiver_username}/{@code opinion}/{@code creator}). Không còn khái niệm {@code duthao_res}
  * như 1 {@code document_type} trong mã Java.</p>
+ *
+ * <p><b>Cập nhật 26/09/2026 (yêu cầu người dùng "Cho ý kiến -> hoàn thiện gắn kèm, cutoverFE")</b>:
+ * <ul>
+ *   <li>Đọc được CẢ 2 dạng dữ liệu của {@code user_coordinator}/{@code user_coordinated}: JSON array
+ *       (ghi bởi use case này) lẫn chuỗi scalar {@code "a;b"} (ghi bởi FE qua {@code Luu} —
+ *       {@code ChiTietPage.jsx} đặt {@code ids.join(";")}; DB thật tenant skhcn đang toàn dạng
+ *       chuỗi). Trước đây chỉ đọc List nên dạng chuỗi bị coi là rỗng: không bao giờ "phản hồi" được,
+ *       không tạo vết, và còn GHI ĐÈ danh sách chờ thành {@code []}. Ghi lại giữ đúng dạng đã đọc.</li>
+ *   <li>{@code action_type} của vết = {@code "ykienphoihop"} (đúng giá trị FE Domino
+ *       {@code ChoYKienModal.jsx} gửi) — trước ghi nhầm {@code "chuyenphoihop"} (là hành động CHUYỂN
+ *       phối hợp của {@code XuLyDuThaoUseCase}, khác nghĩa).</li>
+ *   <li>Người dùng hiện tại phản hồi thì LUÔN tạo vết (Domino {@code CreateOrUpdateDocument()} luôn
+ *       tạo), ý kiến trống thì mặc định {@code "Đã phối hợp"} (cùng mặc định FE Domino) — trả về
+ *       {@code id} của VẾT để FE gắn tệp đính kèm (upload vào dự thảo cha kèm {@code processId} = id
+ *       vết, cùng pattern {@link GanKemTepDuThaoUseCase}). Tạo vết lỗi thì trả lỗi (trước im lặng trả
+ *       id dự thảo, FE sẽ gắn tệp nhầm vào processId = id dự thảo).</li>
+ * </ul></p>
  */
 @Service
 @RequiredArgsConstructor
@@ -65,7 +82,9 @@ public class XinYKienPhoiHopUseCase {
     private static final String OPINION_FIELD = "opinion";
     private static final String CREATOR_FIELD = "creator";
     // Luồng phối hợp là 1 vết draft_process (xem javadoc lớp) — action cố định để đối chiếu Domino.
-    private static final String PHOI_HOP_ACTION = "chuyenphoihop";
+    private static final String PHOI_HOP_ACTION = "ykienphoihop";
+    private static final String DEFAULT_OPINION = "Đã phối hợp";
+    private static final String LIST_SEPARATOR = ";";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     // Xem AuthorAclFieldsService javadoc muc "user_fields dong".
     private static final java.util.Set<String> AUTHOR_TOUCHED_FIELDS = java.util.Set.of(
@@ -78,6 +97,8 @@ public class XinYKienPhoiHopUseCase {
     private final DocumentLogService documentLogService;
     private final DocumentCacheService documentCacheService;
     private final AuthorAclFieldsService authorAclFieldsService;
+    // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
+    private final DraftProcessActorFields draftProcessActorFields;
 
     public Result<UUID> execute(XinYKienPhoiHopRequest request) {
         var draftOptional = duThaoDocumentRepository.findById(request.getId());
@@ -93,8 +114,15 @@ public class XinYKienPhoiHopUseCase {
         var before = buildSnapshot(draft);
         Map<String, Object> fields = new LinkedHashMap<>(dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson()));
 
-        List<String> coordinator = toStringList(fields.get(USER_COORDINATOR_FIELD));
-        List<String> coordinated = toStringList(fields.get(USER_COORDINATED_FIELD));
+        Object rawCoordinator = fields.get(USER_COORDINATOR_FIELD);
+        Object rawCoordinated = fields.get(USER_COORDINATED_FIELD);
+        List<String> coordinator = toStringList(rawCoordinator);
+        List<String> coordinated = toStringList(rawCoordinated);
+        // Field chưa có thì theo dạng của field còn lại (dữ liệu FE ghi luôn là chuỗi scalar).
+        boolean coordinatorAsString = rawCoordinator instanceof String
+            || (rawCoordinator == null && rawCoordinated instanceof String);
+        boolean coordinatedAsString = rawCoordinated instanceof String
+            || (rawCoordinated == null && rawCoordinator instanceof String);
 
         for (String nguoi : request.getNguoiPhoiHop()) {
             if (nguoi != null && !nguoi.isBlank() && !coordinator.contains(nguoi) && !coordinated.contains(nguoi)) {
@@ -107,8 +135,8 @@ public class XinYKienPhoiHopUseCase {
             coordinated.add(actingUsername);
         }
 
-        fields.put(USER_COORDINATOR_FIELD, coordinator);
-        fields.put(USER_COORDINATED_FIELD, coordinated);
+        fields.put(USER_COORDINATOR_FIELD, coordinatorAsString ? String.join(LIST_SEPARATOR, coordinator) : coordinator);
+        fields.put(USER_COORDINATED_FIELD, coordinatedAsString ? String.join(LIST_SEPARATOR, coordinated) : coordinated);
         authorAclFieldsService.applyOnUpdate(DOCUMENT_TYPE, fields, AUTHOR_TOUCHED_FIELDS);
         draft.replaceDynamicFields(toJson(fields));
         var saved = duThaoDocumentRepository.save(draft);
@@ -116,11 +144,8 @@ public class XinYKienPhoiHopUseCase {
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
 
-        if (responded && request.getOpinion() != null && !request.getOpinion().isBlank()) {
-            var childResult = createOpinionRecord(request, actingUsername);
-            if (childResult.isSuccess()) {
-                return childResult;
-            }
+        if (responded) {
+            return createOpinionRecord(request, actingUsername);
         }
 
         return Result.success(saved.getId());
@@ -139,8 +164,9 @@ public class XinYKienPhoiHopUseCase {
         childFields.put(PARENT_ID_FIELD, request.getId().toString());
         childFields.put(ACTION_FIELD, PHOI_HOP_ACTION);
         childFields.put(RECEIVER_USERNAME_FIELD, actingUsername);
-        childFields.put(OPINION_FIELD, request.getOpinion());
-        childFields.put(CREATOR_FIELD, actingUsername);
+        String opinion = request.getOpinion();
+        childFields.put(OPINION_FIELD, opinion == null || opinion.isBlank() ? DEFAULT_OPINION : opinion.trim());
+        draftProcessActorFields.put(childFields, actingUsername);
         childRequest.setFields(childFields);
 
         return addDraftProcessDocumentUseCase.execute(childRequest);
@@ -159,12 +185,24 @@ public class XinYKienPhoiHopUseCase {
         List<String> result = new ArrayList<>();
         if (value instanceof List<?> list) {
             for (Object item : list) {
-                if (item != null) {
-                    result.add(item.toString());
-                }
+                addIfPresent(result, item == null ? null : item.toString());
+            }
+        } else if (value instanceof String text) {
+            for (String item : text.split(LIST_SEPARATOR)) {
+                addIfPresent(result, item);
             }
         }
         return result;
+    }
+
+    private void addIfPresent(List<String> target, String value) {
+        if (value == null) {
+            return;
+        }
+        String trimmed = value.trim();
+        if (!trimmed.isEmpty() && !target.contains(trimmed)) {
+            target.add(trimmed);
+        }
     }
 
     private String toJson(Map<String, Object> value) {

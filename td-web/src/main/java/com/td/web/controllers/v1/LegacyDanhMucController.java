@@ -19,6 +19,7 @@ import com.td.application.sharedcore.CreateOrganizationRequest;
 import com.td.application.sharedcore.CreateOrganizationUseCase;
 import com.td.application.sharedcore.DeleteOrganizationUseCase;
 import com.td.application.sharedcore.GetCapBanHanhOptionsUseCase;
+import com.td.application.sharedcore.GetKyThuaLenhSignersUseCase;
 import com.td.application.sharedcore.GetLegacyOrganizationFlatListUseCase;
 import com.td.application.sharedcore.GetLegacyOrganizationTreeUseCase;
 import com.td.application.sharedcore.GetLegacyOrgLookupForDungChungUseCase;
@@ -74,6 +75,7 @@ public class LegacyDanhMucController extends BaseController {
     private final UpdateOrganizationUseCase updateOrganizationUseCase;
     private final DeleteOrganizationUseCase deleteOrganizationUseCase;
     private final GetCapBanHanhOptionsUseCase getCapBanHanhOptionsUseCase;
+    private final GetKyThuaLenhSignersUseCase getKyThuaLenhSignersUseCase;
 
     // BL-105: LuuDanhMuc/XoaDanhMuc/CapNhatCache dung chung du lieu + cache voi CategoriesController
     private final CreateCategoryUseCase createCategoryUseCase;
@@ -404,6 +406,9 @@ public class LegacyDanhMucController extends BaseController {
         if ("vwcocautochuc".equalsIgnoreCase(viewname)) {
             return ok(getLegacyOrgLookupForDungChungUseCase.getOrganizationChildren(firstKey));
         }
+        if ("vwcocautochuc_cay".equalsIgnoreCase(viewname)) {
+            return ok(getLegacyOrgLookupForDungChungUseCase.getOrganizationSubtree(firstKey));
+        }
         if ("user_by_parentid".equalsIgnoreCase(viewname)) {
             return ok(getLegacyOrgLookupForDungChungUseCase.getOrganizationMembers(firstKey, false));
         }
@@ -498,9 +503,14 @@ public class LegacyDanhMucController extends BaseController {
             + "department), thu tu GOC->LA. Cac mode khac CHUA ho tro, tra 400")
     public ResponseEntity<com.td.application.common.models.ApiResponse<List<Map<String, Object>>>> publish(
             @RequestBody PublishCatalogRequest request) {
+        // 01/10/2026: + get=kythualenh (Hinh thuc ky "Ky thua lenh" - du thao/van ban di), xem
+        // javadoc GetKyThuaLenhSignersUseCase.
+        if ("kythualenh".equalsIgnoreCase(request.getGet())) {
+            return ok(getKyThuaLenhSignersUseCase.execute(request.getCapbanhanhid()));
+        }
         if (!"capbanhanh".equalsIgnoreCase(request.getGet())) {
             return badRequest(Result.failure(
-                "get=" + request.getGet() + " chua duoc ho tro o Java (chi co capbanhanh)"));
+                "get=" + request.getGet() + " chua duoc ho tro o Java (chi co capbanhanh, kythualenh)"));
         }
         return ok(getCapBanHanhOptionsUseCase.execute(request.getDatabasetype()));
     }
@@ -650,7 +660,7 @@ public class LegacyDanhMucController extends BaseController {
         request.setDescription(params.get("description"));
         request.setForm(params.get("form"));
         request.setParentId(parseUuid(firstNonBlank(params.get("parentId"), params.get("parentid"))));
-        request.setSortOrder(parseInt(firstNonBlank(params.get("sortOrder"), params.get("sort_order")), 0));
+        request.setSortOrder(parseInt(firstNonBlank(params.get("sortOrder"), params.get("sort_order")), CreateCategoryRequest.DEFAULT_SORT_ORDER));
         // Bo sung 08/09/2026 (port lichct - nhom xem lich tong hop, muc 5.3 tai lieu 09):
         // "receiver_obj" (chuoi JSON mang thanh vien nhom) khong co cot tuong minh tren Category -
         // luu vao dynamic_fields (JSONB da co san). Chi anh huong khi client THUC SU gui receiver_obj

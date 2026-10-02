@@ -29,6 +29,11 @@ public class PostgresRoleGroupRepository implements RoleGroupRepository {
     }
 
     @Override
+    public java.util.List<RoleGroup> findAllByIdInAndDeletedOnIsNull(java.util.Collection<UUID> ids) {
+        return (ids == null || ids.isEmpty()) ? java.util.List.of() : jpa.findAllByIdInAndDeletedOnIsNull(ids);
+    }
+
+    @Override
     public <S extends RoleGroup> S save(S entity) {
         return jpa.save(entity);
     }

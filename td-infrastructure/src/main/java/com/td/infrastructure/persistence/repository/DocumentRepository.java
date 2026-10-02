@@ -112,6 +112,7 @@ public abstract class DocumentRepository implements com.td.application.documents
         Map<String, Object> parameters = new LinkedHashMap<>();
         appendPendingForUserPredicate(sql, parameters, username);
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendNotRevokedPredicate(sql, parameters, null);
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -151,6 +152,7 @@ public abstract class DocumentRepository implements com.td.application.documents
         Map<String, Object> parameters = new LinkedHashMap<>();
         appendProcessedForUserPredicate(sql, parameters, username);
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendNotRevokedPredicate(sql, parameters, null);
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -259,6 +261,7 @@ public abstract class DocumentRepository implements com.td.application.documents
         Map<String, Object> parameters = new LinkedHashMap<>();
         appendAnyFieldContainsPredicate(sql, parameters, fieldNames, value);
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendNotRevokedPredicate(sql, parameters, null);
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -310,6 +313,9 @@ public abstract class DocumentRepository implements com.td.application.documents
             }
             appendKeywordPredicate(sql, parameters, advancedFilter.getKeyword(), advancedFilter.getKeywordColumns());
         }
+        if (advancedFilter == null || !advancedFilter.isIncludeRevoked()) {
+            appendNotRevokedPredicate(sql, parameters, advancedFilter == null ? null : advancedFilter.getIncludeFieldValues());
+        }
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -318,7 +324,14 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.created_on ASC NULLS LAST LIMIT :limit OFFSET :offset");
+        // 02/10/2026 (theodoi/datheodoi): co primarySortField (hoac newestCreatedFirst - van ban gan
+        // vao ho so) thi sap theo filter, khong thi giu created_on ASC cu (vanbancantheodoi dang dung
+        // overload nay).
+        boolean filterSorted = advancedFilter != null
+            && ((advancedFilter.getPrimarySortField() != null && !advancedFilter.getPrimarySortField().isBlank())
+                || advancedFilter.isNewestCreatedFirst());
+        String orderBy = filterSorted ? buildOrderByClause(advancedFilter) : " ORDER BY d.created_on ASC NULLS LAST";
+        sql.append(orderBy).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -434,6 +447,9 @@ public abstract class DocumentRepository implements com.td.application.documents
             appendCreatedOnInRangePredicate(sql, parameters, filter.getMinCreatedOn(), filter.getMaxCreatedOn());
         }
         appendKeywordPredicate(sql, parameters, filter.getKeyword(), filter.getKeywordColumns());
+        if (!filter.isIncludeRevoked()) {
+            appendNotRevokedPredicate(sql, parameters, filter.getIncludeFieldValues());
+        }
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -548,17 +564,25 @@ public abstract class DocumentRepository implements com.td.application.documents
     // - fallback ve mac dinh cu (last_modified_on DESC) khi khong set, giu nguyen hanh vi truoc do.
     private String buildOrderByClause(VbdenOrgViewFilter filter) {
         if (filter.getPrimarySortField() == null || filter.getPrimarySortField().isBlank()) {
-            return " ORDER BY d.last_modified_on DESC NULLS LAST";
+            // 01/10/2026: xem javadoc VbdenOrgViewFilter#newestCreatedFirst.
+            return filter.isNewestCreatedFirst()
+                ? " ORDER BY d.created_on DESC NULLS LAST, d.last_modified_on DESC NULLS LAST"
+                : " ORDER BY d.last_modified_on DESC NULLS LAST";
         }
         String direction = filter.isSortDescending() ? " DESC NULLS LAST" : " ASC NULLS LAST";
         StringBuilder orderBy = new StringBuilder(" ORDER BY ")
             .append(dynamicSortExpression(filter.getPrimarySortField(), filter.getPrimarySortType()))
             .append(direction);
         if (filter.getSecondarySortField() != null && !filter.getSecondarySortField().isBlank()) {
+            String secondaryDirection = filter.getSecondarySortDescending() == null
+                ? direction
+                : (filter.getSecondarySortDescending() ? " DESC NULLS LAST" : " ASC NULLS LAST");
             orderBy.append(", ")
                 .append(dynamicSortExpression(filter.getSecondarySortField(), filter.getSecondarySortType()))
-                .append(direction);
+                .append(secondaryDirection);
         }
+        // 02/10/2026: on dinh phan trang khi trung gia tri sort (vd. cung ngay den).
+        orderBy.append(", d.created_on DESC NULLS LAST");
         return orderBy.toString();
     }
 
@@ -582,6 +606,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         Map<String, Object> parameters = new LinkedHashMap<>();
         parameters.put("status", status == null ? "" : status.trim().toLowerCase());
+        appendNotRevokedPredicate(sql, parameters, null);
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -600,6 +625,29 @@ public abstract class DocumentRepository implements com.td.application.documents
         List<BusinessDocument> content = query.getResultList();
         return new PageImpl<>(content, pageable, total);
     }
+
+    /**
+     * Bổ sung 30/09/2026 (báo lỗi người dùng: vbdi "Lấy lại văn bản" — văn bản đến đã mất khỏi danh
+     * sách văn thư nhưng vẫn hiện ở {@code vbden/xuly/dencoquan}, view {@code cuatochuc}): Domino khi
+     * thu hồi/lấy lại đổi {@code Form} sang {@code DocumentIn_Deleted} ({@code RevokeDocumentOut}/
+     * {@code RevokeAllDocumentOut}/{@code ReplyDocumentOut}) → văn bản tự rơi khỏi MỌI view
+     * {@code Form="DocumentIn"}. Java chỉ ghi {@code reply="1"}/{@code is_revoke="1"}
+     * ({@code VbdiRevokeTaskHandler}, {@code VbdenForwardUnitRevokeTaskHandler},
+     * {@code CapNhatVanBanThayTheThuHoiUseCase}) nên trước đây CHỈ các view tình cờ có điều kiện
+     * {@code Reply!="1"} (vd {@code quamangnoibo}) mới ẩn được — mọi view khác vẫn hiện. Áp dụng TẬP
+     * TRUNG cho mọi truy vấn DANH SÁCH của repository (không áp cho {@code findByParentId}/
+     * {@code findByFieldValue} — dùng tra cứu nghiệp vụ). Bỏ qua khi {@code includeFieldValues} tự
+     * lọc theo {@code is_revoke} (view "Bị thu hồi").
+     */
+    private void appendNotRevokedPredicate(
+            StringBuilder sql, Map<String, Object> parameters, Map<String, List<String>> includeFieldValues) {
+        if (includeFieldValues != null && includeFieldValues.containsKey(IS_REVOKE_FIELD_NAME)) {
+            return;
+        }
+        appendDynamicFieldValueInPredicate(sql, parameters, IS_REVOKE_FIELD_NAME, List.of("1"), false, "notRevoked");
+    }
+
+    private static final String IS_REVOKE_FIELD_NAME = "is_revoke";
 
     private long countNative(String sql, Map<String, Object> parameters) {
         Query countQuery = entityManager.createNativeQuery("SELECT COUNT(*) FROM (" + sql + ") AS matched");

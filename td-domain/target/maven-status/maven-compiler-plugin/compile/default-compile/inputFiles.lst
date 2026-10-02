@@ -1,3 +1,4 @@
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbden\VbdenUpdateHistoryDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\events\EntityCreatedEvent.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\DomainEvent.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\IAggregateRoot.java
@@ -36,6 +37,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\processdiagram\
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\Repository.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\IAuditableEntity.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\duthao\DuThaoEditHistoryDocument.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\IdentityFileMetadata.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\phieutrinhtd\PhieuTrinhTdProcessDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\RoleGroupPermission.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbdi\VbdiSendLogDocument.java

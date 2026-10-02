@@ -20,12 +20,16 @@ import com.td.application.hosocv.HoSoFileGroupDto;
 import com.td.application.hosocv.KetThucHoSoRequest;
 import com.td.application.hosocv.KetThucHoSoUseCase;
 import com.td.application.hosocv.LuuHoSoRequest;
+import com.td.application.hosocv.LuuVanBanKhacRequest;
+import com.td.application.hosocv.LuuVanBanKhacUseCase;
 import com.td.application.hosocv.RestoreHoSoUseCase;
 import com.td.application.hosocv.TaoHoSoCVRequest;
 import com.td.application.hosocv.TaoHoSoCVUseCase;
 import com.td.application.hosocv.TrinhDuyetHoSoRequest;
 import com.td.application.hosocv.TrinhDuyetHoSoUseCase;
 import com.td.application.hosocv.XuLyLaiHoSoRequest;
+import com.td.application.hosocv.XemVanBanKhacUseCase;
+import com.td.application.hosocv.XoaVanBanKhacUseCase;
 import com.td.application.hosocv.XuLyLaiHoSoUseCase;
 import com.td.application.viewquery.ViewQueryRequest;
 import com.td.application.viewquery.ViewQueryService;
@@ -101,6 +105,10 @@ public class HoSoCVController extends BaseController {
     private final XuLyLaiHoSoUseCase xuLyLaiHoSoUseCase;
     private final GopYPhoiHopUseCase gopYPhoiHopUseCase;
     private final GetTokenLgspUseCase getTokenLgspUseCase;
+    // 02/10/2026: "van ban khac" tab VAN BAN LIEN QUAN - xem javadoc LuuVanBanKhacUseCase.
+    private final LuuVanBanKhacUseCase luuVanBanKhacUseCase;
+    private final XemVanBanKhacUseCase xemVanBanKhacUseCase;
+    private final XoaVanBanKhacUseCase xoaVanBanKhacUseCase;
 
     @PostMapping("/TaoHoSo")
     @PreAuthorize("isAuthenticated()")
@@ -263,6 +271,38 @@ public class HoSoCVController extends BaseController {
             + "ngược coordinated/user_coordinated")
     public ResponseEntity<ApiResponse<UUID>> gopYPhoiHop(@Valid @RequestBody GopYPhoiHopRequest request) {
         return ok(gopYPhoiHopUseCase.execute(request));
+    }
+
+    @PostMapping("/LuuVanBanKhac")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Thêm/sửa văn bản, tài liệu liên quan khác của hồ sơ",
+        description = "Thay qlvb/add?databasetype=hosocv (form other_related_document). id rỗng = thêm "
+            + "vào hồ sơ hosocvId; fields chỉ nhận code/promulgation_date/unit_publisher/signer/subject. "
+            + "Tệp đính kèm tải lên sau qua /api/v1/documents/{id}/files")
+    public ResponseEntity<ApiResponse<UUID>> luuVanBanKhac(@RequestBody LuuVanBanKhacRequest request) {
+        return ok(luuVanBanKhacUseCase.execute(request));
+    }
+
+    @PostMapping("/XemVanBanKhac")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xem 1 văn bản khác của hồ sơ (thay qlvb/get?databasetype=hosocv)")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> xemVanBanKhac(@RequestBody GetHoSoChiTietRequest request) {
+        return ok(xemVanBanKhacUseCase.execute(parseUuidOrNull(request.getId())));
+    }
+
+    @PostMapping("/XoaVanBanKhac")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xoá mềm văn bản khác khỏi hồ sơ (thay qlvb/delete)")
+    public ResponseEntity<ApiResponse<List<UUID>>> xoaVanBanKhac(@RequestBody List<UUID> ids) {
+        return ok(xoaVanBanKhacUseCase.execute(ids));
+    }
+
+    private UUID parseUuidOrNull(String value) {
+        try {
+            return value == null || value.isBlank() ? null : UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     @PostMapping("/GetTokenLgsp")

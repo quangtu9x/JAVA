@@ -16,6 +16,8 @@ import com.td.application.sharedcore.GetUserRoleGroupConfigUseCase;
 import com.td.application.tenant.ResolveUserTenantUseCase;
 import com.td.infrastructure.security.ApiResponseAccessDeniedHandler;
 import com.td.infrastructure.security.ApiResponseAuthenticationEntryPoint;
+import com.td.infrastructure.security.AccountProvisioningChecker;
+import com.td.infrastructure.security.AccountProvisioningFilter;
 import com.td.infrastructure.security.CorsProperties;
 import com.td.infrastructure.security.KeycloakJwtConverter;
 import com.td.infrastructure.security.KeycloakProperties;
@@ -27,6 +29,7 @@ import com.td.infrastructure.tenant.TenantActiveRegistry;
 import com.td.infrastructure.tenant.TenantFilter;
 import com.td.infrastructure.tenant.TenantProperties;
 import com.td.infrastructure.tenant.TenantResolver;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -67,7 +70,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     TenantProperties.class,
     TenantActiveRegistry.class,
     TenantResolver.class,
-    TenantFilter.class
+    TenantFilter.class,
+    AccountProvisioningFilter.class
 })
 @TestPropertySource(properties = "app.security.tdtoken.secret=sec-01-integration-test-secret-please-ignore")
 class VbcddhPermissionIntegrationTest {
@@ -76,6 +80,11 @@ class VbcddhPermissionIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @BeforeEach
+    void stubAccountProvisioningChecker() {
+        when(accountProvisioningChecker.isProvisioned(any(), any())).thenReturn(true);
+    }
 
     // BL-118 (20/08/2026): KeycloakJwtConverter nay inject them use case nay de tra cuu quyen Nhom
     // vai tro theo username Keycloak — @WebMvcTest phai mock de context khoi dong duoc.
@@ -86,6 +95,13 @@ class VbcddhPermissionIntegrationTest {
     // cuu tenant that cua username - @WebMvcTest phai mock de context khoi dong duoc.
     @MockBean
     private ResolveUserTenantUseCase resolveUserTenantUseCase;
+
+    // "Khoa triet de" (22/09/2026): AccountProvisioningFilter (chan MOI request tu tai khoan chua
+    // khai bao) nay la 1 phan cua SecurityConfig filter chain - @WebMvcTest phai mock de context
+    // khoi dong duoc. Stub mac dinh true (@BeforeEach duoi) vi cac test trong file nay kiem tra
+    // PHAN QUYEN theo role, khong phai provisioning - khong duoc de gate moi nay chan nham.
+    @MockBean
+    private AccountProvisioningChecker accountProvisioningChecker;
 
     @MockBean
     private PhanCongNhiemVuUseCase phanCongNhiemVuUseCase;
@@ -104,6 +120,34 @@ class VbcddhPermissionIntegrationTest {
 
         mockMvc.perform(post("/api/v1/vbcddh/PhanCongNhiemVu")
                 .header("Tdtoken", buildToken("truongphong01", "QPhanCong"))
+                .contentType("application/json")
+                .content("{\"idVanBan\":\"" + UUID.randomUUID() + "\",\"assignments\":["
+                    + "{\"donViThucHien\":\"Don vi A\",\"donViThucHienHide\":\"donvi_a\"}]}"))
+            .andExpect(status().isCreated());
+    }
+
+    // Bugfix 24/09/2026 (dong bo VbdenPermissionIntegrationTest#chuyenXuLy_withPhanCongDVRole...):
+    // catalog app_permissions (V1.0.18) co san 3 quyen pham vi hep
+    // (QPhanCongDV/QPhanPhoiDV/QPhanCongPhong) nhung PHAN_CONG_ROLES truoc do chi check ban toan
+    // co quan (QPhanCong/QPhanPhoi).
+    @Test
+    void phanCongNhiemVu_withPhanCongDVRole_shouldReturn201() throws Exception {
+        when(phanCongNhiemVuUseCase.execute(any())).thenReturn(Result.success(List.of(UUID.randomUUID())));
+
+        mockMvc.perform(post("/api/v1/vbcddh/PhanCongNhiemVu")
+                .header("Tdtoken", buildToken("truongdonvi01", "QPhanCongDV"))
+                .contentType("application/json")
+                .content("{\"idVanBan\":\"" + UUID.randomUUID() + "\",\"assignments\":["
+                    + "{\"donViThucHien\":\"Don vi A\",\"donViThucHienHide\":\"donvi_a\"}]}"))
+            .andExpect(status().isCreated());
+    }
+
+    @Test
+    void phanCongNhiemVu_withPhanCongPhongRole_shouldReturn201() throws Exception {
+        when(phanCongNhiemVuUseCase.execute(any())).thenReturn(Result.success(List.of(UUID.randomUUID())));
+
+        mockMvc.perform(post("/api/v1/vbcddh/PhanCongNhiemVu")
+                .header("Tdtoken", buildToken("truongphongban01", "QPhanCongPhong"))
                 .contentType("application/json")
                 .content("{\"idVanBan\":\"" + UUID.randomUUID() + "\",\"assignments\":["
                     + "{\"donViThucHien\":\"Don vi A\",\"donViThucHienHide\":\"donvi_a\"}]}"))

@@ -157,6 +157,7 @@ public class XuLyDuThaoUseCase {
     private static final String RECEIVER_USERNAME_FIELD = "receiver_username";
     private static final String SIGNER_OBJ_FIELD = "signer_obj";
     private static final String USER_SIGNER_FIELD = "user_signer";
+    private static final String SIGNER_FIELD = "signer";
     private static final String NGUOICHUYEN_OBJ_FIELD = "nguoichuyen_obj";
     private static final String DRAFT_RATE_FIELD = "draft_rate";
     private static final String LAST_PROCESS_ID_FIELD = "last_process_id";
@@ -196,6 +197,8 @@ public class XuLyDuThaoUseCase {
     // (bang duthao_documents chi con document chinh 'duthao').
     private final AddDraftProcessDocumentUseCase addDraftProcessDocumentUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
+    private final DraftProcessActorFields draftProcessActorFields;
 
     public Result<UUID> execute(XuLyDuThaoRequest request) {
         if (request == null || request.getId() == null) {
@@ -229,6 +232,9 @@ public class XuLyDuThaoUseCase {
 
         applySelfProcessedMarker(fields, actingUsername);
         fields.put(STATUS_PRE_FIELD, previousStatus);
+        if (ACTION_CHUYEN_KY_DUYET.equals(action)) {
+            applySignerAsReceiver(fields, request);
+        }
         createDraftProcessRecord(document.getId(), action, targetStatus, previousStatus, request, actingUsername)
             .ifPresent(processId -> fields.put(LAST_PROCESS_ID_FIELD, processId));
         applyTargetStatusMutations(targetStatus, previousStatus, fields, request, actingUsername);
@@ -342,6 +348,31 @@ public class XuLyDuThaoUseCase {
         }
     }
 
+    /**
+     * Bugfix 01/10/2026 (người dùng báo: dự thảo được "Chuyển xử lý" rồi người nhận bấm "Chuyển ký
+     * duyệt" → vết ghi Người nhận = người đã chuyển xử lý, đúng ra phải là Người ký): FE không có ô chọn
+     * người nhận cho action này, nhưng modal tự điền sẵn từ {@code nguoichuyen_obj} (người chuyển) rồi
+     * gửi lên. Đích của "Chuyển ký duyệt" LUÔN là người ký của dự thảo → server tự quyết, KHÔNG tin
+     * receiver từ client. Tên: {@code signer} → {@code signer_obj.name} → tên đầy đủ tra theo tài khoản.
+     */
+    private void applySignerAsReceiver(Map<String, Object> fields, XuLyDuThaoRequest request) {
+        applySignerFromSignerObjIfMissing(fields);
+        Object userSignerRaw = fields.get(USER_SIGNER_FIELD);
+        String userSigner = userSignerRaw == null ? "" : String.valueOf(userSignerRaw).trim();
+        if (userSigner.isEmpty()) {
+            return;
+        }
+        String signerName = fields.get(SIGNER_FIELD) == null ? "" : String.valueOf(fields.get(SIGNER_FIELD)).trim();
+        if (signerName.isEmpty()) {
+            signerName = readSignerObjProperty(fields.get(SIGNER_OBJ_FIELD), "name");
+        }
+        if (signerName.isEmpty()) {
+            signerName = draftProcessActorFields.displayName(userSigner);
+        }
+        request.setReceiverUsername(userSigner);
+        request.setReceiver(signerName);
+    }
+
     // DraftProcesses.java dong 84-99: chi ap dung khi user_signer dang RONG va signer_obj co gia
     // tri - try/catch nuot loi parse JSON (giu nguyen user_signer rong neu signer_obj khong hop le).
     private void applySignerFromSignerObjIfMissing(Map<String, Object> fields) {
@@ -351,14 +382,26 @@ public class XuLyDuThaoUseCase {
         if (signerObjRaw == null || String.valueOf(signerObjRaw).isBlank() || !userSignerBlank) {
             return;
         }
+        String user = readSignerObjProperty(signerObjRaw, "user");
+        if (!user.isBlank()) {
+            fields.put(USER_SIGNER_FIELD, user);
+        }
+    }
+
+    // 01/10/2026: signer_obj có 2 dạng — chuỗi JSON (FE cũ) hoặc object lồng trong dynamic_fields
+    // (parseDynamicFields trả LinkedHashMap; String.valueOf(map) = "{name=..}" KHÔNG parse JSON được,
+    // trước đây âm thầm bỏ qua). Lỗi parse → "".
+    private String readSignerObjProperty(Object signerObjRaw, String property) {
+        if (signerObjRaw == null) {
+            return "";
+        }
         try {
-            JsonNode node = OBJECT_MAPPER.readTree(String.valueOf(signerObjRaw));
-            String user = node.path("user").asText("");
-            if (!user.isBlank()) {
-                fields.put(USER_SIGNER_FIELD, user);
-            }
-        } catch (Exception ignored) {
-            // xem javadoc method
+            JsonNode node = signerObjRaw instanceof String text
+                ? OBJECT_MAPPER.readTree(text)
+                : OBJECT_MAPPER.valueToTree(signerObjRaw);
+            return node.path(property).asText("").trim();
+        } catch (Exception ex) {
+            return "";
         }
     }
 
@@ -384,7 +427,7 @@ public class XuLyDuThaoUseCase {
             putIfNotBlank(processFields, RECEIVER_USERNAME_FIELD, request.getReceiverUsername());
             putIfNotBlank(processFields, PROCESS_RECEIVER_FIELD, request.getReceiver());
             putIfNotBlank(processFields, PROCESS_OPINION_FIELD, request.getOpinion());
-            processFields.put(PROCESS_CREATOR_FIELD, actingUsername);
+            draftProcessActorFields.put(processFields, actingUsername);
             processRequest.setFields(processFields);
 
             var result = addDraftProcessDocumentUseCase.execute(processRequest);

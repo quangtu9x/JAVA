@@ -55,11 +55,14 @@ import java.util.UUID;
  * động, không cần soft-delete {@code documents} (Domino cũng KHÔNG xoá thật — {@code docIn.remove}
  * bị comment — chỉ đổi {@code Form} để loại khỏi view, văn bản vẫn truy vấn được trực tiếp).
  *
- * <p><b>Không cần nhánh riêng theo {@code recipientGroup}/{@code isExternal()}</b> (khác
- * {@link VbdiDeliveryTaskHandler}): với {@code internal_unit}/{@code coordinator}/{@code external_unit}
- * (chưa từng tạo văn bản đến thật — chỉ dedup), câu UPDATE tự nhiên khớp 0 dòng (không có
- * {@code parentid_send} nào để so khớp) — no-op an toàn, KHÔNG publish phản hồi (đúng Domino:
- * {@code SendReplyToSender} chỉ gọi khi {@code docs.getCount() > 0}).
+ * <p><b>{@code coordinator}/{@code external_unit}</b> (chưa từng tạo văn bản đến thật — chỉ dedup):
+ * câu UPDATE tự nhiên khớp 0 dòng (không có {@code parentid_send} nào để so khớp) — no-op an toàn,
+ * KHÔNG publish phản hồi (đúng Domino: {@code SendReplyToSender} chỉ gọi khi {@code docs.getCount() > 0}).
+ * <b>Cập nhật 21/09/2026 — {@code internal_unit} KHÔNG còn thuộc nhóm "no-op" này</b> (từ 18/09/2026,
+ * nhóm này CŨNG tạo văn bản đến thật, xem {@link VbdiDeliveryTaskHandler}) — cần thêm điều kiện lọc
+ * theo {@code recipientIdentifier} qua {@link #revokeIncomingDocuments}, KHÔNG thể chỉ dựa vào
+ * {@code parentid_send} như {@code contact_unit} (nhiều đơn vị nội bộ CHIA SẺ 1 tenant — xem javadoc
+ * phương thức đó).
  *
  * <p><b>Bổ sung 08/09/2026 (3, yêu cầu người dùng "lấy lại tận gốc" — 2 khoảng trống phát hiện thêm
  * sau khi bugfix (2) đã xác nhận đúng cho ca đơn giản nhất)</b>:</p>
@@ -207,19 +210,50 @@ public class VbdiRevokeTaskHandler implements TaskHandler {
      * gốc) — port unconditional tương tự, an toàn để chạy lại nhiều lần (idempotent ở mức field value,
      * dù {@code delete_date} sẽ đổi mỗi lần). {@code RETURNING id} để bước 2 biết CHÍNH XÁC những văn
      * bản gốc nào vừa bị lấy lại, tránh phải query lại lần 2.
+     *
+     * <p><b>Bổ sung 21/09/2026 (bugfix người dùng: "kiểm tra Lấy lại văn bản đã hoàn thiện cho ĐƠN VỊ
+     * NỘI BỘ và CÁ NHÂN chưa")</b>: điều kiện CHỈ {@code parentid_send} (không có định danh nơi nhận)
+     * vốn AN TOÀN cho {@code contact_unit} vì mỗi tenant chỉ nhận đúng 1 bản ghi/1 văn bản đi (mỗi
+     * cơ quan {@code contact_unit} có tenant RIÊNG — xem
+     * {@code AddVbdiSendLogUseCase#resolveTargetTenantId}). {@code internal_unit} (bổ sung 18/09/2026,
+     * xem javadoc {@code VbdiDeliveryTaskHandler}) KHÁC HẲN: NHIỀU đơn vị nội bộ CÙNG CHIA SẺ 1 tenant
+     * (tenant của CHÍNH cơ quan gửi) — nếu văn bản gửi tới CẢ "Phòng A" lẫn "Phòng B" (2 bản ghi văn
+     * bản đến RIÊNG trong CÙNG tenant, cùng {@code parentid_send}), "Lấy lại" chỉ chọn Phòng A sẽ khớp
+     * điều kiện CŨ (chỉ {@code parentid_send}) và LẤY LẠI NHẦM CẢ Phòng B — lỗi thật, chưa có test nào
+     * bắt được (test cũ chỉ dùng {@code contact_unit}). Sửa: với {@code internal_unit}, thêm điều kiện
+     * khớp ĐÚNG đơn vị qua {@code unit_process} ({@code VbdenIncomingDocumentWriter#putGroupSpecificFields}
+     * ghi mảng 1 phần tử = identifier của CHÍNH đơn vị đó lúc tạo) — kiểm tra CẢ
+     * {@code unit_process_registered} (field đích {@code LuuVanBanDenUseCase#loaiKhoiDanhSachChoVaoSo}
+     * di chuyển identifier sang khi "vào sổ", xoá khỏi {@code unit_process} — cùng lý do đã bỏ điều
+     * kiện {@code contact_unit_identifier} ở điểm 2, KHÔNG được chỉ kiểm tra 1 trong 2 field). Các
+     * nhóm khác ({@code contact_unit}/{@code external_unit}/{@code coordinator}) GIỮ NGUYÊN hành vi cũ
+     * (không có {@code unit_process}, thêm điều kiện này vào sẽ luôn khớp 0 dòng — không đổi gì).
      */
     private List<UUID> revokeIncomingDocuments(JdbcTemplate jdbc, VbdiDeliveryPayload p) {
         String deleteDate = LocalDateTime.now().format(DATE_TIME_PATTERN);
+        boolean scopeToInternalUnit = VbdiTaskConstants.GROUP_INTERNAL_UNIT.equals(p.getRecipientGroup());
+        String recipientScopeSql = scopeToInternalUnit
+            ? " AND (jsonb_exists(COALESCE(dynamic_fields->'unit_process', '[]'::jsonb), ?)"
+                + " OR jsonb_exists(COALESCE(dynamic_fields->'unit_process_registered', '[]'::jsonb), ?))"
+            : "";
+        List<Object> args = new java.util.ArrayList<>(
+            List.of(deleteDate, DOCUMENT_TYPE_VBDEN, p.getDocumentId()));
+        if (scopeToInternalUnit) {
+            args.add(p.getRecipientIdentifier());
+            args.add(p.getRecipientIdentifier());
+        }
         return jdbc.query("""
                 UPDATE documents
                 SET dynamic_fields = COALESCE(dynamic_fields, '{}'::jsonb) || jsonb_build_object(
                         'reply', '1', 'is_revoke', '1', 'delete_date', ?::text)
                 WHERE document_type = ?
                   AND dynamic_fields->>'parentid_send' = ?
+                """ + recipientScopeSql + """
+
                 RETURNING id
                 """,
             (rs, rowNum) -> (UUID) rs.getObject("id"),
-            deleteDate, DOCUMENT_TYPE_VBDEN, p.getDocumentId());
+            args.toArray());
     }
 
     /**

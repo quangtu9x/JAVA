@@ -128,8 +128,11 @@ public class PostgresHoSoLuuTruPhieuYeuCauDocumentRepository implements HoSoLuuT
                 sql.append(" OR ");
             }
             String scalarParam = "matchField" + index;
-            sql.append("COALESCE(d.dynamic_fields->>'").append(fieldNames.get(index)).append("', '') = :")
+            sql.append("(COALESCE(d.dynamic_fields->>'").append(fieldNames.get(index)).append("', '') = :")
                 .append(scalarParam);
+            // 27/09/2026: + khop thanh vien chuoi "a;b" - xem javadoc DelimitedMemberSql.
+            DelimitedMemberSql.appendOrMember(sql, parameters, fieldNames.get(index), value, "matchFieldMember" + index);
+            sql.append(")");
             parameters.put(scalarParam, value == null ? "" : value);
         }
         sql.append(")");

@@ -43,6 +43,7 @@ public class SecurityConfig {
     private final ApiResponseAuthenticationEntryPoint apiResponseAuthenticationEntryPoint;
     private final ApiResponseAccessDeniedHandler apiResponseAccessDeniedHandler;
     private final TenantFilter tenantFilter;
+    private final AccountProvisioningFilter accountProvisioningFilter;
 
     /**
      * Chain RIÊNG, thứ tự cao hơn (chạy trước) cho đúng 2 route Document Server OnlyOffice gọi
@@ -109,9 +110,14 @@ public class SecurityConfig {
             // Tdtoken (BL-004): xử lý truoc BearerTokenAuthenticationFilter, chỉ can thiệp khi có
             // header Tdtoken và không có Authorization — nếu không sẽ nhường luồng Keycloak.
             .addFilterBefore(tdTokenAuthenticationFilter, BearerTokenAuthenticationFilter.class)
-            // Tenant routing (BL-303): chạy SAU cả 2 filter xác thực — Authentication đã sẵn sàng
-            // (dù qua Tdtoken hay Keycloak) để suy ra tenant_id trước khi vào Controller.
-            .addFilterAfter(tenantFilter, BearerTokenAuthenticationFilter.class);
+            // "Khóa triệt để" (22/09/2026, xem javadoc AccountProvisioningFilter): chặn MỌI request
+            // đã xác thực (Keycloak hoặc Tdtoken) nhưng tài khoản chưa có AppUser — đặt SAU cả 2
+            // filter xác thực (Authentication đã sẵn sàng) NHƯNG TRƯỚC TenantFilter (không được để
+            // tài khoản chưa khai báo lọt tới bước resolve tenant).
+            .addFilterAfter(accountProvisioningFilter, BearerTokenAuthenticationFilter.class)
+            // Tenant routing (BL-303): chạy SAU accountProvisioningFilter — Authentication đã sẵn
+            // sàng VÀ đã qua được cửa provisioning để suy ra tenant_id trước khi vào Controller.
+            .addFilterAfter(tenantFilter, AccountProvisioningFilter.class);
 
         return http.build();
     }

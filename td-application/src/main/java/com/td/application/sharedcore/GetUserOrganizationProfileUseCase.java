@@ -86,6 +86,8 @@ public class GetUserOrganizationProfileUseCase {
         var dto = new UserOrganizationProfileDto();
         dto.setUsername(user.getUsername());
         dto.setFullName(user.getFullName());
+        dto.setAppUserId(user.getId() == null ? "" : user.getId().toString());
+        dto.setPhoneNumber(nullToEmpty(user.getPhoneNumber()));
         dto.setCapLanhDao(nullToEmpty(user.getCapLanhDao()));
         dto.setIdentifier(nullToEmpty(user.getIdentifier()));
         dto.setLevel(user.getLevel() == null ? "" : String.valueOf(user.getLevel()));
@@ -119,6 +121,7 @@ public class GetUserOrganizationProfileUseCase {
         Set<UUID> visited = new HashSet<>();
         StringBuilder identifiers = new StringBuilder();
         StringBuilder parentIds = new StringBuilder();
+        StringBuilder parents = new StringBuilder();
         while (currentId != null && visited.add(currentId)) {
             var orgOpt = organizationRepository.findByIdAndDeletedOnIsNull(currentId);
             if (orgOpt.isEmpty()) {
@@ -135,10 +138,14 @@ public class GetUserOrganizationProfileUseCase {
             // "parentids" (Domino): chuỗi UNID tổ tiên, CÙNG thứ tự/lượt đi lên với "identifiers" —
             // tương đương Java dùng UUID của chính node (không có UNID Domino thật để tái tạo).
             parentIds.append(org.getId()).append(";");
+            // "parents" (Domino): chuỗi TÊN tổ tiên, cùng lượt/thứ tự với "parentids" (luôn giữ chỗ kể cả
+            // tên rỗng, để vị trí theo cấp khớp parentids) — xem javadoc UserOrganizationProfileDto#getParents.
+            parents.append(org.getName() == null ? "" : org.getName()).append(";");
             currentId = org.getParentId();
         }
         dto.setIdentifiers(identifiers.toString());
         dto.setParentIds(parentIds.toString());
+        dto.setParents(parents.toString());
     }
 
     private void applyIfMatch(UserOrganizationProfileDto dto, Organization org, String form) {

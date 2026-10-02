@@ -28,7 +28,12 @@ public class CreatePrivateCategoryRequest {
     /** null = tạo ở cấp gốc */
     private UUID parentId;
 
-    private int sortOrder = 0;
+    // 25/09/2026 (quy ước "Thứ tự hiển thị"): mặc định 99 thay cho 0 — danh sách sắp xếp TĂNG DẦN, để 0
+    // thì bản ghi mới luôn nhảy lên đầu. Cùng giá trị CreateCategoryRequest/CreateAppUserRequest và FE
+    // utils/sortOrder.js.
+    public static final int DEFAULT_SORT_ORDER = 99;
+
+    private Integer sortOrder = DEFAULT_SORT_ORDER;
 
     // Mã định danh đơn vị/phòng ban (currentUser.identifier bên FE) — xem PrivateCategory.identifier.
     @Size(max = 200, message = "Identifier tối đa 200 ký tự")

@@ -199,6 +199,66 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
         return new PageImpl<>(content, pageable, total);
     }
 
+    // 01/10/2026 - view gop "Van thu tra lai" (xem javadoc DuThaoDocumentRepository).
+    @Override
+    public Page<DuThaoDocument> findReturnedByClerkForUser(
+            String documentType, Map<String, String> statusByReturnFor, String username,
+            String keyword, List<String> keywordColumns, Pageable pageable) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM duthao_documents d
+            WHERE d.deleted_on IS NULL
+            """);
+
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        appendReturnedByClerkPredicate(sql, parameters, statusByReturnFor, username);
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+
+        if (documentType != null && !documentType.isBlank()) {
+            sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
+            parameters.put("documentType", documentType.trim().toLowerCase());
+        }
+
+        long total = countNative(sql.toString(), parameters);
+
+        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
+        parameters.forEach(query::setParameter);
+        query.setParameter("limit", pageable.getPageSize());
+        query.setParameter("offset", pageable.getOffset());
+
+        @SuppressWarnings("unchecked")
+        List<DuThaoDocument> content = query.getResultList();
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    // Package-private seam cho unit test. Moi cap (return_document_out_for -> status) la 1 nhanh OR,
+    // tranh hien du thao da roi khoi trang thai tra lai (vd tra lanh dao rf=1 roi lanh dao tra tiep
+    // chuyen vien -> status=2 nhung rf van =1).
+    void appendReturnedByClerkPredicate(
+            StringBuilder sql, Map<String, Object> parameters, Map<String, String> statusByReturnFor,
+            String username) {
+        String normalized = username == null ? "" : username.trim().toLowerCase();
+        if (normalized.isEmpty() || statusByReturnFor == null || statusByReturnFor.isEmpty()) {
+            sql.append(" AND 1 = 0");
+            return;
+        }
+        sql.append(" AND LOWER(TRIM(COALESCE(d.dynamic_fields->>'return_document_out_for_user', ''))) = :returnedForUser");
+        parameters.put("returnedForUser", normalized);
+        List<String> branches = new ArrayList<>();
+        int index = 0;
+        for (Map.Entry<String, String> entry : statusByReturnFor.entrySet()) {
+            String forParam = "returnedFor" + index;
+            String statusParam = "returnedStatus" + index;
+            branches.add("(COALESCE(d.dynamic_fields->>'return_document_out_for', '') = :" + forParam
+                + " AND COALESCE(d.status, '') = :" + statusParam + ")");
+            parameters.put(forParam, entry.getKey());
+            parameters.put(statusParam, entry.getValue());
+            index++;
+        }
+        sql.append(" AND (").append(String.join(" OR ", branches)).append(")");
+    }
+
     // Tach seam package-private de unit-test SQL builder khong can EntityManager (cung khuon
     // appendVbdenOrgKeyPredicates). "fieldWithoutStatus" khop khong dieu kien status (nhanh
     // user_coordinated); "fieldWithStatus" CHI tinh khi status nam trong doneStatuses (nhanh
@@ -209,9 +269,13 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
             String fieldWithStatus, List<String> doneStatuses, String value) {
         sql.append(" AND (")
             .append("(d.dynamic_fields @> CAST(:orGroupContains0 AS jsonb)")
-            .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldWithoutStatus).append("', '') = :orGroupScalar0)")
+            .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldWithoutStatus).append("', '') = :orGroupScalar0");
+        appendDelimitedMemberMatch(sql, parameters, fieldWithoutStatus, value, "orGroupMember0");
+        sql.append(")")
             .append(" OR ((d.dynamic_fields @> CAST(:orGroupContains1 AS jsonb)")
-            .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldWithStatus).append("', '') = :orGroupScalar1)");
+            .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldWithStatus).append("', '') = :orGroupScalar1");
+        appendDelimitedMemberMatch(sql, parameters, fieldWithStatus, value, "orGroupMember1");
+        sql.append(")");
         parameters.put("orGroupContains0", buildContainsFilter(fieldWithoutStatus, value));
         parameters.put("orGroupScalar0", value == null ? "" : value);
         parameters.put("orGroupContains1", buildContainsFilter(fieldWithStatus, value));
@@ -274,11 +338,19 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
             String fieldName = fieldNames.get(index);
             sql.append("(d.dynamic_fields @> CAST(:").append(containsParam).append(" AS jsonb)")
                 .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-                .append(scalarParam).append(")");
+                .append(scalarParam);
+            appendDelimitedMemberMatch(sql, parameters, fieldName, value, "containsFieldMember" + index);
+            sql.append(")");
             parameters.put(containsParam, buildContainsFilter(fieldName, value));
             parameters.put(scalarParam, value == null ? "" : value);
         }
         sql.append(")");
+    }
+
+    // Bugfix 27/09/2026 (DT-29136): khớp thành viên chuỗi "a;b" — xem javadoc DelimitedMemberSql.
+    private void appendDelimitedMemberMatch(
+            StringBuilder sql, Map<String, Object> parameters, String fieldName, String value, String paramName) {
+        DelimitedMemberSql.appendOrMember(sql, parameters, fieldName, value, paramName);
     }
 
     private String buildContainsFilter(String fieldName, String value) {
@@ -423,21 +495,8 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
 
     private void appendKeywordPredicate(
             StringBuilder sql, Map<String, Object> parameters, String keyword, List<String> keywordColumns) {
-        if (keyword == null || keyword.isBlank() || keywordColumns == null || keywordColumns.isEmpty()) {
-            return;
-        }
-        String likeValue = "%" + keyword.trim().toLowerCase() + "%";
-        sql.append(" AND (");
-        for (int index = 0; index < keywordColumns.size(); index++) {
-            if (index > 0) {
-                sql.append(" OR ");
-            }
-            String parameterName = "keyword" + index;
-            sql.append("LOWER(COALESCE(d.dynamic_fields->>'").append(keywordColumns.get(index)).append("', ''))")
-                .append(" LIKE :").append(parameterName);
-            parameters.put(parameterName, likeValue);
-        }
-        sql.append(")");
+        // 01/10/2026: xem KeywordSql (title + chong SQL injection ten cot).
+        KeywordSql.append(sql, parameters, keyword, keywordColumns, "d");
     }
 
     private long countNative(String sql, Map<String, Object> parameters) {

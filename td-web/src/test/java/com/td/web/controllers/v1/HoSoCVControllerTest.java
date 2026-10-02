@@ -83,6 +83,12 @@ class HoSoCVControllerTest {
     private GopYPhoiHopUseCase gopYPhoiHopUseCase;
     @MockBean
     private GetTokenLgspUseCase getTokenLgspUseCase;
+    @MockBean
+    private com.td.application.hosocv.LuuVanBanKhacUseCase luuVanBanKhacUseCase;
+    @MockBean
+    private com.td.application.hosocv.XemVanBanKhacUseCase xemVanBanKhacUseCase;
+    @MockBean
+    private com.td.application.hosocv.XoaVanBanKhacUseCase xoaVanBanKhacUseCase;
 
     @Test
     void taoHoSo_shouldDelegateToTaoHoSoCVUseCaseAndReturn201() throws Exception {

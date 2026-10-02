@@ -43,8 +43,16 @@ public interface HoSoCVDocumentRepository extends IRepository<HoSoCVDocument> {
             String documentType, String includeListField, String excludeListField, String value,
             Pageable pageable);
 
+    /** 01/10/2026: như trên + lọc từ khoá "tìm trong danh sách". */
+    Page<HoSoCVDocument> findByListFieldMemberExcludingOther(
+            String documentType, String includeListField, String excludeListField, String value,
+            String keyword, List<String> keywordColumns, Pageable pageable);
+
     /** {@code vwTrash} — hồ sơ đã xoá mềm ({@code deleted_on IS NOT NULL}). */
     Page<HoSoCVDocument> findDeleted(String documentType, Pageable pageable);
+
+    /** 01/10/2026: như trên + lọc từ khoá "tìm trong danh sách". */
+    Page<HoSoCVDocument> findDeleted(String documentType, String keyword, List<String> keywordColumns, Pageable pageable);
 
     /**
      * {@code vwUser_Process_Handler_Den_Han_Nop_Luu_Tru}/{@code vwOverdue_Processing}/
@@ -59,4 +67,11 @@ public interface HoSoCVDocumentRepository extends IRepository<HoSoCVDocument> {
             String documentType, String keyFieldName, String keyValue,
             String dateFieldName, boolean strictlyBefore,
             Map<String, String> extraDynamicFieldEquals, Pageable pageable);
+
+    /** 01/10/2026: như trên + lọc từ khoá "tìm trong danh sách". */
+    Page<HoSoCVDocument> findByFieldValueDueDate(
+            String documentType, String keyFieldName, String keyValue,
+            String dateFieldName, boolean strictlyBefore,
+            Map<String, String> extraDynamicFieldEquals, String keyword, List<String> keywordColumns,
+            Pageable pageable);
 }

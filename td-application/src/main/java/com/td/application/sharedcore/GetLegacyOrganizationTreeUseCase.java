@@ -335,6 +335,11 @@ public class GetLegacyOrganizationTreeUseCase {
         Map<String, Object> dynamicFields = dynamicDocumentFieldsService.parseDynamicFields(organization.getDynamicFieldsJson());
         data.put("mailin", asString(dynamicFields.get("mailin")));
         data.put("clerical", asString(dynamicFields.get("clerical")));
+        // Bổ sung 30/09/2026 (yêu cầu người dùng: cây modal "Chuyển xử lý" vbden — lãnh đạo cấp 1 tìm cơ
+        // quan có "Mã định danh khác" = mã định danh của mình): giá trị THẬT cấu hình ở màn quản trị
+        // (dynamicFields.identifier_other). Key RIÊNG — KHÔNG ghi đè "identifier_other" ở trên (node
+        // "unit" đang mang nghĩa khác: mã cơ quan cha; node "agency" đang để "" — có nơi FE đọc).
+        data.put("identifier_other_org", asString(dynamicFields.get("identifier_other")));
 
         return data;
     }

@@ -6,6 +6,7 @@ import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.domain.vbden.VbdenEditHistoryDocument;
+import com.td.application.sharedcore.UserFullNameResolver;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -45,6 +46,7 @@ public class AddVbdenEditHistoryUseCase {
     private final DocumentRepository documentRepository;
     private final CurrentUserProvider currentUserProvider;
     private final DocumentLogService documentLogService;
+    private final UserFullNameResolver userFullNameResolver;
 
     public Result<UUID> execute(AddVbdenEditHistoryRequest request) {
         if (request == null || request.getParentId() == null) {
@@ -62,14 +64,18 @@ public class AddVbdenEditHistoryUseCase {
             return Result.failure("Danh sách thay đổi (edit_obj) trống, không ghi vết");
         }
 
+        String username = currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME);
         var savedFormEdit = request.getFormEdit() == null || request.getFormEdit().isBlank()
             ? DEFAULT_FORM_EDIT : request.getFormEdit();
         var entity = new VbdenEditHistoryDocument(
             request.getParentId(),
             savedFormEdit,
             toJson(editObj),
-            request.getCreatorName(),
-            currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME));
+            // 25/09/2026: tên hiển thị do SERVER tra theo tài khoản đăng nhập (xem
+            // UserFullNameResolver) — trước đây lấy nguyên creatorName client gửi, nhiều đường ghi vết
+            // phụ (gắn tệp, ký số) không gửi nên dòng vết chỉ hiện tài khoản.
+            userFullNameResolver.resolveForWrite(username, request.getCreatorName()),
+            username);
 
         var saved = vbdenEditHistoryDocumentRepository.save(entity);
         documentLogService.logCreate(saved.getId(), buildSnapshot(saved, editObj.size()));

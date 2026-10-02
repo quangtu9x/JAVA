@@ -53,7 +53,8 @@ class XuLyDuThaoUseCaseTest {
     void setUp() {
         useCase = new XuLyDuThaoUseCase(
             duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider,
-            documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService);
+            documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
         lenient().when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         // DT-007: mac dinh tao draft_process thanh cong - cac test khong quan tam ket qua nay chi
@@ -305,6 +306,71 @@ class XuLyDuThaoUseCaseTest {
 
         Map<String, Object> fields = fieldsOf(document);
         assertThat(fields).doesNotContainKey("receiver_username");
+    }
+
+    // Bugfix 01/10/2026: nguoi duoc "Chuyen xu ly" bam "Chuyen ky duyet" - FE gui receiver = nguoi da
+    // chuyen xu ly (tu nguoichuyen_obj). Vet phai ghi Nguoi nhan = NGUOI KY cua du thao.
+    @Test
+    void execute_chuyenkyduyet_shouldRecordSignerAsReceiverIgnoringClientReceiver() {
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.OTHER_HANDLER_SUBMIT,
+            "{\"user_creator\":\"demo3\",\"signer\":\"Le Phu Ha\",\"user_signer\":\"lpha\",\"user_other_process_handler\":\"demo2\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("chuyenkyduyet");
+        request.setReceiver("Chuyen vien 1");
+        request.setReceiverUsername("demo3");
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(com.td.application.documents.AddDynamicDocumentRequest.class);
+        verify(addDraftProcessDocumentUseCase).execute(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFields())
+            .containsEntry("receiver", "Le Phu Ha")
+            .containsEntry("receiver_username", "lpha");
+    }
+
+    // signer rong -> lay ten tu signer_obj; user_signer rong -> lay tu signer_obj.user.
+    @Test
+    void execute_chuyenkyduyet_withOnlySignerObj_shouldUseSignerObjNameAndUser() {
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.DRAFTING,
+            "{\"signer_obj\":\"{\\\"name\\\":\\\"Le Phu Ha\\\",\\\"user\\\":\\\"lpha\\\"}\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("chuyenkyduyet");
+        request.setReceiverUsername("demo3");
+
+        useCase.execute(request);
+
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(com.td.application.documents.AddDynamicDocumentRequest.class);
+        verify(addDraftProcessDocumentUseCase).execute(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFields())
+            .containsEntry("receiver", "Le Phu Ha")
+            .containsEntry("receiver_username", "lpha");
+    }
+
+    // signer_obj luu dang OBJECT long (du lieu that) - truoc day String.valueOf(map) khong parse duoc.
+    @Test
+    void execute_chuyenkyduyet_withNestedSignerObject_shouldFillUserSignerAndReceiver() {
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.DRAFTING,
+            "{\"signer_obj\":{\"name\":\"Le Phu Ha\",\"user\":\"lpha\"}}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("chuyenkyduyet");
+
+        useCase.execute(request);
+
+        assertThat(fieldsOf(document)).containsEntry("user_signer", "lpha");
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(com.td.application.documents.AddDynamicDocumentRequest.class);
+        verify(addDraftProcessDocumentUseCase).execute(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getFields())
+            .containsEntry("receiver", "Le Phu Ha")
+            .containsEntry("receiver_username", "lpha");
     }
 
     @Test

@@ -23,6 +23,7 @@ C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\Record
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\SharedCoreRoleGroupsController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\PrivateCategoriesController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\TdWebApiApplication.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\SimPkiSignController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\OpenApiConfig.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\RequestBodyCachingFilter.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\BaseController.java
@@ -37,4 +38,5 @@ C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\Platfo
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\template\department\web\DepartmentsController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\FormDataToJsonFilter.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\RedisCacheConfig.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\IdentityDocumentsController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\HoSoLuuTruController.java

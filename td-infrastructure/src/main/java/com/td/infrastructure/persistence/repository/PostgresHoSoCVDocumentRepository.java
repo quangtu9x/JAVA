@@ -107,6 +107,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         // danh sach gia tri, khop IT NHAT 1 (OR) - dung cho field text tu do cua CollapseHoSoCV.jsx
         // (name/title/first_topic/second_topic) - xem javadoc buildHoSoCVAdvancedSearchFilter.
         appendContainsAnyFieldValuePredicates(sql, parameters, filter.getContainsAnyFieldValues());
+        appendExcludeMemberFieldValuePredicates(sql, parameters, filter.getExcludeMemberFieldValues());
         if (filter.getRequireEmptyFieldName() != null && !filter.getRequireEmptyFieldName().isBlank()) {
             sql.append(" AND COALESCE(d.dynamic_fields->>'")
                 .append(filter.getRequireEmptyFieldName()).append("', '') = ''");
@@ -133,13 +134,25 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             "minStoragedDate", filter.getMinStoragedDate(), "maxStoragedDate", filter.getMaxStoragedDate());
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        return executeQuery(sql, parameters, pageable, "d.last_modified_on DESC NULLS LAST");
+        // 02/10/2026: "van ban khac" cua ho so (vwOther_Related_Document_Document_Profiles_ID) sap
+        // @Created giam dan nhu Domino - xem VbdenOrgViewFilter#newestCreatedFirst.
+        return executeQuery(sql, parameters, pageable, filter.isNewestCreatedFirst()
+            ? "d.created_on DESC NULLS LAST"
+            : "d.last_modified_on DESC NULLS LAST");
     }
 
     @Override
     public Page<HoSoCVDocument> findByListFieldMemberExcludingOther(
             String documentType, String includeListField, String excludeListField, String value,
             Pageable pageable) {
+        return findByListFieldMemberExcludingOther(documentType, includeListField, excludeListField, value, null, null, pageable);
+    }
+
+    // 01/10/2026: + keyword/keywordColumns ("tim trong danh sach").
+    @Override
+    public Page<HoSoCVDocument> findByListFieldMemberExcludingOther(
+            String documentType, String includeListField, String excludeListField, String value,
+            String keyword, List<String> keywordColumns, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM hosocv_documents d
@@ -151,6 +164,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         if (excludeListField != null && !excludeListField.isBlank()) {
             appendAnyListFieldMemberPredicate(sql, parameters, List.of(excludeListField), value, true);
         }
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
         return executeQuery(sql, parameters, pageable, "d.last_modified_on DESC NULLS LAST");
@@ -158,6 +172,12 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
 
     @Override
     public Page<HoSoCVDocument> findDeleted(String documentType, Pageable pageable) {
+        return findDeleted(documentType, null, null, pageable);
+    }
+
+    // 01/10/2026: + keyword/keywordColumns ("tim trong danh sach").
+    @Override
+    public Page<HoSoCVDocument> findDeleted(String documentType, String keyword, List<String> keywordColumns, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM hosocv_documents d
@@ -165,6 +185,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             """);
 
         Map<String, Object> parameters = new LinkedHashMap<>();
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
         return executeQuery(sql, parameters, pageable, "d.deleted_on DESC NULLS LAST");
@@ -175,6 +196,17 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             String documentType, String keyFieldName, String keyValue,
             String dateFieldName, boolean strictlyBefore,
             Map<String, String> extraDynamicFieldEquals, Pageable pageable) {
+        return findByFieldValueDueDate(documentType, keyFieldName, keyValue, dateFieldName, strictlyBefore,
+            extraDynamicFieldEquals, null, null, pageable);
+    }
+
+    // 01/10/2026: + keyword/keywordColumns ("tim trong danh sach").
+    @Override
+    public Page<HoSoCVDocument> findByFieldValueDueDate(
+            String documentType, String keyFieldName, String keyValue,
+            String dateFieldName, boolean strictlyBefore,
+            Map<String, String> extraDynamicFieldEquals, String keyword, List<String> keywordColumns,
+            Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM hosocv_documents d
@@ -212,6 +244,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
                 }
             }
         }
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
         return executeQuery(sql, parameters, pageable, "d.last_modified_on DESC NULLS LAST");
@@ -257,7 +290,10 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             String fieldName = fieldNames.get(index);
             sql.append("(d.dynamic_fields @> CAST(:").append(containsParam).append(" AS jsonb)")
                 .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-                .append(scalarParam).append(")");
+                .append(scalarParam);
+            // 27/09/2026: + khop thanh vien chuoi "a;b" - xem javadoc DelimitedMemberSql.
+            DelimitedMemberSql.appendOrMember(sql, parameters, fieldName, value, "containsFieldMember" + index);
+            sql.append(")");
             parameters.put(containsParam, buildContainsFilter(fieldName, value));
             parameters.put(scalarParam, value == null ? "" : value);
         }
@@ -396,7 +432,11 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
                 sql.append("(d.dynamic_fields->'").append(fieldName).append("' @> jsonb_build_array(CAST(:")
                     .append(containsParam).append(" AS text))")
                     .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
-                    .append(scalarParam).append(")");
+                    .append(scalarParam);
+                // 01/10/2026: + thanh vien chuoi "a;b" (vd coordinator/user_coordinated nhieu nguoi).
+                DelimitedMemberSql.appendOrMember(sql, parameters, fieldName, value,
+                    "anyValMember" + fieldIndex + "_" + valueIndex);
+                sql.append(")");
                 parameters.put(containsParam, value);
                 parameters.put(scalarParam, value);
             }
@@ -404,6 +444,43 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
                 sql.append("1 = 0");
             }
             sql.append(")");
+            fieldIndex++;
+        }
+    }
+
+    // 01/10/2026 - Domino "fieldnot_X" (!@Contains): field KHONG chua gia tri o ca 3 dang (phan tu mang
+    // JSON, scalar bang, thanh vien chuoi "a;b") - xem javadoc VbdenOrgViewFilter#excludeMemberFieldValues.
+    // Package-private cho unit test SQL builder.
+    void appendExcludeMemberFieldValuePredicates(
+            StringBuilder sql, Map<String, Object> parameters, Map<String, List<String>> excludeMemberFieldValues) {
+        if (excludeMemberFieldValues == null || excludeMemberFieldValues.isEmpty()) {
+            return;
+        }
+        int fieldIndex = 0;
+        for (Map.Entry<String, List<String>> entry : excludeMemberFieldValues.entrySet()) {
+            String fieldName = entry.getKey();
+            List<String> values = entry.getValue();
+            if (fieldName == null || fieldName.isBlank() || values == null) {
+                fieldIndex++;
+                continue;
+            }
+            for (int valueIndex = 0; valueIndex < values.size(); valueIndex++) {
+                String value = values.get(valueIndex);
+                if (value == null || value.isBlank()) {
+                    continue;
+                }
+                String containsParam = "noneVal" + fieldIndex + "_" + valueIndex;
+                String scalarParam = "noneValScalar" + fieldIndex + "_" + valueIndex;
+                sql.append(" AND NOT (COALESCE(d.dynamic_fields->'").append(fieldName)
+                    .append("' @> jsonb_build_array(CAST(:").append(containsParam).append(" AS text)), false)")
+                    .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
+                    .append(scalarParam);
+                DelimitedMemberSql.appendOrMember(sql, parameters, fieldName, value,
+                    "noneValMember" + fieldIndex + "_" + valueIndex);
+                sql.append(")");
+                parameters.put(containsParam, value);
+                parameters.put(scalarParam, value);
+            }
             fieldIndex++;
         }
     }
@@ -434,21 +511,8 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
 
     private void appendKeywordPredicate(
             StringBuilder sql, Map<String, Object> parameters, String keyword, List<String> keywordColumns) {
-        if (keyword == null || keyword.isBlank() || keywordColumns == null || keywordColumns.isEmpty()) {
-            return;
-        }
-        String likeValue = "%" + keyword.trim().toLowerCase() + "%";
-        sql.append(" AND (");
-        for (int index = 0; index < keywordColumns.size(); index++) {
-            if (index > 0) {
-                sql.append(" OR ");
-            }
-            String parameterName = "keyword" + index;
-            sql.append("LOWER(COALESCE(d.dynamic_fields->>'").append(keywordColumns.get(index)).append("', ''))")
-                .append(" LIKE :").append(parameterName);
-            parameters.put(parameterName, likeValue);
-        }
-        sql.append(")");
+        // 01/10/2026: xem KeywordSql (title + chong SQL injection ten cot).
+        KeywordSql.append(sql, parameters, keyword, keywordColumns, "d");
     }
 
     private long countNative(String sql, Map<String, Object> parameters) {

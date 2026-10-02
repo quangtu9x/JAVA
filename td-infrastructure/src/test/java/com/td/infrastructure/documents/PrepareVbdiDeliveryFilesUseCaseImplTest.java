@@ -151,4 +151,78 @@ class PrepareVbdiDeliveryFilesUseCaseImplTest {
         assertThat(result.getData()).hasSize(1);
         assertThat(result.getData().get(0).getOriginalFilename()).isEqualTo("ok.pdf");
     }
+
+    /**
+     * Bổ sung 21/09/2026 (yêu cầu người dùng: "nếu check vào phát hành kèm văn bản đến thì khi gửi
+     * phải gửi tất cả những file đính kèm của văn bản đến theo" — xem javadoc
+     * {@code PrepareVbdiDeliveryFilesRequest#getAdditionalSourceDocumentIds}): tệp của CÁC văn bản
+     * đến tham chiếu CŨNG phải được copy, CÙNG namespace với tệp của chính văn bản đi.
+     */
+    @Test
+    void execute_withAdditionalSourceDocumentIds_shouldAlsoCopyTheirFiles() {
+        UUID documentId = UUID.randomUUID();
+        UUID vbdenId = UUID.randomUUID();
+        when(minioService.getBucketName()).thenReturn("td-webapi-files");
+        FileMetadataEntity vbdiFile = sourceFile(documentId, "to_trinh.pdf", "pdf");
+        FileMetadataEntity vbdenFile = sourceFile(vbdenId, "cong_van_den.pdf", "pdf");
+        when(fileMetadataRepo.findAllByDocumentId(documentId)).thenReturn(List.of(vbdiFile));
+        when(fileMetadataRepo.findAllByDocumentId(vbdenId)).thenReturn(List.of(vbdenFile));
+
+        var request = new PrepareVbdiDeliveryFilesRequest();
+        request.setDocumentId(documentId);
+        request.setSenderIdentifier("H05.01");
+        request.setAdditionalSourceDocumentIds(List.of(vbdenId));
+
+        var result = newUseCase().execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).extracting(VbdiDeliveryFileRef::getOriginalFilename)
+            .containsExactly("to_trinh.pdf", "cong_van_den.pdf");
+        verify(minioService).copyObject(org.mockito.ArgumentMatchers.eq(vbdiFile.getFilePath()), any());
+        verify(minioService).copyObject(org.mockito.ArgumentMatchers.eq(vbdenFile.getFilePath()), any());
+    }
+
+    @Test
+    void execute_withNullAdditionalSourceDocumentIds_shouldOnlyCopyOwnFiles() {
+        UUID documentId = UUID.randomUUID();
+        when(minioService.getBucketName()).thenReturn("td-webapi-files");
+        FileMetadataEntity vbdiFile = sourceFile(documentId, "to_trinh.pdf", "pdf");
+        when(fileMetadataRepo.findAllByDocumentId(documentId)).thenReturn(List.of(vbdiFile));
+
+        var request = new PrepareVbdiDeliveryFilesRequest();
+        request.setDocumentId(documentId);
+        request.setSenderIdentifier("H05.01");
+
+        var result = newUseCase().execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).hasSize(1);
+    }
+
+    /**
+     * Bổ sung 30/09/2026: nhóm hiển thị phía nơi nhận — tệp văn bản đi theo {@code tepkemtheo}, tệp
+     * "Phát hành kèm văn bản đến" luôn là "Tệp kèm theo".
+     */
+    @Test
+    void execute_shouldAssignAttachmentGroupPerFile() {
+        UUID documentId = UUID.randomUUID();
+        UUID vbdenId = UUID.randomUUID();
+        when(minioService.getBucketName()).thenReturn("td-webapi-files");
+        FileMetadataEntity banHanh = sourceFile(documentId, "quyet_dinh.pdf", "pdf");
+        FileMetadataEntity kemTheo = sourceFile(documentId, "Phu_Luc.docx", "docx");
+        FileMetadataEntity vbdenFile = sourceFile(vbdenId, "cong_van_den.pdf", "pdf");
+        when(fileMetadataRepo.findAllByDocumentId(documentId)).thenReturn(List.of(banHanh, kemTheo));
+        when(fileMetadataRepo.findAllByDocumentId(vbdenId)).thenReturn(List.of(vbdenFile));
+
+        var request = new PrepareVbdiDeliveryFilesRequest();
+        request.setDocumentId(documentId);
+        request.setAdditionalSourceDocumentIds(List.of(vbdenId));
+        request.setAttachedFilenames(List.of(" phu_luc.docx "));
+
+        var result = newUseCase().execute(request);
+
+        assertThat(result.getData()).extracting(VbdiDeliveryFileRef::getAttachmentGroup)
+            .containsExactly(VbdiDeliveryFileRef.GROUP_TEP_BAN_HANH, VbdiDeliveryFileRef.GROUP_TEP_KEM_THEO,
+                VbdiDeliveryFileRef.GROUP_TEP_KEM_THEO);
+    }
 }

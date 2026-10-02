@@ -54,7 +54,8 @@ public class CreatePrivateCategoryUseCase {
             }
 
             var category = new PrivateCategory(code, name, description, form, parentId, level, fullPath,
-                request.getSortOrder(), request.getIdentifier());
+                request.getSortOrder() == null ? CreatePrivateCategoryRequest.DEFAULT_SORT_ORDER : request.getSortOrder(),
+                request.getIdentifier());
 
             if (request.getDynamicFields() != null && !request.getDynamicFields().isEmpty()) {
                 String dynamicFieldsJson = dynamicDocumentFieldsService.buildDynamicFieldsJson(

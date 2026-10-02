@@ -107,12 +107,12 @@ public class ChuyenXemDeBietVbdiUseCase {
 
     public Result<UUID> execute(ChuyenXemDeBietVbdiRequest request) {
         if (request == null || request.getDocumentId() == null) {
-            return Result.failure("Thieu documentId can chuyen xem de biet");
+            return Result.failure("Thiếu mã văn bản cần chuyển xem để biết");
         }
         List<VbdiForwardReadRecipient> coordinators = nonNull(request.getCoordinators());
         List<VbdiForwardReadRecipient> internalUnits = nonNull(request.getInternalUnits());
         if (coordinators.isEmpty() && internalUnits.isEmpty()) {
-            return Result.failure("Chua chon nguoi/don vi xem de biet");
+            return Result.failure("Chưa chọn người/đơn vị xem để biết");
         }
         var document = vbdiDocumentRepository.findById(request.getDocumentId()).orElse(null);
         if (document == null || document.isDeleted()
@@ -213,9 +213,10 @@ public class ChuyenXemDeBietVbdiUseCase {
         detailEntry.put("create_date", now);
         detailEntry.put("name", item.getName());
         detailEntry.put("status", STATUS_DA_CHUYEN);
-        String defaultContent = actingFullName + " chuyen xem de biet cho " + item.getName()
-            + (item.getUnit() != null && !item.getUnit().isBlank() ? " thuoc " + item.getUnit() : "")
-            + " vao luc " + now;
+        // 30/09/2026 (yêu cầu người dùng): nội dung hiển thị ở Nhật ký gửi nhận — viết CÓ DẤU.
+        String defaultContent = actingFullName + " chuyển xem để biết cho " + item.getName()
+            + (item.getUnit() != null && !item.getUnit().isBlank() ? " thuộc " + item.getUnit() : "")
+            + " vào lúc " + now;
         detailEntry.put("content", !opinion.isBlank() ? opinion : defaultContent);
         detail.add(detailEntry);
         node.set("detail", detail);

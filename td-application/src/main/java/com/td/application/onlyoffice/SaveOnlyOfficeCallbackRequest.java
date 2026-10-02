@@ -9,10 +9,15 @@ import java.io.InputStream;
 import java.util.UUID;
 
 /**
- * Ghi đè nội dung tệp {@code documentId}/{@code fileId} bằng bản OnlyOffice vừa lưu (status 2/6 ở
- * callback — xem {@code SaveOnlyOfficeCallbackUseCase}). Ghi ĐÈ đúng vị trí lưu trữ MinIO hiện có
- * (không tạo dòng {@code file_metadata} mới) để giữ nguyên {@code fileId} — mọi màn hình/đường dẫn
- * tải xuống đang tham chiếu tệp này (danh sách tệp, ký số, lịch sử...) không cần đổi gì.
+ * Lưu bản OnlyOffice vừa sửa (status 2/6 ở callback — xem {@code SaveOnlyOfficeCallbackUseCase}) của tệp
+ * gốc {@code documentId}/{@code fileId}.
+ *
+ * <p><b>Đổi hành vi 25/09/2026</b> (yêu cầu người dùng: "tôi muốn lưu vết và file mới, không lưu đè vào
+ * file cũ, có thể tham khảo chức năng sửa file cũ (bte)"): trước đây GHI ĐÈ đúng tệp gốc (giữ nguyên
+ * fileId). Nay lưu thành TỆP MỚI (dòng file_metadata mới, {@code source_file_id} = tệp gốc), tệp gốc giữ
+ * nguyên — cùng tinh thần luồng "Sửa tệp" BTE ({@code tdeditorJavaFile.js}). {@code editSessionKey} (=
+ * {@code document.key} của phiên soạn thảo) để các lần callback sau trong CÙNG phiên ghi vào đúng tệp mới
+ * đó thay vì tạo trùng; {@code username} (người mở phiên) dùng đặt tên tệp mới giống BTE.</p>
  */
 @Data
 @Builder
@@ -24,4 +29,6 @@ public class SaveOnlyOfficeCallbackRequest {
     private UUID fileId;
     private InputStream content;
     private long contentLength;
+    private String editSessionKey;
+    private String username;
 }

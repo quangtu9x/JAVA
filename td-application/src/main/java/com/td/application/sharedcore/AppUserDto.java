@@ -52,6 +52,11 @@ public class AppUserDto {
     // "Nhóm vai trò" (BL-111) — 1 user có thể thuộc NHIỀU nhóm (N:N, bổ sung 19/08/2026).
     private List<UUID> roleGroupIds;
 
+    // 25/09/2026 (báo lỗi người dùng: "Danh sách người dùng chưa hiển thị thông tin nhóm quyền"): tên
+    // các nhóm quyền, cùng thứ tự roleGroupIds (bỏ nhóm đã xoá). Chỉ SearchAppUsersUseCase nạp (tra 1
+    // lần cho cả trang); nơi khác để rỗng.
+    private List<String> roleGroupNames;
+
     // Field tự định nghĩa từ FE (cột dynamic_fields JSONB) — BL-109 mở rộng cho AppUser.
     private Map<String, Object> dynamicFields;
 }

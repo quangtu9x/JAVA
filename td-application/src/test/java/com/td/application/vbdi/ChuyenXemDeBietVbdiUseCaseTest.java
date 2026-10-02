@@ -154,6 +154,22 @@ class ChuyenXemDeBietVbdiUseCaseTest {
         assertThat(entry.path("detail").get(0).path("content").asText()).isEqualTo("Gui de biet");
     }
 
+    // 30/09/2026: không nhập ý kiến -> câu mặc định CÓ DẤU (hiện ở Nhật ký gửi nhận).
+    @Test
+    void execute_withoutOpinion_shouldWriteVietnameseDefaultContent() {
+        var document = vbdiDocument();
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new ChuyenXemDeBietVbdiRequest();
+        request.setDocumentId(document.getId());
+        request.setCoordinators(List.of(recipient("u1", "Lê Phú Hà", "lpha")));
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+        JsonNode entry = OBJECT_MAPPER.valueToTree(fieldsOf(document).get("xemdebiet_obj_rtext")).get(0);
+        assertThat(entry.path("detail").get(0).path("content").asText())
+            .startsWith("Nguyen Van Thu chuyển xem để biết cho Lê Phú Hà vào lúc ");
+    }
+
     @Test
     void execute_withInternalUnit_shouldAddIdentifierToPendingButNotHideAll() {
         var document = vbdiDocument();

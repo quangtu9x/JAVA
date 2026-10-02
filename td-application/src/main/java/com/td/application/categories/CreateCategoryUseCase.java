@@ -58,7 +58,8 @@ public class CreateCategoryUseCase {
             }
 
             // 4. Lưu
-            var category = new Category(code, name, description, form, parentId, level, fullPath, request.getSortOrder());
+            var category = new Category(code, name, description, form, parentId, level, fullPath,
+                request.getSortOrder() == null ? CreateCategoryRequest.DEFAULT_SORT_ORDER : request.getSortOrder());
 
             if (request.getDynamicFields() != null && !request.getDynamicFields().isEmpty()) {
                 String dynamicFieldsJson = dynamicDocumentFieldsService.buildDynamicFieldsJson(

@@ -17,4 +17,7 @@ public interface RoleGroupRepository extends IRepository<RoleGroup> {
     Optional<RoleGroup> findByIdAndDeletedOnIsNull(UUID id);
 
     Page<RoleGroup> search(SearchRoleGroupsRequest request, Pageable pageable);
+
+    // 25/09/2026: tra tên nhiều nhóm quyền 1 lần (cột "Nhóm quyền" ở Danh sách người dùng, tránh N+1).
+    java.util.List<RoleGroup> findAllByIdInAndDeletedOnIsNull(java.util.Collection<UUID> ids);
 }

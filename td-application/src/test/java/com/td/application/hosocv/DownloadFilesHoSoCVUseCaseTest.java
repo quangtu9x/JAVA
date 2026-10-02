@@ -23,12 +23,17 @@ class DownloadFilesHoSoCVUseCaseTest {
 
     @Mock
     private ListDocumentFilesUseCase listDocumentFilesUseCase;
+    @Mock
+    private HoSoCVDocumentRepository hoSoCVDocumentRepository;
+    @Mock
+    private HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
     private DownloadFilesHoSoCVUseCase useCase;
 
     @BeforeEach
     void setUp() {
-        useCase = new DownloadFilesHoSoCVUseCase(listDocumentFilesUseCase);
+        useCase = new DownloadFilesHoSoCVUseCase(listDocumentFilesUseCase, hoSoCVDocumentRepository,
+            new com.td.application.documents.DynamicDocumentFieldsService(), hoSoVanBanKhacFinder);
     }
 
     @Test
@@ -86,5 +91,36 @@ class DownloadFilesHoSoCVUseCaseTest {
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getData()).isEmpty();
+    }
+
+    // 02/10/2026: co hosocvId -> server tu gom VB di, VB den, "van ban khac" (dung thu tu) + bo trung.
+    @Test
+    void execute_withHosocvId_shouldCollectLinkedDocumentsAndVanBanKhacInOrderWithoutDuplicates() {
+        UUID vbdiId = UUID.randomUUID();
+        UUID vbdenId = UUID.randomUUID();
+        com.td.domain.hosocv.HoSoCVDocument hosocv =
+            new com.td.domain.hosocv.HoSoCVDocument("Hồ sơ", "hosocv", "0", null, null, null, null)
+                .replaceDynamicFields("{\"document_out_attached_id\":\"" + vbdiId + ";khong-phai-uuid\","
+                    + "\"document_in_attached_id\":\"" + vbdenId + "\"}");
+        com.td.domain.hosocv.HoSoCVDocument vanBanKhac = new com.td.domain.hosocv.HoSoCVDocument(
+            "VB khác", LuuVanBanKhacUseCase.DOCUMENT_TYPE, "1", null, null, null, null);
+        when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(java.util.Optional.of(hosocv));
+        when(hoSoVanBanKhacFinder.findByHoSo(hosocv.getId())).thenReturn(List.of(vanBanKhac));
+        when(listDocumentFilesUseCase.execute(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new PaginationResponse<>(List.of(), 0, 1, 0L, 0, true, true));
+
+        var request = new DownloadFilesHoSoCVRequest();
+        request.setHosocvId(hosocv.getId());
+        var duplicate = new HoSoFileRefDto();
+        duplicate.setDocumentType("vbdi");
+        duplicate.setDocumentId(vbdiId);
+        request.setVanBanLienQuan(List.of(duplicate));
+
+        var result = useCase.execute(request);
+
+        assertThat(result.getData()).extracting(HoSoFileGroupDto::getDocumentId)
+            .containsExactly(vbdiId, vbdenId, vanBanKhac.getId());
+        assertThat(result.getData()).extracting(HoSoFileGroupDto::getDocumentType)
+            .containsExactly("vbdi", "vbden", LuuVanBanKhacUseCase.DOCUMENT_TYPE);
     }
 }

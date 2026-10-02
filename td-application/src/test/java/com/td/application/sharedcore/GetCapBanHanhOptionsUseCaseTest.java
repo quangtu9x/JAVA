@@ -104,7 +104,8 @@ class GetCapBanHanhOptionsUseCaseTest {
         when(organizationRepository.findByIdAndDeletedOnIsNull(agencyLevel.getId())).thenReturn(Optional.of(agencyLevel));
         when(dynamicDocumentFieldsService.parseDynamicFields(anyString())).thenReturn(Map.of());
 
-        var result = useCase.execute("duthao");
+        // 01/10/2026: duthao/vbdi bo cap 1 (xem test ngay duoi); databasetype rong giu du chuoi to tien.
+        var result = useCase.execute(null);
 
         assertThat(result.isSuccess()).isTrue();
         List<Map<String, Object>> data = result.getData();
@@ -115,7 +116,32 @@ class GetCapBanHanhOptionsUseCaseTest {
         assertThat(data.get(3)).containsEntry("name", "Tổ Hành chính").containsEntry("form", "department");
     }
 
-    // Domino goc: bo qua to tien khong co identifier (rong).
+    // 01/10/2026: du thao + van ban di chi lay co quan/don vi/phong cua nguoi dung - bo cap 1 (agency_level).
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"duthao", "vbdi"})
+    void execute_duthaoAndVbdi_shouldExcludeAgencyLevel(String databasetype) {
+        Organization agencyLevel = newOrg("H05", "Tỉnh A", "agency_level", null);
+        Organization agency = newOrg("H05.12", "Sở Nội vụ", "agency", agencyLevel.getId());
+        Organization unit = newOrg("H05.12.07", "Phòng Tổ chức", "unit", agency.getId());
+        Organization department = newOrg("H05.12.07.01", "Tổ Hành chính", "department", unit.getId());
+
+        AppUser user = new AppUser("kc-nv1", "nv1", "Nguyen Van A", null, department.getId(), null, true,
+            null, 0, null, null, null, null, null, null, null, false, null);
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nv1"));
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("nv1")).thenReturn(Optional.of(user));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(department.getId())).thenReturn(Optional.of(department));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(unit.getId())).thenReturn(Optional.of(unit));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(agency.getId())).thenReturn(Optional.of(agency));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(agencyLevel.getId())).thenReturn(Optional.of(agencyLevel));
+        when(dynamicDocumentFieldsService.parseDynamicFields(anyString())).thenReturn(Map.of());
+
+        List<Map<String, Object>> data = useCase.execute(databasetype).getData();
+
+        assertThat(data).extracting(node -> node.get("name"))
+            .containsExactly("Sở Nội vụ", "Phòng Tổ chức", "Tổ Hành chính");
+    }
+
+    // Domino goc: bo qua to tien khong co identifier (rong). (duthao: chi con cap 1 -> giu lai cap 1.)
     @Test
     void execute_ancestorWithBlankIdentifier_shouldBeSkipped() {
         Organization agencyLevel = newOrg("H05", "Tỉnh A", "agency_level", null);
@@ -157,5 +183,36 @@ class GetCapBanHanhOptionsUseCaseTest {
     private Organization newOrg(String identifier, String name, String nodeType, UUID parentId) {
         return new Organization(identifier, name, null, parentId, nodeType, 0, name, 0,
             0, null, null, null, null, null, null, null, null, null);
+    }
+
+    // 01/10/2026: co quan cau hinh "bo sung don vi con" + to chuc cau hinh "an khoi cap ban hanh"
+    // (thay nhanh HĐND gan cung o FE).
+    @Test
+    void execute_agencyIncludeChildrenAndHiddenNodes_shouldFollowConfig() {
+        Organization agencyLevel = newOrg("H05", "Tỉnh A", "agency_level", null);
+        Organization agency = newOrg("K56", "Đoàn ĐBQH và HĐND", "agency", agencyLevel.getId());
+        agency.replaceDynamicFields("{\"cfg_capbanhanh_them_don_vi_con\":\"1\",\"cfg_an_khoi_capbanhanh\":\"1\"}");
+        Organization vanPhong = newOrg("K56.06", "Văn phòng", "unit", agency.getId());
+        Organization hoiDong = newOrg("K56.01", "Hội đồng nhân dân", "unit", agency.getId());
+        Organization phong = newOrg("K56.07", "Phòng Công tác HĐND", "unit", agency.getId());
+        phong.replaceDynamicFields("{\"cfg_an_khoi_capbanhanh\":\"1\"}");
+
+        AppUser user = new AppUser("kc-vt", "vt", "Văn thư", null, vanPhong.getId(), null, true,
+            null, 0, null, null, null, null, null, null, null, false, null);
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vt"));
+        when(appUserRepository.findByUsernameAndDeletedOnIsNull("vt")).thenReturn(Optional.of(user));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(vanPhong.getId())).thenReturn(Optional.of(vanPhong));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(agency.getId())).thenReturn(Optional.of(agency));
+        when(organizationRepository.findByIdAndDeletedOnIsNull(agencyLevel.getId())).thenReturn(Optional.of(agencyLevel));
+        when(organizationRepository.findByParentIdAndDeletedOnIsNull(agency.getId()))
+            .thenReturn(List.of(phong, vanPhong, hoiDong));
+        DynamicDocumentFieldsService real = new DynamicDocumentFieldsService();
+        when(dynamicDocumentFieldsService.parseDynamicFields(anyString()))
+            .thenAnswer(inv -> real.parseDynamicFields(inv.getArgument(0)));
+
+        List<Map<String, Object>> data = useCase.execute("duthao").getData();
+
+        // an co quan + phong; giu Van phong (cua user) + bo sung Hoi dong; khong cap 1.
+        assertThat(data).extracting(node -> node.get("name")).containsExactlyInAnyOrder("Văn phòng", "Hội đồng nhân dân");
     }
 }

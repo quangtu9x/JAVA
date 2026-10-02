@@ -197,18 +197,19 @@ class PostgresDocumentRepositoryTest {
 
     // 31/08/2026 (port "toanbovanban" - RangePicker "khoang ngay nhan van ban"): mirror y het bo test
     // appendDeadlineInRangePredicate, chi khac ten field/param - xem javadoc VbdenOrgViewFilter#minReceivedDate.
+    // 02/10/2026: dung chung bieu thuc sort "date" - khop ca 3 dang received_date that.
     @Test
-    void appendReceivedDateInRangePredicate_withBothBounds_shouldAddFormatGuardAndBothComparisons() {
+    void appendReceivedDateInRangePredicate_withBothBounds_shouldCompareParsedDateOfAllFormats() {
         StringBuilder sql = new StringBuilder();
         Map<String, Object> parameters = new LinkedHashMap<>();
 
         repository.appendReceivedDateInRangePredicate(
             sql, parameters, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31));
 
-        assertThat(sql.toString()).contains("~ :receivedDateFormat");
-        assertThat(sql.toString()).contains("TO_DATE(d.dynamic_fields->>'received_date', 'DD/MM/YYYY') >= :minReceivedDate");
-        assertThat(sql.toString()).contains("TO_DATE(d.dynamic_fields->>'received_date', 'DD/MM/YYYY') <= :maxReceivedDate");
-        assertThat(parameters).containsEntry("receivedDateFormat", "^[0-9]{2}/[0-9]{2}/[0-9]{4}$");
+        String receivedDate = repository.dynamicSortExpression("received_date", "date");
+        assertThat(sql.toString()).isEqualTo(
+            " AND " + receivedDate + " >= :minReceivedDate AND " + receivedDate + " <= :maxReceivedDate");
+        assertThat(parameters).doesNotContainKey("receivedDateFormat");
         assertThat(parameters).containsEntry("minReceivedDate", java.sql.Date.valueOf(LocalDate.of(2026, 8, 1)));
         assertThat(parameters).containsEntry("maxReceivedDate", java.sql.Date.valueOf(LocalDate.of(2026, 8, 31)));
     }
@@ -307,6 +308,46 @@ class PostgresDocumentRepositoryTest {
         assertThat(parameters).containsEntry("keyword2", "%cong van a%");
     }
 
+    // Bugfix 01/10/2026: trich yeu nam o cot tinh title; ban ghi so vbden_so khop qua van ban goc (parentid).
+    @Test
+    void appendKeywordPredicate_shouldAlsoMatchTitleAndParentDocumentOfSoEntries() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        repository.appendKeywordPredicate(sql, parameters, "Van ban", List.of("code", "subject"));
+
+        String text = sql.toString();
+        assertThat(text).contains("LOWER(COALESCE(d.title, '')) LIKE :keyword1");
+        assertThat(text).contains("d.document_type = 'vbden_so' AND EXISTS (SELECT 1 FROM documents p"
+            + " WHERE CAST(p.id AS text) = d.dynamic_fields->>'parentid'");
+        assertThat(text).contains("LOWER(COALESCE(p.dynamic_fields->>'code', '')) LIKE :keyword0");
+        assertThat(text).contains("LOWER(COALESCE(p.title, '')) LIKE :keyword1");
+        // title chi them cho subject, khong cho code.
+        assertThat(text).doesNotContain("d.title, '')) LIKE :keyword0");
+    }
+
+    // 01/10/2026: ten cot tu client noi thang vao SQL -> bo cot khong an toan (chong SQL injection).
+    @Test
+    void appendKeywordPredicate_shouldIgnoreUnsafeColumnNames() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        repository.appendKeywordPredicate(sql, parameters, "x", List.of("code') OR 1=1 --", "subject"));
+
+        assertThat(sql.toString()).doesNotContain("1=1").contains("'subject'");
+        assertThat(parameters).containsOnlyKeys("keyword0");
+    }
+
+    @Test
+    void appendKeywordPredicate_withOnlyUnsafeColumns_shouldAddNoPredicate() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        repository.appendKeywordPredicate(sql, parameters, "x", List.of("a'b"));
+
+        assertThat(sql.toString()).isEmpty();
+    }
+
     @Test
     void appendKeywordPredicate_withBlankKeyword_shouldAddNoPredicate() {
         StringBuilder sql = new StringBuilder();
@@ -380,11 +421,27 @@ class PostgresDocumentRepositoryTest {
 
     // Bugfix 21/08/2026: du lieu thuc te "received_date" la "dd/MM/yyyy" (vd "21/08/2026"), khong
     // phai ISO - dung TO_DATE voi format ro rang, guard regex tranh loi runtime voi du lieu sai dang.
+    // 02/10/2026: them 2 dang "dd/MM/yyyy HH:mm:ss" va "yyyy-MM-dd" (truoc tra NULL) - chi lay ngay.
     @Test
-    void dynamicSortExpression_withDateType_shouldParseDdMmYyyyFormat() {
+    void dynamicSortExpression_withDateType_shouldParseAllStoredFormatsAtDayPrecision() {
         assertThat(repository.dynamicSortExpression("received_date", "date"))
-            .isEqualTo("(CASE WHEN NULLIF(d.dynamic_fields->>'received_date', '') ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'"
-                + " THEN TO_DATE(d.dynamic_fields->>'received_date', 'DD/MM/YYYY') ELSE NULL END)");
+            .isEqualTo("(CASE WHEN d.dynamic_fields->>'received_date' ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'"
+                + " THEN TO_DATE(SUBSTRING(d.dynamic_fields->>'received_date' FROM 1 FOR 10), 'DD/MM/YYYY')"
+                + " WHEN d.dynamic_fields->>'received_date' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'"
+                + " THEN TO_DATE(SUBSTRING(d.dynamic_fields->>'received_date' FROM 1 FOR 10), 'YYYY-MM-DD')"
+                + " ELSE NULL END)");
+    }
+
+    // 02/10/2026 (theodoi): received_date that co 3 dang; khong duoc co ky tu ":" (Hibernate parser).
+    @Test
+    void dynamicSortExpression_withDatetimeType_shouldParseAllStoredFormatsWithoutColons() {
+        String expression = repository.dynamicSortExpression("received_date", "datetime");
+
+        assertThat(expression)
+            .contains("'DD/MM/YYYY HH24 MI SS'")
+            .contains("'DD/MM/YYYY'")
+            .contains("'YYYY-MM-DD'")
+            .doesNotContain(":");
     }
 
     @Test

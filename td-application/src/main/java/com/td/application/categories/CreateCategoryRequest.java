@@ -29,7 +29,12 @@ public class CreateCategoryRequest {
     /** null = tạo ở cấp gốc */
     private UUID parentId;
 
-    private int sortOrder = 0;
+    // 24/09/2026 (yêu cầu người dùng): mặc định 99 thay cho 0 — danh sách sắp xếp TĂNG DẦN theo thứ tự
+    // hiển thị (rồi tên A-Z), để 0 thì bản ghi mới luôn nhảy lên đầu. Cùng giá trị với
+    // CreateAppUserRequest.DEFAULT_SORT_ORDER và FE utils/sortOrder.js.
+    public static final int DEFAULT_SORT_ORDER = 99;
+
+    private Integer sortOrder = DEFAULT_SORT_ORDER;
 
     // Field tự định nghĩa từ FE, lưu vào cột dynamic_fields (JSONB) — cùng convention với
     // Create/UpdateOrganizationRequest (BL-109): dateFields/numberFields/richtextFields là chuỗi

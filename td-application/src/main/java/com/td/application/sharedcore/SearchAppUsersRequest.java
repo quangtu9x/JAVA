@@ -25,6 +25,10 @@ public class SearchAppUsersRequest {
     @Max(value = 200, message = "Page size tối đa 200")
     private int pageSize = 20;
 
-    private String sortBy = "fullName";
+    // 24/09/2026: mặc định theo "Thứ tự hiển thị", sau đó Họ tên A-Z, Tên đăng nhập (xem
+    // SearchAppUsersUseCase.buildPageable). Hằng số dùng chung cho @RequestParam(defaultValue) ở controller.
+    public static final String DEFAULT_SORT_BY = "sortOrder";
+
+    private String sortBy = DEFAULT_SORT_BY;
     private String sortDirection = "asc";
 }

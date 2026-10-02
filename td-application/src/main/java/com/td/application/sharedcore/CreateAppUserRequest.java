@@ -41,7 +41,11 @@ public class CreateAppUserRequest {
     @NotNull(message = "Cấp (trong cây cơ cấu tổ chức) không được để trống")
     private Integer level;
 
-    private Integer sortOrder = 0;
+    // 24/09/2026 (yêu cầu người dùng): mặc định 99 thay cho 0 — danh sách sắp xếp TĂNG DẦN theo thứ tự
+    // hiển thị, để 0 thì người dùng mới luôn nhảy lên đầu. Người nhập giá trị cụ thể vẫn giữ nguyên.
+    public static final int DEFAULT_SORT_ORDER = 99;
+
+    private Integer sortOrder = DEFAULT_SORT_ORDER;
 
     private String phoneNumber;
 
