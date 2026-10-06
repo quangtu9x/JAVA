@@ -153,6 +153,8 @@ public class GetVbdenDetailUseCase {
     private final AppUserRepository appUserRepository;
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final com.td.application.documents.AuthorAclFieldsService authorAclFieldsService;
+    // 05/10/2026: "Nhật ký đã xem" có lần xem đầu + lần xem cuối (log_seen_document_detail).
+    private final com.td.application.documents.SeenDocumentDetailRecorder seenDocumentDetailRecorder;
 
     public Result<Map<String, Object>> execute(GetVbdenDetailRequest request) {
         UUID idso = parseUuid(request.getIdso());
@@ -247,6 +249,14 @@ public class GetVbdenDetailUseCase {
         BusinessDocument parent = documentRepository.findById(id).orElse(null);
         if (parent != null) {
             markViewedIfPending(parent);
+            // 05/10/2026: "data" đọc TRƯỚC khi ghi "đã xem" -> chép lại 2 field nhật ký mới nhất để người
+            // đang xem thấy ngay lần xem này của mình ("Nhật ký đã xem").
+            Map<String, Object> viewedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+            for (String logField : List.of(LOG_READ_FIELD, com.td.application.documents.SeenDocumentDetailRecorder.FIELD)) {
+                if (viewedFields.containsKey(logField)) {
+                    data.put(logField, viewedFields.get(logField));
+                }
+            }
             // Bugfix 22/08/2026 - xem javadoc chi tiet o executeWithRegisterEntry (cung ly do: van
             // ban tao qua TiepNhanVbdenUseCase khong co "subject" trong dynamic_fields, chi co
             // "title" tren entity).
@@ -419,6 +429,11 @@ public class GetVbdenDetailUseCase {
             }
 
             if (appendLogReadEntry(fields, username)) {
+                changed = true;
+            }
+            // 05/10/2026: log_read_obj chỉ giữ LẦN XEM ĐẦU (danh sách dùng để in đậm "chưa đọc"); thêm
+            // log_seen_document_detail cập nhật lần xem cuối MỖI lần mở — cùng định dạng dự thảo/văn bản đi.
+            if (seenDocumentDetailRecorder.record(fields, username)) {
                 changed = true;
             }
 

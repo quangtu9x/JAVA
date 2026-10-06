@@ -498,13 +498,19 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
         if (fieldNames == null || fieldNames.isEmpty()) {
             return new PageImpl<>(List.of(), pageable, 0);
         }
+        // 06/10/2026: status null = KHONG loc trang thai (vwIssuance_Document_Profiles_ID - tab "Van ban
+        // phat hanh" ho so cong viec, formula Domino khong co dieu kien status). Moi caller cu deu truyen
+        // VbdiStatus.ISSUED nen khong doi hanh vi.
+        boolean filterStatus = status != null;
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM vbdi_documents d
             WHERE d.deleted_on IS NULL
-              AND LOWER(COALESCE(d.status, '')) = :status
-              AND (
             """);
+        if (filterStatus) {
+            sql.append("  AND LOWER(COALESCE(d.status, '')) = :status\n");
+        }
+        sql.append("  AND (\n");
         // Tuong duong @Explode(field;";") roi so khop - boc them ";" 2 dau field/gia tri tim de tranh
         // khop nham chuoi con (vd "H05.1" khong duoc khop nham trong "H05.10") - xem javadoc method.
         for (int index = 0; index < fieldNames.size(); index++) {
@@ -517,7 +523,9 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
         sql.append(")");
 
         Map<String, Object> parameters = new LinkedHashMap<>();
-        parameters.put("status", status == null ? "" : status.trim().toLowerCase());
+        if (filterStatus) {
+            parameters.put("status", status.trim().toLowerCase());
+        }
         parameters.put("member", member == null ? "" : member.trim());
 
         if (documentType != null && !documentType.isBlank()) {
@@ -681,5 +689,40 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
         Query countQuery = entityManager.createNativeQuery("SELECT COUNT(*) FROM (" + sql + ") AS matched");
         parameters.forEach(countQuery::setParameter);
         return ((Number) countQuery.getSingleResult()).longValue();
+    }
+
+    // 06/10/2026 (bang document_links - docs/architecture/document-links.md): van ban theo TAP id lay tu
+    // DocumentLinkService (khong con khop field id noi ";" trong dynamic_fields).
+    @Override
+    public Page<VbdiDocument> findByIds(
+            String documentType, java.util.Collection<UUID> ids, com.td.application.vbdi.VbdiDocumentOutFilter filter, Pageable pageable) {
+        if (ids == null || ids.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM vbdi_documents d
+            WHERE d.deleted_on IS NULL
+              AND d.id IN (:ids)
+            """);
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("ids", ids);
+        if (documentType != null && !documentType.isBlank()) {
+            sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
+            parameters.put("documentType", documentType.trim().toLowerCase());
+        }
+        appendFilterPredicates(sql, parameters, filter);
+
+        long total = countNative(sql.toString(), parameters);
+
+        sql.append(ISSUED_ORDER_BY).append(" LIMIT :limit OFFSET :offset");
+        Query query = entityManager.createNativeQuery(sql.toString(), VbdiDocument.class);
+        parameters.forEach(query::setParameter);
+        query.setParameter("limit", pageable.getPageSize());
+        query.setParameter("offset", pageable.getOffset());
+
+        @SuppressWarnings("unchecked")
+        List<VbdiDocument> content = query.getResultList();
+        return new PageImpl<>(content, pageable, total);
     }
 }

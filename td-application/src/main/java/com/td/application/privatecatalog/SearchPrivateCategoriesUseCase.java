@@ -18,6 +18,7 @@ public class SearchPrivateCategoriesUseCase {
 
     private final PrivateCategoryRepository privateCategoryRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final ActiveGroupMembersFilter activeGroupMembersFilter;
 
     public PaginationResponse<PrivateCategoryDto> execute(SearchPrivateCategoriesRequest request) {
         try {
@@ -28,6 +29,9 @@ public class SearchPrivateCategoriesUseCase {
                 .map(entity -> PrivateCategoryDtoMapper.map(
                     entity, dynamicDocumentFieldsService.parseDynamicFields(entity.getDynamicFieldsJson())))
                 .toList();
+            if (Boolean.TRUE.equals(request.getActiveMembersOnly())) {
+                filterInactiveMembers(items);
+            }
 
             return new PaginationResponse<>(
                 items,
@@ -45,6 +49,24 @@ public class SearchPrivateCategoriesUseCase {
                 Math.min(Math.max(1, request.getPageSize()), 200),
                 0L, 0, true, true
             );
+        }
+    }
+
+    // 06/10/2026: xem SearchPrivateCategoriesRequest#activeMembersOnly + ActiveGroupMembersFilter.
+    private static final String RECEIVER_OBJ_FIELD = "receiver_obj";
+
+    private void filterInactiveMembers(List<PrivateCategoryDto> items) {
+        List<Object> filtered = activeGroupMembersFilter.filter(items.stream()
+            .map(dto -> dto.getDynamicFields() == null ? null : dto.getDynamicFields().get(RECEIVER_OBJ_FIELD))
+            .toList());
+        for (int i = 0; i < items.size(); i++) {
+            PrivateCategoryDto dto = items.get(i);
+            if (dto.getDynamicFields() == null || !dto.getDynamicFields().containsKey(RECEIVER_OBJ_FIELD)) {
+                continue;
+            }
+            java.util.Map<String, Object> fields = new java.util.LinkedHashMap<>(dto.getDynamicFields());
+            fields.put(RECEIVER_OBJ_FIELD, filtered.get(i));
+            dto.setDynamicFields(fields);
         }
     }
 

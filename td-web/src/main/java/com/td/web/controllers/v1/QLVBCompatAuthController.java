@@ -139,6 +139,12 @@ public class QLVBCompatAuthController {
                 + "duoc khai bao trong danh muc nguoi dung (app_users)", user.getUsername());
             return ResponseEntity.ok(buildNotProvisionedAuthResponse());
         }
+        // 06/10/2026 (yêu cầu người dùng "khoá rồi thì khi đăng nhập hiển thị trang thông báo"): tài
+        // khoản đã khai báo nhưng đang bị Khoá - KHÔNG cấp token, FE điều hướng trang taikhoanbikhoa.html.
+        if (isAccountLocked(superAdmin, orgProfile)) {
+            log.warn("Dang nhap bi tu choi: tai khoan '{}' dang bi khoa", user.getUsername());
+            return ResponseEntity.ok(buildLockedAuthResponse());
+        }
 
         // Bổ sung 20/08/2026 (bugfix nghiêm trọng): claim "roles" của Tdtoken trước đây CHỈ chứa role
         // Keycloak thật của user (vd chỉ "USER") — quyền nghiệp vụ QLVB (QCapNhatVBDen/QPhanCong/...)
@@ -175,6 +181,10 @@ public class QLVBCompatAuthController {
             log.warn("Lay ho so bi tu choi: tai khoan '{}' xac thuc Keycloak thanh cong nhung chua "
                 + "duoc khai bao trong danh muc nguoi dung (app_users)", user.getUsername());
             return ResponseEntity.ok(buildNotProvisionedProfileResponse(user.getUsername()));
+        }
+        if (isAccountLocked(superAdmin, orgProfile)) {
+            log.warn("Lay ho so bi tu choi: tai khoan '{}' dang bi khoa", user.getUsername());
+            return ResponseEntity.ok(buildLockedProfileResponse(user.getUsername()));
         }
 
         // Fetch ĐÚNG 1 lần, dùng chung cho buildProfile() (hiển thị) lẫn buildTdTokenClaims() (claim
@@ -593,6 +603,38 @@ public class QLVBCompatAuthController {
         response.put("accountProvisioned", Boolean.FALSE);
         response.put("message", NOT_PROVISIONED_MESSAGE);
         return response;
+    }
+
+    /**
+     * 06/10/2026: tài khoản có AppUser nhưng đang bị Khoá ({@code isActive=false}). superAdmin miễn
+     * trừ (tránh tự khoá mất quyền quản trị tối cao), cùng quy tắc với isAccountProvisioned.
+     */
+    private boolean isAccountLocked(boolean superAdmin, UserOrganizationProfileDto org) {
+        return !superAdmin && appUserExists(org) && !org.isActive();
+    }
+
+    private static final String LOCKED_MESSAGE =
+        "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ quản trị viên để được mở khoá.";
+
+    /** Cùng khuôn buildNotProvisionedAuthResponse - FE (Auth.tsx#getTDAuth) đọc "accountLocked". */
+    private Map<String, Object> buildLockedAuthResponse() {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("token", null);
+        response.put("refreshToken", "");
+        response.put("refreshTokenExpiryTime", "");
+        response.put("isAuthSuccessful", Boolean.FALSE);
+        response.put("isTfaEnabled", Boolean.FALSE);
+        response.put("accountLocked", Boolean.TRUE);
+        response.put("message", LOCKED_MESSAGE);
+        return response;
+    }
+
+    private Map<String, Object> buildLockedProfileResponse(String username) {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("username", username);
+        profile.put("accountLocked", Boolean.TRUE);
+        profile.put("message", LOCKED_MESSAGE);
+        return profile;
     }
 
     /** Response {@code UserModel}-shaped tối giản, KHÔNG kèm tdtoken — xem javadoc isAccountProvisioned. */

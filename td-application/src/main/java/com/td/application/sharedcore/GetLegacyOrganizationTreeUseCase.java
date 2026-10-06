@@ -116,7 +116,8 @@ public class GetLegacyOrganizationTreeUseCase {
         }
         Map<UUID, List<AppUser>> byOrganizationId = new HashMap<>();
         for (AppUser user : appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(organizationIds)) {
-            if (user.getOrganizationId() == null) {
+            // 06/10/2026: cay chon nguoi - bo nguoi dang bi Khoa.
+            if (user.getOrganizationId() == null || !user.isActive()) {
                 continue;
             }
             byOrganizationId.computeIfAbsent(user.getOrganizationId(), key -> new ArrayList<>()).add(user);

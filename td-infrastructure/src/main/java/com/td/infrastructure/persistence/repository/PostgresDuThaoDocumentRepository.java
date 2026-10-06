@@ -36,6 +36,11 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String STATUS_FIELD_NAME = "status";
+    // 06/10/2026 (yêu cầu người dùng "các danh sách ở dự thảo sắp theo ngày tạo mới nhất lên trên"):
+    // MỌI danh sách dự thảo dùng chung 1 thứ tự — trước đây lẫn created_on ASC (hàng đợi cá nhân) và
+    // last_modified_on DESC (dự thảo cũ vừa xử lý nhảy lên đầu). FE gửi orderBy nhưng Java bỏ qua, nên
+    // chốt ở đây — cùng quy ước PostgresHoSoCVDocumentRepository#NEWEST_CREATED_FIRST.
+    static final String NEWEST_CREATED_FIRST = "d.created_on DESC NULLS LAST, d.last_modified_on DESC NULLS LAST";
 
     private final DuThaoDocumentJpaRepository jpaRepository;
 
@@ -92,7 +97,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.created_on ASC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(" ORDER BY ").append(NEWEST_CREATED_FIRST).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -152,7 +157,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(" ORDER BY ").append(NEWEST_CREATED_FIRST).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -188,7 +193,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(" ORDER BY ").append(NEWEST_CREATED_FIRST).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -221,7 +226,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(" ORDER BY ").append(NEWEST_CREATED_FIRST).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -503,5 +508,40 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
         Query countQuery = entityManager.createNativeQuery("SELECT COUNT(*) FROM (" + sql + ") AS matched");
         parameters.forEach(countQuery::setParameter);
         return ((Number) countQuery.getSingleResult()).longValue();
+    }
+
+    // 06/10/2026 (bang document_links - docs/architecture/document-links.md): van ban theo TAP id lay tu
+    // DocumentLinkService (khong con khop field id noi ";" trong dynamic_fields).
+    @Override
+    public Page<DuThaoDocument> findByIds(
+            String documentType, java.util.Collection<UUID> ids, String keyword, List<String> keywordColumns, Pageable pageable) {
+        if (ids == null || ids.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM duthao_documents d
+            WHERE d.deleted_on IS NULL
+              AND d.id IN (:ids)
+            """);
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("ids", ids);
+        if (documentType != null && !documentType.isBlank()) {
+            sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
+            parameters.put("documentType", documentType.trim().toLowerCase());
+        }
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+
+        long total = countNative(sql.toString(), parameters);
+
+        sql.append(" ORDER BY ").append(NEWEST_CREATED_FIRST).append(" LIMIT :limit OFFSET :offset");
+        Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
+        parameters.forEach(query::setParameter);
+        query.setParameter("limit", pageable.getPageSize());
+        query.setParameter("offset", pageable.getOffset());
+
+        @SuppressWarnings("unchecked")
+        List<DuThaoDocument> content = query.getResultList();
+        return new PageImpl<>(content, pageable, total);
     }
 }

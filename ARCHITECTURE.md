@@ -720,6 +720,23 @@ làm ví dụ ĐÃ SỬA ĐÚNG chuẩn).
   tự của mọi danh mục không được lưu cho tới 24/09/2026. Lớp API FE phải đổi tên trước khi gửi
   (`applySortOrderToPayload`). Khi thêm field mới, kiểm tra tên key thật trong request.
 
+### 9. Liên kết giữa các văn bản — bảng `document_links`, từ 06/10/2026
+
+Liên kết giữa hai văn bản (hồ sơ công việc ↔ dự thảo / văn bản đi / văn bản đến, dự thảo → văn bản đi phát
+hành) lưu ở **bảng riêng `document_links`**, mỗi dòng là một liên kết có hướng; gỡ liên kết là xoá mềm.
+Không còn ghi id nối `;` vào `dynamic_fields` của cả hai phía.
+
+- Gắn / gỡ / tra cứu qua `DocumentLinkService` (`link`, `unlink`, `findTargetIds`, `findSourceIds`). Loại
+  liên kết là enum `DocumentLinkType`; thêm loại mới thì thêm hằng mới, không đổi `code` đã có dữ liệu.
+- "Trả lời cho văn bản đến" (`documentin_obj`) và "Văn bản kèm theo" (`vanban_lienquan_obj`) của văn bản đi /
+  dự thảo cũng nằm trong bảng, bản chụp phần tử ở cột `link_data`; `RelatedDocumentSnapshots` dựng lại 2
+  field cho API (FE đọc như cũ) và bỏ 2 field khỏi payload lưu chung.
+- Danh sách có phân trang: lấy tập id rồi gọi `findByIds(...)` của repository module (vbden/vbdi/duthao).
+- **Liên kết mới không thêm field id / mảng bản chụp vào `dynamic_fields` nữa.**
+- Không còn ghi song song field cũ. Từ 06/10/2026 phiếu trình cũng dùng bảng này (cutover FE phiếu trình).
+
+Chi tiết (bảng, loại liên kết, nơi đọc/ghi, phần còn lại): [docs/architecture/document-links.md](docs/architecture/document-links.md).
+
 ---
 
 ## Deployment

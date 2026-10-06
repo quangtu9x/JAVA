@@ -35,6 +35,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GetDuThaoDetailUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private DuThaoDocumentRepository duThaoDocumentRepository;
     @Mock
@@ -167,7 +169,8 @@ class GetDuThaoDetailUseCaseTest {
 
     private GetDuThaoDetailUseCase newUseCase() {
         return new GetDuThaoDetailUseCase(
-            duThaoDocumentRepository, listDocumentFilesUseCase, dynamicDocumentFieldsService);
+            duThaoDocumentRepository, listDocumentFilesUseCase, dynamicDocumentFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
     }
 
     private void stubEmptyFiles(UUID documentId) {

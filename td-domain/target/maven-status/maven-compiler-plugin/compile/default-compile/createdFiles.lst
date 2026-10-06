@@ -13,6 +13,7 @@ com\td\domain\categories\Category.class
 com\td\domain\vbcddh\VbcddhDocument.class
 com\td\domain\common\contracts\Entity.class
 com\td\domain\common\contracts\BaseEntity.class
+com\td\domain\documentlinks\DocumentLinkType.class
 com\td\domain\common\events\EntityUpdatedEvent.class
 com\td\domain\vbden\VbdenResDocument.class
 com\td\domain\sharedcore\UserDataScope.class
@@ -56,6 +57,7 @@ com\td\domain\hosoluutru\HoSoLuuTruDocument.class
 com\td\domain\documents\DocumentLog.class
 com\td\domain\hosoluutru\HoSoLuuTruProcessDocument.class
 com\td\domain\sharedcore\AppRole.class
+com\td\domain\documentlinks\DocumentLink.class
 com\td\domain\hosoluutru\HoSoLuuTruPhieuYeuCauDocument.class
 com\td\domain\vbden\VbdenUpdateHistoryDocument.class
 com\td\domain\sharedcore\IdentityFileMetadata.class

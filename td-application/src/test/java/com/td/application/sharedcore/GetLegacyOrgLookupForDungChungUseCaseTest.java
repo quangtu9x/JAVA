@@ -128,6 +128,34 @@ class GetLegacyOrgLookupForDungChungUseCaseTest {
         return newOrganization(identifier, name, form, 0);
     }
 
+    // 06/10/2026: vwunitleaders - lãnh đạo đang hoạt động trong cây con, lọc level + nhóm cấp lãnh đạo.
+    @Test
+    void getUnitLeaders_shouldKeepActiveLeadersMatchingLevelAndGroup() {
+        var target = newUseCase();
+        UUID orgId = UUID.randomUUID();
+        when(organizationRepository.findByParentIdAndDeletedOnIsNull(orgId)).thenReturn(List.of());
+        AppUser pb = leader("pb", orgId, true, 2, "lanhdaopb", 2);
+        AppUser cq = leader("cq", orgId, true, 2, "lanhdaocq", 1);
+        AppUser locked = leader("khoa", orgId, false, 2, "lanhdaocq", 0);
+        AppUser vp = leader("vp", orgId, true, 2, "lanhdaovp", 0);
+        AppUser otherLevel = leader("cap3", orgId, true, 3, "lanhdaodv", 0);
+        AppUser staff = leader("cv", orgId, true, 2, "khong", 0);
+        when(appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(List.of(orgId)))
+            .thenReturn(List.of(pb, cq, locked, vp, otherLevel, staff));
+
+        assertThat(target.getUnitLeaders(orgId.toString(), "2", "lanhdao"))
+            .extracting(row -> row.get("username")).containsExactly("cq", "pb");
+        assertThat(target.getUnitLeaders(orgId.toString(), "2", "lanhdaovp"))
+            .extracting(row -> row.get("username")).containsExactly("vp");
+        assertThat(target.getUnitLeaders(orgId.toString(), "", ""))
+            .extracting(row -> row.get("username")).containsExactlyInAnyOrder("vp", "cap3", "cq", "pb");
+    }
+
+    private AppUser leader(String username, UUID orgId, boolean active, int level, String capLanhDao, int sortOrder) {
+        return new AppUser("sub-" + username, username, username, null, orgId, null, active,
+            level, sortOrder, null, null, null, null, null, capLanhDao, null, false, null);
+    }
+
     private Organization newOrganization(String identifier, String name, String form, int sortOrder) {
         return new Organization(identifier, name, null, null, form, 3, name, sortOrder,
             0, null, null, null, null, null, null, null, null, null);

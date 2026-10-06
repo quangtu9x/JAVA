@@ -2,6 +2,9 @@ package com.td.application.duthao;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
+import com.td.application.documentlinks.DocumentLinkService;
+import com.td.application.documentlinks.RelatedDocumentSnapshots;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
@@ -49,6 +52,7 @@ public class XoaTraLoiVanBanDenDuThaoUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentCacheService documentCacheService;
     private final DocumentLogService documentLogService;
+    private final DocumentLinkService documentLinkService;
 
     public Result<UUID> execute(XoaTraLoiVanBanDenDuThaoRequest request) {
         if (request == null || request.getDraftId() == null) {
@@ -65,34 +69,24 @@ public class XoaTraLoiVanBanDenDuThaoUseCase {
         }
         var draft = draftOptional.get();
 
-        Map<String, Object> fields = new LinkedHashMap<>(
-            dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson()));
-        List<Object> existingList = toObjectList(fields.get(DOCUMENT_IN_FIELD));
-        String targetId = request.getDocumentId().trim();
-
-        List<Object> remaining = new ArrayList<>();
-        boolean removed = false;
-        for (Object item : existingList) {
-            if (!removed && item instanceof Map<?, ?> map && targetId.equals(String.valueOf(map.get("id")))) {
-                removed = true;
-                continue;
-            }
-            remaining.add(item);
-        }
-
-        if (!removed) {
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): go lien ket
+        // "Tra loi cho van ban den" (duthao_traloi_vbden) = xoa mem 1 dong, khong ghi lai dynamic_fields. documentId khong phai UUID (phan tu
+        // Domino cu) -> khong co lien ket nao, tra success nhu truoc (khong co gi de go).
+        java.util.UUID targetId;
+        try {
+            targetId = java.util.UUID.fromString(request.getDocumentId().trim());
+        } catch (IllegalArgumentException ex) {
             return Result.success(draft.getId());
         }
-
-        var before = buildSnapshot(draft);
-        fields.put(DOCUMENT_IN_FIELD, remaining);
-        draft.replaceDynamicFields(toJson(fields));
-        var saved = duThaoDocumentRepository.save(draft);
-        documentCacheService.evict(saved.getId());
-        documentCacheService.evictAllListCaches();
-        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
-        log.info("Xoa van ban den {} khoi documentin_obj cua du thao {}", targetId, saved.getId());
-        return Result.success(saved.getId());
+        boolean removed = false;
+        for (DocumentLinkType type : List.of(DocumentLinkType.DUTHAO_TRALOI_VBDEN)) {
+            removed |= documentLinkService.unlink(type, draft.getId(), targetId);
+        }
+        if (removed) {
+            documentCacheService.evict(draft.getId());
+            documentCacheService.evictAllListCaches();
+        }
+        return Result.success(draft.getId());
     }
 
     private Map<String, Object> buildSnapshot(DuThaoDocument document) {

@@ -24,10 +24,14 @@ class GetGroupPeopleForIdentifierUseCaseTest {
     @Mock
     private PrivateCategoryRepository privateCategoryRepository;
 
+    @Mock
+    private com.td.application.sharedcore.AppUserRepository appUserRepository;
+
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
 
     private GetGroupPeopleForIdentifierUseCase newUseCase() {
-        return new GetGroupPeopleForIdentifierUseCase(privateCategoryRepository, dynamicDocumentFieldsService);
+        return new GetGroupPeopleForIdentifierUseCase(privateCategoryRepository, dynamicDocumentFieldsService,
+            new ActiveGroupMembersFilter(appUserRepository));
     }
 
     @Test

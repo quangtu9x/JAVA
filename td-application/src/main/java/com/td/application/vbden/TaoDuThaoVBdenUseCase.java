@@ -70,6 +70,10 @@ public class TaoDuThaoVBdenUseCase {
     public static final String DOCUMENT_TYPE = "vbden";
     public static final String CHILD_DOCUMENT_TYPE = "vbden_res";
     public static final String ACTION_TAO_DU_THAO = "taoduthao";
+    // 06/10/2026 (cutover FE phieu trinh): Domino dung CHUNG logic nay cho "taophieutrinh" - mo rong
+    // whitelist (cac action con lai ganduthaotraloi/taohoso van chua mo).
+    public static final String ACTION_TAO_PHIEU_TRINH = "taophieutrinh";
+    private static final java.util.Set<String> ALLOWED_ACTIONS = java.util.Set.of(ACTION_TAO_DU_THAO, ACTION_TAO_PHIEU_TRINH);
 
     private static final String NOT_FOUND_MESSAGE = "Khong tim thay van ban den";
     private static final String USER_PROCESS_FIELD = "user_process";
@@ -90,6 +94,11 @@ public class TaoDuThaoVBdenUseCase {
     private final AuthorAclFieldsService authorAclFieldsService;
 
     public Result<UUID> execute(TaoDuThaoVBdenRequest request) {
+        String action = request.getAction() == null || request.getAction().isBlank()
+            ? ACTION_TAO_DU_THAO : request.getAction().trim().toLowerCase();
+        if (!ALLOWED_ACTIONS.contains(action)) {
+            return Result.failure("Action khong ho tro: " + request.getAction());
+        }
         var parentOptional = documentRepository.findById(request.getParentid());
         if (parentOptional.isEmpty() || parentOptional.get().isDeleted()) {
             return Result.failure(NOT_FOUND_MESSAGE);
@@ -148,13 +157,15 @@ public class TaoDuThaoVBdenUseCase {
     // opinion/creator/position/res_obj - dung ten field Java thuc su dung, cung quy uoc
     // CapNhatKetQuaXuLyUseCase/KetThucXuLyUseCase.
     private Result<UUID> createProcessingRecord(TaoDuThaoVBdenRequest request, String actingUsername) {
+        String action = request.getAction() == null || request.getAction().isBlank()
+            ? ACTION_TAO_DU_THAO : request.getAction().trim().toLowerCase();
         var childRequest = new AddDynamicDocumentRequest();
-        childRequest.setTitle(ACTION_TAO_DU_THAO);
+        childRequest.setTitle(action);
         childRequest.setDocumentType(CHILD_DOCUMENT_TYPE);
 
         Map<String, String> childFields = new LinkedHashMap<>();
         childFields.put("parentid", request.getParentid().toString());
-        childFields.put("action", ACTION_TAO_DU_THAO);
+        childFields.put("action", action);
         childFields.put("nguoi_thuc_hien", actingUsername);
         String displayCreator = request.getCreatorName() != null && !request.getCreatorName().isBlank()
             ? request.getCreatorName() : actingUsername;

@@ -176,7 +176,6 @@ public class SendVbdiDocumentUseCase {
     /** Checkbox FE "Phát hành kèm văn bản đến" — xem javadoc {@link #resolvePhatHanhKemVbdenIds}. */
     private static final String PHAT_HANH_KEM_VBDEN_FIELD = "phathanhkemvbden";
     /** {@code TraLoiVanBanDenUseCase#DOCUMENT_IN_FIELD} — lặp lại GIÁ TRỊ, không import (module khác). */
-    private static final String DOCUMENT_IN_OBJ_FIELD = "documentin_obj";
     /** Tên tệp "Tệp kèm theo" của văn bản đi ("a.pdf;b.docx;") — xem {@link #resolveAttachedFilenames}. */
     private static final String TEP_KEM_THEO_FIELD = "tepkemtheo";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -188,6 +187,7 @@ public class SendVbdiDocumentUseCase {
     private final PrepareVbdiDeliveryFilesUseCase prepareVbdiDeliveryFilesUseCase;
     private final OrganizationRepository organizationRepository;
     private final OrganizationAgencyResolver organizationAgencyResolver;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<Integer> execute(SendVbdiDocumentRequest request) {
         if (request == null || request.getDocumentId() == null) {
@@ -276,7 +276,7 @@ public class SendVbdiDocumentUseCase {
             var request = new PrepareVbdiDeliveryFilesRequest();
             request.setDocumentId(document.getId());
             request.setSenderIdentifier(senderIdentifier == null ? null : senderIdentifier.toString());
-            request.setAdditionalSourceDocumentIds(resolvePhatHanhKemVbdenIds(fields));
+            request.setAdditionalSourceDocumentIds(resolvePhatHanhKemVbdenIds(fields, document.getId()));
             request.setAttachedFilenames(resolveAttachedFilenames(fields));
 
             var result = prepareVbdiDeliveryFilesUseCase.execute(request);
@@ -296,7 +296,7 @@ public class SendVbdiDocumentUseCase {
     /**
      * 21/09/2026 (xem javadoc {@link #prepareDeliveryFiles}): "Phát hành kèm văn bản đến" — CHỈ áp
      * dụng khi {@value #PHAT_HANH_KEM_VBDEN_FIELD} = "1" (checkbox FE, {@code SubFormThongTinCoBan.jsx}
-     * — CHỈ hiện khi văn bản đi có ít nhất 1 văn bản đến trong {@value #DOCUMENT_IN_OBJ_FIELD}, xem
+     * — CHỈ hiện khi văn bản đi có ít nhất 1 văn bản đến trong liên kết vbdi_traloi_vbden (trước là {@code documentin_obj}), xem
      * {@link TraLoiVanBanDenUseCase} — field ghi bởi tính năng "Trả lời văn bản đến"). Đọc lại field
      * {@code documentin_obj} (JSON array {@code {id,...}}, đã parse sẵn thành {@code List<Map>} bởi
      * {@code FieldTypeInferrer} hậu tố {@code "_obj"}) — lấy MỌI {@code id} hợp lệ (UUID), bỏ qua
@@ -305,25 +305,13 @@ public class SendVbdiDocumentUseCase {
      * KỲ use case Java nào ghi (đã rà soát toàn bộ {@code td-application}), luôn rỗng cho văn bản
      * Java-native nên fallback đó không có ý nghĩa ở đây.
      */
-    private List<java.util.UUID> resolvePhatHanhKemVbdenIds(Map<String, Object> fields) {
+    // 06/10/2026 (bang document_links giai doan 2): van ban den "tra loi" doc tu lien ket vbdi_traloi_vbden
+    // (khong con field documentin_obj trong dynamic_fields) - docs/architecture/document-links.md.
+    private List<java.util.UUID> resolvePhatHanhKemVbdenIds(Map<String, Object> fields, java.util.UUID vbdiId) {
         if (!"1".equals(String.valueOf(fields.get(PHAT_HANH_KEM_VBDEN_FIELD)))) {
             return List.of();
         }
-        Object raw = fields.get(DOCUMENT_IN_OBJ_FIELD);
-        if (!(raw instanceof List<?> list)) {
-            return List.of();
-        }
-        List<java.util.UUID> ids = new java.util.ArrayList<>();
-        for (Object item : list) {
-            if (item instanceof Map<?, ?> map && map.get("id") != null) {
-                try {
-                    ids.add(java.util.UUID.fromString(map.get("id").toString().trim()));
-                } catch (IllegalArgumentException ex) {
-                    log.warn("documentin_obj co id khong hop le (khong phai UUID), bo qua: {}", map.get("id"));
-                }
-            }
-        }
-        return ids;
+        return relatedDocumentSnapshots.replyTargetIds(vbdiId, com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_VBDI);
     }
 
     /**

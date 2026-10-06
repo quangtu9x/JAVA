@@ -94,6 +94,28 @@ class KiemTrungSoDenUseCaseTest {
     }
 
     @Test
+    void execute_documentNumberStoredAsDouble_shouldMatchAndReturnPlainTextAndTitleSubject() {
+        // 05/10/2026: document_number lưu dạng số trong JSONB -> Double 92.0; trích yếu ở cột title.
+        stubCurrentUserIdentifier("G10");
+        BusinessDocument doc = new BusinessDocument("Trich yeu o cot title", "vbden", "0", null, null, null, null);
+        when(documentRepository.findByFieldValue(any(), any(), any(), any()))
+            .thenReturn(new PageImpl<>(List.of(doc)));
+        when(dynamicDocumentFieldsService.parseDynamicFields(any())).thenReturn(Map.of(
+            "document_number", 92.0d, "identifier_creator", "G10"
+        ));
+
+        var request = new KiemTrungSoDenRequest();
+        request.setDocumentRegisterId(UUID.randomUUID());
+        request.setDocumentNumber("92");
+
+        var result = useCase.execute(request);
+
+        assertThat(result.getData()).hasSize(1);
+        assertThat(result.getData().get(0).getDocumentNumber()).isEqualTo("92");
+        assertThat(result.getData().get(0).getSubject()).isEqualTo("Trich yeu o cot title");
+    }
+
+    @Test
     void execute_matchingNumberButDifferentIdentifier_shouldNotMatch() {
         stubCurrentUserIdentifier("G10");
         UUID registerId = UUID.randomUUID();

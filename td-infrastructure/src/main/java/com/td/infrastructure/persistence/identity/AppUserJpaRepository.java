@@ -36,6 +36,13 @@ public interface AppUserJpaRepository extends BaseRepository<AppUser> {
 
     boolean existsByUsernameAndDeletedOnIsNull(String username);
 
+    // 06/10/2026: @Query tường minh - derive "IsActive..." dễ bị parse nhầm từ khoá "Is".
+    @Query("SELECT CASE WHEN COUNT(u) > 0 THEN TRUE ELSE FALSE END FROM AppUser u WHERE u.username = :username AND u.isActive = false AND u.deletedOn IS NULL")
+    boolean existsLockedByUsername(@Param("username") String username);
+
+    @Query("SELECT u.username FROM AppUser u WHERE u.username IN :usernames AND u.isActive = true AND u.deletedOn IS NULL")
+    List<String> findActiveUsernamesIn(@Param("usernames") java.util.Collection<String> usernames);
+
     @Query("SELECT CASE WHEN COUNT(u) > 0 THEN TRUE ELSE FALSE END FROM AppUser u WHERE u.username = :username AND u.id <> :id AND u.deletedOn IS NULL")
     boolean existsByUsernameAndIdNotAndDeletedOnIsNull(@Param("username") String username, @Param("id") UUID id);
 

@@ -44,6 +44,11 @@ public class PostgresDraftProcessDocumentRepository implements DraftProcessDocum
     }
 
     @Override
+    public java.util.Optional<DraftProcessDocument> findById(java.util.UUID id) {
+        return id == null ? java.util.Optional.empty() : jpaRepository.findById(id);
+    }
+
+    @Override
     public Page<DraftProcessDocument> findByParentId(String parentId, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*

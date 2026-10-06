@@ -8,6 +8,8 @@ import com.td.application.vbdi.VbdiDocumentRepository;
 import com.td.domain.hosocv.HoSoCVDocument;
 import com.td.domain.hosocv.HoSoCVProcessDocument;
 import lombok.RequiredArgsConstructor;
+import com.td.application.documentlinks.DocumentLinkService;
+import com.td.domain.documentlinks.DocumentLinkType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,12 +47,13 @@ public class GetHoSoChiTietUseCase {
     private static final String TYPE_DUTHAO = "duthao";
     private static final String TYPE_VBDI = "vbdi";
 
-    // field tren hoso (ghi boi GanKemVanBanUseCase) -> loai van ban - dung de dispatch dung repository.
-    private static final Map<String, String> ATTACHED_FIELD_TYPE_MAP = Map.of(
-        "duthao_attached_id", TYPE_DUTHAO,
-        "document_out_attached_id", TYPE_VBDI,
-        "document_in_attached_id", "vbden",
-        "submission_dossier_attached_id", "phieutrinh"
+    // 06/10/2026: doc bang document_links (docs/architecture/document-links.md) thay 4 field
+    // *_attached_id tren ho so. Thu tu nhom giu nhu truoc: du thao, van ban di, van ban den, phieu trinh.
+    private static final List<List<DocumentLinkType>> LINKED_GROUPS = List.of(
+        List.of(DocumentLinkType.HOSO_DUTHAO),
+        List.of(DocumentLinkType.HOSO_VBDI, DocumentLinkType.HOSO_VBDI_PHATHANH),
+        List.of(DocumentLinkType.HOSO_VBDEN, DocumentLinkType.HOSO_VBDEN_XULY),
+        List.of(DocumentLinkType.HOSO_PHIEUTRINH)
     );
 
     private final HoSoCVDocumentRepository hoSoCVDocumentRepository;
@@ -59,6 +62,7 @@ public class GetHoSoChiTietUseCase {
     private final DuThaoDocumentRepository duThaoDocumentRepository;
     private final VbdiDocumentRepository vbdiDocumentRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final DocumentLinkService documentLinkService;
     // 02/10/2026: van_ban_lien_quan gom thêm "văn bản khác" của hồ sơ - xem LuuVanBanKhacUseCase.
     private final HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
@@ -85,7 +89,7 @@ public class GetHoSoChiTietUseCase {
         Map<String, Object> dynamicFields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
         allFields.putAll(dynamicFields);
 
-        List<Map<String, Object>> vanBanLienQuan = collectLinkedVanBan(dynamicFields);
+        List<Map<String, Object>> vanBanLienQuan = collectLinkedVanBan(document.getId());
         hoSoVanBanKhacFinder.findByHoSo(document.getId()).forEach(vanBanKhac -> vanBanLienQuan.add(
             vanBanSummary(vanBanKhac.getDocumentType(), vanBanKhac.getId(), vanBanKhac.getTitle(), vanBanKhac.getStatus())));
         allFields.put("van_ban_lien_quan", vanBanLienQuan);
@@ -94,16 +98,11 @@ public class GetHoSoChiTietUseCase {
         return Result.success(allFields);
     }
 
-    private List<Map<String, Object>> collectLinkedVanBan(Map<String, Object> hosoFields) {
+    private List<Map<String, Object>> collectLinkedVanBan(UUID hosocvId) {
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<String, String> entry : ATTACHED_FIELD_TYPE_MAP.entrySet()) {
-            String fieldName = entry.getKey();
-            String vanBanType = entry.getValue();
-            for (String idStr : toSemicolonList(hosoFields.get(fieldName))) {
-                UUID vanBanId = parseUuid(idStr);
-                if (vanBanId == null) {
-                    continue;
-                }
+        for (List<DocumentLinkType> group : LINKED_GROUPS) {
+            String vanBanType = group.get(0).targetType();
+            for (UUID vanBanId : documentLinkService.findTargetIds(hosocvId, group)) {
                 resolveVanBanSummary(vanBanType, vanBanId).ifPresent(result::add);
             }
         }
@@ -142,24 +141,6 @@ public class GetHoSoChiTietUseCase {
             item.put("created_on", process.getCreatedOn());
             item.putAll(dynamicDocumentFieldsService.parseDynamicFields(process.getDynamicFieldsJson()));
             result.add(item);
-        }
-        return result;
-    }
-
-    private List<String> toSemicolonList(Object value) {
-        List<String> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            for (Object item : list) {
-                if (item != null) {
-                    result.add(item.toString());
-                }
-            }
-        } else if (value instanceof String str && !str.isBlank()) {
-            for (String part : str.split(";")) {
-                if (!part.isBlank()) {
-                    result.add(part.trim());
-                }
-            }
         }
         return result;
     }

@@ -78,6 +78,7 @@ public class SoanThaoVbdiUseCase {
 
     private final AddVbdiDynamicDocumentUseCase addVbdiDynamicDocumentUseCase;
     private final DocumentRegisterRepository documentRegisterRepository;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(SoanThaoVbdiRequest request) {
         if (request.getDocumentRegisterId() != null) {
@@ -91,11 +92,21 @@ public class SoanThaoVbdiUseCase {
         addRequest.setTitle(request.getSubject());
         addRequest.setDocumentType(DOCUMENT_TYPE);
         addRequest.setStatus(resolveStatus(request.getStatus()));
-        addRequest.setFields(request.getFields());
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): documentin_obj /
+        // vanban_lienquan_obj KHONG luu trong dynamic_fields nua - tao moi
+        // thi chuyen phan tu thanh lien ket.
+        Map<String, String> fields = request.getFields() == null
+            ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(request.getFields());
+        Map<String, Object> relatedPayload = relatedDocumentSnapshots.strip(fields);
+        addRequest.setFields(fields);
         addRequest.setDateFields(request.getDateFields());
         addRequest.setNumberFields(request.getNumberFields());
         addRequest.setRichtextFields(request.getRichtextFields());
-        return addVbdiDynamicDocumentUseCase.execute(addRequest);
+        Result<UUID> result = addVbdiDynamicDocumentUseCase.execute(addRequest);
+        if (result.isSuccess()) {
+            relatedDocumentSnapshots.importFromPayload(relatedPayload, result.getData(), com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_VBDI);
+        }
+        return result;
     }
 
     private String resolveStatus(String rawStatus) {

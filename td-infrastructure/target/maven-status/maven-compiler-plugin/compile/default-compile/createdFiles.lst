@@ -17,6 +17,7 @@ com\td\infrastructure\persistence\repository\HoSoCVProcessDocumentJpaRepository.
 com\td\infrastructure\persistence\repository\ProcessDiagramJpaRepository.class
 com\td\infrastructure\tenant\TenantNotActiveException.class
 com\td\infrastructure\persistence\identity\AppRoleJpaRepository.class
+com\td\infrastructure\persistence\repository\PostgresPhieuTrinhTdDocumentRepository$1.class
 com\td\infrastructure\tenant\controlplane\ControlPlaneFlywayMigrationService.class
 com\td\infrastructure\tenant\controlplane\IdentityJpaRepositoriesConfig.class
 com\td\infrastructure\persistence\repository\HoSoLuuTruDocumentJpaRepository.class
@@ -44,6 +45,7 @@ com\td\infrastructure\search\DocumentSearchMapper$2.class
 com\td\infrastructure\messaging\EnvelopeJsonBuilder.class
 com\td\infrastructure\messaging\RabbitDeliveryTracker.class
 com\td\infrastructure\documents\RenameFileUseCaseImpl.class
+com\td\infrastructure\persistence\repository\PostgresDocumentLinkRepository.class
 com\td\infrastructure\persistence\repository\PostgresPhieuTrinhTdDocumentRepository.class
 com\td\infrastructure\persistence\repository\FileMetadataJpaRepository.class
 com\td\infrastructure\onlyoffice\LinkOnlyOfficeEditedFileToProcessUseCaseImpl.class
@@ -67,6 +69,7 @@ com\td\infrastructure\persistence\repository\PostgresHoSoLuuTruDocumentRepositor
 com\td\infrastructure\messaging\KafkaMessagePublisher.class
 com\td\infrastructure\tenant\TenantProperties.class
 com\td\infrastructure\simpki\GetSimPkiSignStatusUseCaseImpl.class
+com\td\infrastructure\persistence\repository\DocumentLinkJpaRepository.class
 com\td\infrastructure\security\TdTokenAuthenticationException.class
 com\td\infrastructure\tenant\TenantPoolFactory.class
 com\td\infrastructure\persistence\repository\HoSoLuuTruPhieuYeuCauDocumentJpaRepository.class

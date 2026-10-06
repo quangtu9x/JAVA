@@ -25,6 +25,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TaoDuThaoUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private AddDuThaoDynamicDocumentUseCase addDuThaoDynamicDocumentUseCase;
     @Mock
@@ -34,7 +36,8 @@ class TaoDuThaoUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new TaoDuThaoUseCase(addDuThaoDynamicDocumentUseCase, currentUserProvider);
+        useCase = new TaoDuThaoUseCase(addDuThaoDynamicDocumentUseCase, currentUserProvider,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
         // Bugfix 24/08/2026: khong phai test nao cung can stub nay (vd. khi request da tu gui san
         // user_creator) - lenient() de tranh UnnecessaryStubbingException.
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nhanvien01"));

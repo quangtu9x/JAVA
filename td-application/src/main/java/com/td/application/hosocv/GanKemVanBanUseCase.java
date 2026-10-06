@@ -1,74 +1,42 @@
 package com.td.application.hosocv;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
-import com.td.application.documents.DocumentCacheService;
-import com.td.application.documents.DocumentLogService;
+import com.td.application.documentlinks.DocumentLinkService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.application.duthao.DuThaoDocumentRepository;
+import com.td.application.phieutrinhtd.PhieuTrinhTdDocumentRepository;
 import com.td.application.vbdi.VbdiDocumentRepository;
-import com.td.domain.hosocv.HoSoCVDocument;
+import com.td.domain.documentlinks.DocumentLinkType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
- * BL-240 (HoSoCV Core) — DoD (2): gắn văn bản đến/đi/dự thảo vào hồ sơ công việc. Đúng cơ chế thật
- * ({@code GanKemVanBan.XuLyGanKemVanBanVaoHoSoCV_Chung()}) — 1 field trên phía văn bản
- * ({@code field_in_van_ban}, luôn {@code document_profiles_id} trừ 2 ngoại lệ) + 1 field trên phía
- * hồ sơ ({@code field_in_ho_so}), cả 2 dạng chuỗi nối {@code ";"}, chọn theo {@code actionName}:
+ * BL-240 (HoSoCV Core) — gắn / gỡ văn bản (dự thảo, văn bản đi, văn bản đến, phiếu trình) vào hồ sơ công
+ * việc, tương thích {@code GanKemVanBan.XuLyGanKemVanBanVaoHoSoCV_Chung()} của Domino theo
+ * {@code actionName}.
  *
- * <ul>
- *   <li>{@code gankemduthao}: {@code document_profiles_id} / {@code duthao_attached_id}</li>
- *   <li>{@code ganvanbandi}: {@code document_profiles_id} / {@code document_out_attached_id}</li>
- *   <li>{@code ganvanbanphathanh}: {@code issuance_document_profiles_id} /
- *       {@code document_out_attached_id}</li>
- *   <li>{@code ganvanbanden}: {@code document_profiles_id} / {@code document_in_attached_id}</li>
- *   <li>{@code ganvanbandenxuly}: {@code document_profiles_handling_id} /
- *       {@code document_in_attached_id}</li>
- *   <li>{@code gankemphieutrinh}: {@code document_profiles_id} /
- *       {@code submission_dossier_attached_id}</li>
- * </ul>
+ * <p><b>Từ 06/10/2026</b> liên kết lưu ở bảng {@code document_links} qua {@link DocumentLinkService}
+ * (xem {@code docs/architecture/document-links.md}) — KHÔNG còn ghi id nối {@code ";"} vào
+ * {@code dynamic_fields} của cả 2 phía ({@code document_profiles_id}, {@code *_attached_id},
+ * {@code hoso_attached_id}, {@code document_profiles_from_draft_id}...). Dữ liệu cũ của các field đó đã
+ * được migration {@code V1.0.69} chuyển sang bảng; field cũ không còn được đọc ở đâu.
  *
- * <p><b>Sửa 01/09/2026</b>: gắn thêm giờ ĐỐI XỨNG với remove (ghi CẢ 2 phía cho MỌI actionName) —
- * xem lịch sử javadoc trước đây trong git.
+ * <p>Vẫn kiểm tra văn bản tồn tại ĐÚNG bảng vật lý theo {@code actionName}
+ * ({@link #ACTION_DOCUMENT_TYPE_MAP}): {@code duthao_documents} / {@code vbdi_documents} /
+ * {@code phieutrinhtd_documents} / {@code documents} (vbden) — id không tồn tại hoặc đã xoá thì bỏ qua
+ * (giữ hành vi cũ). Không validate loại của id có khớp {@code actionName} hay không (Domino cũng không).
  *
- * <p><b>Mở rộng — sửa BUG TRA SAI BẢNG (ưu tiên cao nhất theo
- * {@code docs/analysis/13-checklist-port-hosocv-domino-sang-java.md} Phần 3)</b>: bản trước đây tra
- * CẢ hồ sơ lẫn văn bản gắn kèm qua 1 {@link DocumentRepository} duy nhất (bảng {@code documents}
- * chung). Nhưng từ 25/08/2026, {@code duthao} và {@code vbdi} đã tách hẳn sang bảng vật lý riêng
- * ({@code duthao_documents}/{@code vbdi_documents}) — {@code documentRepository.findById(vanBanId)}
- * cho 3/6 actionName ({@code gankemduthao}/{@code ganvanbandi}/{@code ganvanbanphathanh}) LUÔN trả
- * rỗng, bị bỏ qua âm thầm (API vẫn trả {@code success} giả — gắn kèm không có tác dụng gì). Nay hồ
- * sơ công việc CŨNG đã tách bảng riêng ({@code hosocv_documents}), nên phải sửa CẢ 2 phía:
- * <ol>
- *   <li>Phía hồ sơ: tra qua {@link HoSoCVDocumentRepository} (không phải {@code DocumentRepository}).</li>
- *   <li>Phía văn bản: dispatch theo {@code actionName} → loại văn bản mong đợi
- *       ({@link #ACTION_DOCUMENT_TYPE_MAP}) → đúng repository ({@code duthao}→
- *       {@link DuThaoDocumentRepository}, {@code vbdi}→{@link VbdiDocumentRepository}, còn lại
- *       ({@code vbden}/{@code phieutrinh} — chưa có module riêng) → {@link DocumentRepository}).</li>
- * </ol>
- * Vì 4 kiểu entity ({@code HoSoCVDocument}/{@code DuThaoDocument}/{@code VbdiDocument}/
- * {@code BusinessDocument}) không chia sẻ interface chung cho {@code dynamicFieldsJson}, dùng 1
- * record nội bộ {@link VanBanHandle} (id + "đọc field động hiện tại" + "ghi lại") để
- * {@code updateVanBanLinkField}/{@code syncVbdiFromDraft} thao tác chung 1 công thức bất kể loại
- * bảng vật lý nào — {@code currentDynamicFieldsJson} là {@code Supplier} (không phải giá trị đã
- * chụp sẵn) để 2 lần gọi liên tiếp trên cùng 1 văn bản (field phía văn bản rồi
- * {@code hoso_attached_id}) đọc đúng trạng thái MỚI NHẤT sau lần ghi đầu, không bị lệch dữ liệu.
- *
- * <p>Không validate loại document của {@code vanBanId} có THẬT SỰ khớp {@code actionName} không
- * (Domino cũng không validate — tin tưởng FE gửi đúng loại/id); {@link #ACTION_DOCUMENT_TYPE_MAP}
- * chỉ quyết định TRA Ở BẢNG NÀO, không phải validate ngược lại.
+ * <p>{@code gankemduthao}: văn bản đi đã phát hành từ dự thảo cũng được gắn/gỡ vào tab "Văn bản phát
+ * hành" của hồ sơ ({@code hoso_vbdi_phathanh}) — tương đương {@code document_profiles_from_draft_id} cũ.
  */
 @Service
 @RequiredArgsConstructor
@@ -80,267 +48,117 @@ public class GanKemVanBanUseCase {
     private static final String INVALID_ACTION_NAME_MESSAGE = "Không xác định được loại gắn kèm (actionName)";
     private static final String REMOVE_ACTION = "remove";
     private static final String DUTHAO_ACTION_NAME = "gankemduthao";
+    // Field nghiệp vụ của dự thảo (ChuyenThanhVanBanDi) - fallback khi dự thảo phát hành trước 06/10/2026
+    // mà migration chưa có liên kết duthao_vbdi (vd văn bản đi đã bị xoá rồi khôi phục).
     private static final String DUTHAO_DOCUMENT_OUT_ID_FIELD = "document_out_id";
-    private static final String VBDI_FROM_DRAFT_FIELD = "document_profiles_from_draft_id";
-    private static final String HOSO_ATTACHED_ID_FIELD = "hoso_attached_id";
     private static final String TYPE_DUTHAO = "duthao";
     private static final String TYPE_VBDI = "vbdi";
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final String TYPE_PHIEUTRINH = "phieutrinh";
 
-    // actionName -> {field_in_van_ban, field_in_ho_so}
-    private static final Map<String, String[]> ACTION_FIELD_MAP = Map.of(
-        DUTHAO_ACTION_NAME, new String[]{"document_profiles_id", "duthao_attached_id"},
-        "ganvanbandi", new String[]{"document_profiles_id", "document_out_attached_id"},
-        "ganvanbanphathanh", new String[]{"issuance_document_profiles_id", "document_out_attached_id"},
-        "ganvanbanden", new String[]{"document_profiles_id", "document_in_attached_id"},
-        "ganvanbandenxuly", new String[]{"document_profiles_handling_id", "document_in_attached_id"},
-        "gankemphieutrinh", new String[]{"document_profiles_id", "submission_dossier_attached_id"}
+    // actionName -> loại liên kết.
+    private static final Map<String, DocumentLinkType> ACTION_LINK_TYPE_MAP = Map.of(
+        DUTHAO_ACTION_NAME, DocumentLinkType.HOSO_DUTHAO,
+        "ganvanbandi", DocumentLinkType.HOSO_VBDI,
+        "ganvanbanphathanh", DocumentLinkType.HOSO_VBDI_PHATHANH,
+        "ganvanbanden", DocumentLinkType.HOSO_VBDEN,
+        "ganvanbandenxuly", DocumentLinkType.HOSO_VBDEN_XULY,
+        "gankemphieutrinh", DocumentLinkType.HOSO_PHIEUTRINH
     );
 
-    // actionName -> loai van ban MONG DOI (quyet dinh tra o repository/bang vat ly nao). "vbden"/
-    // "phieutrinh" van nam bang "documents" dung chung (chua tach rieng - phieutrinh chua co module).
+    // actionName -> loại văn bản (quyết định tra tồn tại ở bảng vật lý nào).
     private static final Map<String, String> ACTION_DOCUMENT_TYPE_MAP = Map.of(
         DUTHAO_ACTION_NAME, TYPE_DUTHAO,
         "ganvanbandi", TYPE_VBDI,
         "ganvanbanphathanh", TYPE_VBDI,
         "ganvanbanden", "vbden",
         "ganvanbandenxuly", "vbden",
-        "gankemphieutrinh", "phieutrinh"
+        "gankemphieutrinh", TYPE_PHIEUTRINH
     );
 
     private final HoSoCVDocumentRepository hoSoCVDocumentRepository;
+    private final DocumentLinkService documentLinkService;
     private final DocumentRepository documentRepository;
     private final DuThaoDocumentRepository duThaoDocumentRepository;
     private final VbdiDocumentRepository vbdiDocumentRepository;
+    private final PhieuTrinhTdDocumentRepository phieuTrinhTdDocumentRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
-    private final DocumentLogService documentLogService;
-    private final DocumentCacheService documentCacheService;
-
-    /** Tay cam trung lap cho 1 van ban gan kem, bat ke nam o bang vat ly nao. */
-    private record VanBanHandle(
-        UUID id, Supplier<String> currentDynamicFieldsJson, Consumer<String> persistDynamicFields) {
-    }
 
     public Result<UUID> execute(GanKemVanBanRequest request) {
         String normalizedAction = normalize(request.getActionName());
-        String[] fieldPair = ACTION_FIELD_MAP.get(normalizedAction);
-        if (fieldPair == null) {
+        DocumentLinkType linkType = ACTION_LINK_TYPE_MAP.get(normalizedAction);
+        if (linkType == null) {
             return Result.failure(INVALID_ACTION_NAME_MESSAGE);
         }
-        String fieldInVanBan = fieldPair[0];
-        String fieldInHoSo = fieldPair[1];
 
         var hosocvOptional = hoSoCVDocumentRepository.findById(request.getHosocvId());
         if (hosocvOptional.isEmpty() || hosocvOptional.get().isDeleted()
                 || !DOCUMENT_TYPE.equalsIgnoreCase(hosocvOptional.get().getDocumentType())) {
             return Result.failure(NOT_FOUND_MESSAGE);
         }
-        var hosocv = hosocvOptional.get();
-        String hosocvIdStr = hosocv.getId().toString();
+        UUID hosocvId = hosocvOptional.get().getId();
 
         boolean isRemove = REMOVE_ACTION.equalsIgnoreCase(request.getAction());
         boolean isDuThao = DUTHAO_ACTION_NAME.equals(normalizedAction);
         List<UUID> vanBanIds = request.getVanBanIds() == null ? List.of() : request.getVanBanIds();
-        // Danh sach van ban da xu ly that su (chi tinh khi resolveVanBan tim thay dung bang) - khac
-        // ban truoc day (documentRepository.findById lai khong bao gio thay 3/6 actionName do bug
-        // tra sai bang).
-        List<String> processedVanBanIds = new ArrayList<>();
 
         for (UUID vanBanId : vanBanIds) {
-            Optional<VanBanHandle> vanBanHandleOptional = resolveVanBan(normalizedAction, vanBanId);
-            if (vanBanHandleOptional.isEmpty()) {
+            if (vanBanId == null || !exists(normalizedAction, vanBanId)) {
                 continue;
             }
-            VanBanHandle vanBanHandle = vanBanHandleOptional.get();
-            String vanBanIdStr = vanBanId.toString();
-
-            updateVanBanLinkField(vanBanHandle, fieldInVanBan, hosocvIdStr, isRemove);
-            updateVanBanLinkField(vanBanHandle, HOSO_ATTACHED_ID_FIELD, hosocvIdStr, isRemove);
-            processedVanBanIds.add(vanBanIdStr);
+            apply(linkType, hosocvId, vanBanId, isRemove);
             if (isDuThao) {
-                syncVbdiFromDraft(vanBanHandle, hosocvIdStr, isRemove);
+                for (UUID vbdiId : issuedDocumentsOfDraft(vanBanId)) {
+                    apply(DocumentLinkType.HOSO_VBDI_PHATHANH, hosocvId, vbdiId, isRemove);
+                }
             }
         }
-
-        if (!processedVanBanIds.isEmpty()) {
-            if (isRemove) {
-                removeManyFromLinkField(hosocv, fieldInHoSo, processedVanBanIds);
-            } else {
-                addManyToLinkField(hosocv, fieldInHoSo, processedVanBanIds);
-            }
-        }
-
-        return Result.success(hosocv.getId());
+        return Result.success(hosocvId);
     }
 
-    // Dispatch theo loai van ban MONG DOI cua actionName (ACTION_DOCUMENT_TYPE_MAP) sang dung
-    // repository/bang vat ly - day la phan sua BUG TRA SAI BANG (xem javadoc lop).
-    private Optional<VanBanHandle> resolveVanBan(String actionName, UUID vanBanId) {
-        String expectedType = ACTION_DOCUMENT_TYPE_MAP.getOrDefault(actionName, "");
-        return switch (expectedType) {
-            case TYPE_DUTHAO -> duThaoDocumentRepository.findById(vanBanId)
-                .filter(document -> !document.isDeleted())
-                .map(document -> new VanBanHandle(
-                    document.getId(), document::getDynamicFieldsJson,
-                    json -> {
-                        document.replaceDynamicFields(json);
-                        duThaoDocumentRepository.save(document);
-                    }));
-            case TYPE_VBDI -> vbdiDocumentRepository.findById(vanBanId)
-                .filter(document -> !document.isDeleted())
-                .map(document -> new VanBanHandle(
-                    document.getId(), document::getDynamicFieldsJson,
-                    json -> {
-                        document.replaceDynamicFields(json);
-                        vbdiDocumentRepository.save(document);
-                    }));
-            default -> documentRepository.findById(vanBanId)
-                .filter(document -> !document.isDeleted())
-                .map(document -> new VanBanHandle(
-                    document.getId(), document::getDynamicFieldsJson,
-                    json -> {
-                        document.replaceDynamicFields(json);
-                        documentRepository.save(document);
-                    }));
+    private void apply(DocumentLinkType type, UUID hosocvId, UUID vanBanId, boolean remove) {
+        if (remove) {
+            documentLinkService.unlink(type, hosocvId, vanBanId);
+        } else {
+            documentLinkService.link(type, hosocvId, vanBanId);
+        }
+    }
+
+    private boolean exists(String actionName, UUID vanBanId) {
+        return switch (ACTION_DOCUMENT_TYPE_MAP.getOrDefault(actionName, "")) {
+            case TYPE_DUTHAO -> duThaoDocumentRepository.findById(vanBanId).filter(d -> !d.isDeleted()).isPresent();
+            case TYPE_VBDI -> vbdiDocumentRepository.findById(vanBanId).filter(d -> !d.isDeleted()).isPresent();
+            // 06/10/2026: phiếu trình (TD) có bảng riêng phieutrinhtd_documents - trước đây tra nhầm bảng
+            // documents. FE phiếu trình hiện vẫn chạy Domino (chưa cutover) nên nhánh này chưa có dữ liệu.
+            case TYPE_PHIEUTRINH -> phieuTrinhTdDocumentRepository.findById(vanBanId).filter(d -> !d.isDeleted()).isPresent();
+            default -> documentRepository.findById(vanBanId).filter(d -> !d.isDeleted()).isPresent();
         };
     }
 
-    private void syncVbdiFromDraft(VanBanHandle duThaoHandle, String hosocvIdStr, boolean remove) {
-        Map<String, Object> duThaoFields = dynamicDocumentFieldsService.parseDynamicFields(duThaoHandle.currentDynamicFieldsJson().get());
-        String vbdiIdStr = asString(duThaoFields.get(DUTHAO_DOCUMENT_OUT_ID_FIELD));
-        if (vbdiIdStr == null || vbdiIdStr.isBlank()) {
-            return;
-        }
-        UUID vbdiId;
-        try {
-            vbdiId = UUID.fromString(vbdiIdStr.trim());
-        } catch (IllegalArgumentException ex) {
-            return;
-        }
-        vbdiDocumentRepository.findById(vbdiId)
-            .filter(document -> !document.isDeleted())
-            .ifPresent(document -> {
-                VanBanHandle vbdiHandle = new VanBanHandle(
-                    document.getId(), document::getDynamicFieldsJson,
-                    json -> {
-                        document.replaceDynamicFields(json);
-                        vbdiDocumentRepository.save(document);
-                    });
-                updateVanBanLinkField(vbdiHandle, VBDI_FROM_DRAFT_FIELD, hosocvIdStr, remove);
-            });
-    }
-
-    // Cong thuc chung cho MOI loai van ban (bat ke bang vat ly nao) - doc lai field dong MOI NHAT
-    // qua currentDynamicFieldsJson() (Supplier, khong phai gia tri chup san) de 2 lan goi lien tiep
-    // tren CUNG 1 van ban (fieldInVanBan roi HOSO_ATTACHED_ID_FIELD) thay doi dung tren trang thai
-    // moi nhat, khong bi lech du lieu.
-    private void updateVanBanLinkField(VanBanHandle handle, String fieldName, String value, boolean remove) {
-        Map<String, Object> before = new LinkedHashMap<>(
-            dynamicDocumentFieldsService.parseDynamicFields(handle.currentDynamicFieldsJson().get()));
-        List<String> values = toSemicolonList(before.get(fieldName));
-
-        boolean changed;
-        if (remove) {
-            changed = values.remove(value);
-        } else {
-            changed = !values.contains(value);
-            if (changed) {
-                values.add(value);
-            }
-        }
-        if (!changed) {
-            return;
-        }
-
-        Map<String, Object> after = new LinkedHashMap<>(before);
-        after.put(fieldName, String.join(";", values));
-        handle.persistDynamicFields().accept(toJson(after));
-        documentCacheService.evict(handle.id());
-        documentLogService.logUpdate(handle.id(), before, after);
-    }
-
-    // 01/09/2026: doi ung voi removeManyFromLinkField - ghi field phia HO SO khi gan them (xem
-    // javadoc lop). Dedup rieng cho tung gia tri (khop XuLyGanKemDuThaoVaoHoSoVC() that: kiem tra
-    // lastIndexOf truoc khi noi ";"). Hosocv gio la HoSoCVDocument (bang rieng hosocv_documents),
-    // khong con dung chung BusinessDocument nua.
-    private void addManyToLinkField(HoSoCVDocument document, String fieldName, List<String> valuesToAdd) {
-        Map<String, Object> fields = new LinkedHashMap<>(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
-        List<String> values = toSemicolonList(fields.get(fieldName));
-        boolean changed = false;
-        for (String value : valuesToAdd) {
-            if (!values.contains(value)) {
-                values.add(value);
-                changed = true;
-            }
-        }
-        if (!changed) {
-            return;
-        }
-
-        var before = buildSnapshot(document);
-        fields.put(fieldName, String.join(";", values));
-        document.replaceDynamicFields(toJson(fields));
-        var saved = hoSoCVDocumentRepository.save(document);
-        documentCacheService.evict(saved.getId());
-        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
-    }
-
-    private void removeManyFromLinkField(HoSoCVDocument document, String fieldName, List<String> valuesToRemove) {
-        Map<String, Object> fields = new LinkedHashMap<>(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
-        List<String> values = toSemicolonList(fields.get(fieldName));
-        boolean changed = values.removeAll(valuesToRemove);
-        if (!changed) {
-            return;
-        }
-
-        var before = buildSnapshot(document);
-        fields.put(fieldName, String.join(";", values));
-        document.replaceDynamicFields(toJson(fields));
-        var saved = hoSoCVDocumentRepository.save(document);
-        documentCacheService.evict(saved.getId());
-        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
-    }
-
-    private Map<String, Object> buildSnapshot(HoSoCVDocument document) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("title", document.getTitle());
-        snapshot.put("documentType", document.getDocumentType());
-        snapshot.put("status", document.getStatus());
-        snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
-        return snapshot;
-    }
-
-    private List<String> toSemicolonList(Object value) {
-        List<String> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            for (Object item : list) {
-                if (item != null) {
-                    result.add(item.toString());
-                }
-            }
-        } else if (value instanceof String str && !str.isBlank()) {
-            for (String part : str.split(";")) {
-                if (!part.isBlank()) {
-                    result.add(part.trim());
-                }
-            }
-        }
+    // Văn bản đi đã phát hành từ dự thảo: liên kết duthao_vbdi + fallback field document_out_id.
+    private Set<UUID> issuedDocumentsOfDraft(UUID duThaoId) {
+        Set<UUID> result = new LinkedHashSet<>(
+            documentLinkService.findTargetIds(duThaoId, List.of(DocumentLinkType.DUTHAO_VBDI)));
+        duThaoDocumentRepository.findById(duThaoId)
+            .map(document -> dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson())
+                .get(DUTHAO_DOCUMENT_OUT_ID_FIELD))
+            .flatMap(GanKemVanBanUseCase::parseUuid)
+            .filter(vbdiId -> vbdiDocumentRepository.findById(vbdiId).filter(d -> !d.isDeleted()).isPresent())
+            .ifPresent(result::add);
         return result;
+    }
+
+    private static Optional<UUID> parseUuid(Object value) {
+        if (value == null || value.toString().isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(UUID.fromString(value.toString().trim()));
+        } catch (IllegalArgumentException ex) {
+            return Optional.empty();
+        }
     }
 
     private String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase();
-    }
-
-    private String asString(Object value) {
-        return value == null ? null : value.toString();
-    }
-
-    private String toJson(Map<String, Object> value) {
-        try {
-            return OBJECT_MAPPER.writeValueAsString(value);
-        } catch (Exception ex) {
-            return "{}";
-        }
     }
 }

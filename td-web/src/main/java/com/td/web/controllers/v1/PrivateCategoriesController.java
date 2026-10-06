@@ -68,9 +68,11 @@ public class PrivateCategoriesController extends BaseController {
             @RequestParam(required = false)            Integer level,
             @RequestParam(required = false)            Boolean isActive,
             @RequestParam(required = false)            List<String> forms,
-            @RequestParam(required = false)            String  identifier) {
+            @RequestParam(required = false)            String  identifier,
+            @RequestParam(required = false)            Boolean activeMembersOnly) {
 
         var request = new SearchPrivateCategoriesRequest();
+        request.setActiveMembersOnly(activeMembersOnly);
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
         request.setSortBy(sortBy);

@@ -66,6 +66,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\VbdiSendLogDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\onlyoffice\OnlyOfficeAccessTokenException.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresVbdenUpdateHistoryDocumentRepository.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\DocumentLinkJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\documents\CopyDocumentFilesUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\errortracking\SearchErrorLogsRequest.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresDuThaoEditHistoryDocumentRepository.java
@@ -201,6 +202,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\search\ElasticsearchDocumentSearchService.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\NumberingConfigJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\messaging\MessagingConfig.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresDocumentLinkRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\VbcddhDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\TdTokenAuthenticationToken.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\DownloadSignedPdfUseCaseImpl.java

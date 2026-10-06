@@ -50,4 +50,16 @@ public class AccountProvisioningChecker {
         }
         return appUserRepository.existsByUsernameAndDeletedOnIsNull(username);
     }
+
+    /**
+     * 06/10/2026: tài khoản đã khai báo nhưng đang bị Khoá ({@code isActive=false}) — chặn cả token
+     * đã cấp TRƯỚC khi bị khoá (Tdtoken/JWT còn hạn). superAdmin miễn trừ, cùng quy tắc
+     * {@code QLVBCompatAuthController#isAccountLocked}.
+     */
+    public boolean isLocked(String username, Set<String> roles) {
+        if (username == null || username.isBlank() || isSuperAdmin(username, roles)) {
+            return false;
+        }
+        return appUserRepository.existsLockedByUsername(username);
+    }
 }

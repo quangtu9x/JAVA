@@ -29,6 +29,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GetVbdiDetailUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -205,7 +207,8 @@ class GetVbdiDetailUseCaseTest {
     }
 
     private GetVbdiDetailUseCase newUseCase() {
-        return new GetVbdiDetailUseCase(vbdiDocumentRepository, listDocumentFilesUseCase, dynamicDocumentFieldsService);
+        return new GetVbdiDetailUseCase(vbdiDocumentRepository, listDocumentFilesUseCase, dynamicDocumentFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
     }
 
     private VbdiDocument newDocument(String documentType, String dynamicFieldsJson) {

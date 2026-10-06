@@ -45,6 +45,7 @@ public class GetGroupPeopleForIdentifierUseCase {
 
     private final PrivateCategoryRepository privateCategoryRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final ActiveGroupMembersFilter activeGroupMembersFilter;
 
     public Result<List<Map<String, Object>>> execute(String identifier) {
         if (identifier == null || identifier.isBlank()) {
@@ -60,6 +61,13 @@ public class GetGroupPeopleForIdentifierUseCase {
             .sorted(Comparator.<Map<String, Object>>comparingInt(node -> asInt(node.get("sort_order")))
                 .thenComparing(node -> String.valueOf(node.getOrDefault("name", "")), java.text.Collator.getInstance(new java.util.Locale("vi", "VN"))))
             .toList();
+
+        // 06/10/2026: bỏ thành viên đã bị Khoá/Xoá khỏi ảnh chụp receiver_obj - xem ActiveGroupMembersFilter.
+        List<Object> filtered = activeGroupMembersFilter.filter(
+            nodes.stream().map(node -> node.get(RECEIVER_OBJ_FIELD)).toList());
+        for (int i = 0; i < nodes.size(); i++) {
+            nodes.get(i).put(RECEIVER_OBJ_FIELD, filtered.get(i));
+        }
 
         return Result.success(nodes);
     }

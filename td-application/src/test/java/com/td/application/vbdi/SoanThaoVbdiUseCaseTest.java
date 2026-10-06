@@ -27,6 +27,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SoanThaoVbdiUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private AddVbdiDynamicDocumentUseCase addVbdiDynamicDocumentUseCase;
     @Mock
@@ -36,7 +38,8 @@ class SoanThaoVbdiUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new SoanThaoVbdiUseCase(addVbdiDynamicDocumentUseCase, documentRegisterRepository);
+        useCase = new SoanThaoVbdiUseCase(addVbdiDynamicDocumentUseCase, documentRegisterRepository,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
     }
 
     @Test

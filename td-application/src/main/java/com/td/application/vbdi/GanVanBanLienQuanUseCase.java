@@ -2,6 +2,7 @@ package com.td.application.vbdi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
+import com.td.application.documentlinks.RelatedDocumentSnapshots;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
@@ -67,6 +68,7 @@ public class GanVanBanLienQuanUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentCacheService documentCacheService;
     private final DocumentLogService documentLogService;
+    private final RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(GanVanBanLienQuanRequest request) {
         if (request == null || request.getVbdiId() == null) {
@@ -82,46 +84,27 @@ public class GanVanBanLienQuanUseCase {
         }
         var vbdiDocument = vbdiOptional.get();
 
-        Map<String, Object> fields = new LinkedHashMap<>(
-            dynamicDocumentFieldsService.parseDynamicFields(vbdiDocument.getDynamicFieldsJson()));
-        List<Object> existingList = toObjectList(fields.get(RELATED_FIELD));
-        Set<String> existingIds = new LinkedHashSet<>();
-        for (Object item : existingList) {
-            if (item instanceof Map<?, ?> map && map.get("id") != null) {
-                existingIds.add(map.get("id").toString());
-            }
-        }
-
-        var before = buildSnapshot(vbdiDocument);
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): moi phan tu =
+        // 1 lien ket vbdi_kemtheo_{vbden|vbdi} theo database_type (ban chup o link_data), khong ghi
+        // vanban_lienquan_obj vao dynamic_fields. Dedup theo id; phan tu id khong phai UUID bi bo qua.
         int added = 0;
         for (Map<String, Object> item : request.getRelatedDocuments()) {
-            Object rawId = item == null ? null : item.get("id");
-            if (rawId == null || rawId.toString().isBlank()) {
+            if (item == null) {
                 continue;
             }
-            String idText = rawId.toString().trim();
-            if (existingIds.add(idText)) {
-                Map<String, Object> entry = new LinkedHashMap<>(item);
-                entry.put("id", idText);
-                existingList.add(entry);
+            Object databaseType = item.get("database_type");
+            var type = RelatedDocumentSnapshots.relatedType(
+                RelatedDocumentSnapshots.SOURCE_VBDI, databaseType == null ? null : databaseType.toString());
+            if (relatedDocumentSnapshots.linkItem(type, vbdiDocument.getId(), item)) {
                 added++;
             }
         }
-
-        if (added == 0) {
-            // Toan bo da co san (dedup het) - khong co gi de luu, tra ve thanh cong (dung Domino goc,
-            // khong bao loi khi bam lai "Dong y" voi cung 1 van ban da gan).
-            return Result.success(vbdiDocument.getId());
+        if (added > 0) {
+            documentCacheService.evict(vbdiDocument.getId());
+            documentCacheService.evictAllListCaches();
+            log.info("Gan {} van ban lien quan vao van ban di {}", added, vbdiDocument.getId());
         }
-
-        fields.put(RELATED_FIELD, existingList);
-        vbdiDocument.replaceDynamicFields(toJson(fields));
-        var saved = vbdiDocumentRepository.save(vbdiDocument);
-        documentCacheService.evict(saved.getId());
-        documentCacheService.evictAllListCaches();
-        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
-        log.info("Gan {} van ban lien quan vao van ban di {}", added, saved.getId());
-        return Result.success(saved.getId());
+        return Result.success(vbdiDocument.getId());
     }
 
     private boolean isUsableVbdiDocument(VbdiDocument document) {

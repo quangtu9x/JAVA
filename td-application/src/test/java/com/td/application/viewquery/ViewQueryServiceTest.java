@@ -100,6 +100,9 @@ class ViewQueryServiceTest {
     @Mock
     private ListDocumentFilesUseCase listDocumentFilesUseCase;
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+    @Mock
+    private com.td.application.phieutrinhtd.PhieuTrinhTdViewQuery phieuTrinhTdViewQuery;
     private ViewQueryService service;
 
     @BeforeEach
@@ -111,7 +114,10 @@ class ViewQueryServiceTest {
             phieuTrinhTdDocumentRepository,
             new DynamicDocumentFieldsService(),
             appUserRepository, currentUserProvider, resolveIdentifierByLevelUseCase, getUserOrganizationProfileUseCase,
-            draftProcessDocumentRepository, listDocumentFilesByProcessUseCase, listDocumentFilesUseCase);
+            draftProcessDocumentRepository, listDocumentFilesByProcessUseCase, listDocumentFilesUseCase,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository),
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
+            phieuTrinhTdViewQuery);
         // DT-007 (27/08/2026): moi vet draft_process ghep them "files" trong response, loc theo
         // cap (parentDraftId, processId) - stub mac dinh trang rong de cac test khong lien quan
         // file khong bi NPE (da co guard parentid khong hop le nen phan lon test se khong goi toi
@@ -390,6 +396,60 @@ class ViewQueryServiceTest {
             .containsEntry("nguoi_thuc_hien", "alice");
         assertThat(result.getItems().get(1)).containsEntry("creator", "Ten Da Luu");
         verify(appUserRepository, never()).findByUsernameAndDeletedOnIsNull("bob");
+    }
+
+    // 05/10/2026 ("Cập nhật kết quả xử lý -> lưu xong không thấy đính kèm ở quá trình xử lý"): tệp lưu theo
+    // id dòng vbden_res phải trả kèm "files" (có file_id) cho ListiconQuatrinhXLVBden.
+    @Test
+    void execute_qtxlByParentId_shouldIncludeFilesUploadedOnProcessRow() {
+        UUID parentId = UUID.randomUUID();
+        var row = newVbdenResDocument("ketthucxuly",
+            "{\"parentid\":\"" + parentId + "\",\"action\":\"ketthucxuly\",\"nguoi_thuc_hien\":\"lpha\",\"creator\":\"Lê Phú Hà\",\"position\":\"Giám đốc\"}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parentId.toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(row), PageRequest.of(0, 20), 1));
+        UUID fileId = UUID.randomUUID();
+        when(listDocumentFilesUseCase.execute(row.getId())).thenReturn(new PaginationResponse<>(
+            List.of(FileDto.builder().fileId(fileId).originalFileName("ket-qua.pdf").fileSize(10L).build()),
+            0, 1, 1L, 1, true, true));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("QTXL_by_parentid");
+        request.setKeys(List.of(parentId.toString()));
+        request.setItems("getall");
+
+        var result = service.execute("vbden_res", request);
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> files = (List<Map<String, Object>>) result.getItems().get(0).get("files");
+        assertThat(files).singleElement().satisfies(file -> {
+            assertThat(file).containsEntry("name", "ket-qua.pdf").containsEntry("file_id", fileId);
+        });
+    }
+
+    // 05/10/2026 (lpha báo "Xử lý lại -> thiếu chức danh"): dòng thiếu "position" được điền chức danh hiện
+    // tại của người thực hiện lúc đọc; dòng đã có chức danh giữ nguyên.
+    @Test
+    void execute_qtxlByParentId_shouldFillMissingPositionFromCurrentProfile() {
+        UUID parentId = UUID.randomUUID();
+        var missing = newVbdenResDocument("xulylai",
+            "{\"parentid\":\"" + parentId + "\",\"action\":\"xulylai\",\"nguoi_thuc_hien\":\"lpha\",\"creator\":\"Lê Phú Hà\"}");
+        var kept = newVbdenResDocument("chuyenxuly",
+            "{\"parentid\":\"" + parentId + "\",\"nguoi_thuc_hien\":\"lpha\",\"creator\":\"Lê Phú Hà\",\"position\":\"Phó phòng\"}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parentId.toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(missing, kept), PageRequest.of(0, 20), 2));
+        var profile = new com.td.application.sharedcore.UserOrganizationProfileDto();
+        profile.setPosition("Trưởng phòng");
+        when(getUserOrganizationProfileUseCase.execute("lpha")).thenReturn(profile);
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("QTXL_by_parentid");
+        request.setKeys(List.of(parentId.toString()));
+        request.setItems("getall");
+
+        var result = service.execute("vbden_res", request);
+
+        assertThat(result.getItems().get(0)).containsEntry("position", "Trưởng phòng");
+        assertThat(result.getItems().get(1)).containsEntry("position", "Phó phòng");
     }
 
     @Test
@@ -846,6 +906,39 @@ class ViewQueryServiceTest {
         assertThat(filterCaptor.getValue().getKeyword()).isEqualTo("HS-01");
         assertThat(filterCaptor.getValue().getKeywordColumns()).containsExactly("name");
         verify(hoSoCVDocumentRepository, never()).findByAnyFieldContains(anyString(), any(), anyString(), any());
+    }
+
+    // 06/10/2026 (bao loi "Ho so xu ly chinh -> loc van ra toan bo"): tieu chi "search" phai ap ca cho
+    // hang doi ca nhan, va hang doi co trang thai giu dieu kien trang thai cua VIEW (ghi de lua chon).
+    @Test
+    void execute_hosocvPersonalQueues_withSearch_shouldApplyAdvancedFilter() {
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("chuyenvien01"));
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(hoSoCVDocumentRepository.findByVbdenOrgView(eq("hosocv"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwUser_Process_Handler");
+        request.setKeys(List.of("$username$"));
+        request.setSearch(Map.of("category", "HS-A", "title", "Ke hoach", "create_date", List.of("01/10/2026", "06/10/2026")));
+        service.execute("hosocv", request);
+
+        VbdenOrgViewFilter filter = filterCaptor.getValue();
+        assertThat(filter.getOrgFieldNames()).containsExactly("user_process_handler");
+        assertThat(filter.getIncludeFieldValues()).containsEntry("category", List.of("HS-A"));
+        assertThat(filter.getContainsAnyFieldValues()).containsEntry("title", List.of("Ke hoach"));
+        assertThat(filter.getMinCreatedOn()).isEqualTo(java.time.LocalDate.of(2026, 10, 1));
+        verify(hoSoCVDocumentRepository, never()).findByAnyFieldContains(anyString(), any(), anyString(), any());
+
+        ViewQueryRequest trinh = new ViewQueryRequest();
+        trinh.setViewname("vwUser_Process_Handler_Trinh_1");
+        trinh.setKeys(List.of("$username$"));
+        trinh.setSearch(Map.of("trinhlanhdaoduyet", "3", "category", "HS-A"));
+        service.execute("hosocv", trinh);
+
+        assertThat(filterCaptor.getValue().getIncludeFieldValues())
+            .containsEntry("trinhlanhdaoduyet", List.of("1"))
+            .containsEntry("category", List.of("HS-A"));
     }
 
     // Mo rong BL-240 - vai view moi tieu bieu (khong lap lai het ~26 view, chi khoa hanh vi predicate
@@ -4269,119 +4362,32 @@ class ViewQueryServiceTest {
         assertThat(result.getTotalItems()).isEqualTo(1L);
     }
 
-    // Port module "Phieu trinh tham dinh" (phieutrinhtd), 09/09/2026 - xem
-    // docs/analysis/20-phan-tich-port-phieutrinh-domino-sang-java.md muc 6.3. Test doi chieu dispatch
-    // dung method repository + tham so dung nghia ten tab (khong lap lai loi FE query_by_phieutrinh
-    // da phat hien - tai lieu 20 muc 4 #2).
+    // 06/10/2026 (cutover FE phieu trinh): moi view phieutrinhtd/phieutrinhtd_res chuyen sang
+    // PhieuTrinhTdViewQuery (test rieng PhieuTrinhTdViewQueryTest) - o day chi kiem tra re nhanh.
     @Test
-    void execute_phieutrinhtdToanBo_shouldDispatchToAnyFieldContainsMemberAcrossRelationFields() {
-        PhieuTrinhTdDocument document = new PhieuTrinhTdDocument(
-            "Phieu trinh A", PhieuTrinhTdDocument.STATUS_DANG_SOAN_THAO, null);
-        when(phieuTrinhTdDocumentRepository.findByAnyFieldContainsMember(any(), eq("nguyenvana"), any()))
-            .thenReturn(new PageImpl<>(List.of(document)));
-
-        var request = new ViewQueryRequest();
-        request.setViewname("phieutrinhtd_toanbo");
-        request.setKeys(List.of("nguyenvana"));
-
-        var result = service.execute("phieutrinhtd", request);
-
-        assertThat(result.getItems()).hasSize(1);
-        assertThat(result.getItems().get(0).get("status")).isEqualTo(PhieuTrinhTdDocument.STATUS_DANG_SOAN_THAO);
-        verify(phieuTrinhTdDocumentRepository).findByAnyFieldContainsMember(
-            eq(List.of("user_creator", "user_lanhdao1", "user_lanhdao2", "user_lanhdaovanphong")),
-            eq("nguyenvana"), any());
-    }
-
-    @Test
-    void execute_phieutrinhtdDangSoan_shouldFilterByUserCreatorAndStatusDangSoanThao() {
-        when(phieuTrinhTdDocumentRepository.findByAnyFieldContainsMemberAndStatusIn(any(), any(), any(), any()))
-            .thenReturn(new PageImpl<>(List.of()));
-
-        var request = new ViewQueryRequest();
-        request.setViewname("phieutrinhtd_dangsoan");
-        request.setKeys(List.of("nguyenvana"));
+    void execute_phieutrinhtd_shouldDelegateToPhieuTrinhTdViewQuery() {
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwUser_Creator");
+        org.mockito.Mockito.when(phieuTrinhTdViewQuery.execute(request))
+            .thenReturn(new PaginationResponse<>(List.of(), 1, 20, 0L, 0, true, true));
 
         service.execute("phieutrinhtd", request);
+        service.execute("phieutrinhtd_res", request);
 
-        verify(phieuTrinhTdDocumentRepository).findByAnyFieldContainsMemberAndStatusIn(
-            eq(List.of("user_creator")), eq("nguyenvana"), eq(List.of(PhieuTrinhTdDocument.STATUS_DANG_SOAN_THAO)), any());
+        verify(phieuTrinhTdViewQuery, org.mockito.Mockito.times(2)).execute(request);
     }
 
+    // 06/10/2026 (bang document_links - docs/architecture/document-links.md): cac view "van ban gan vao
+    // ho so" lay tap id tu bang lien ket (dung loai lien ket theo module) roi findByIds; FE gui id ho so
+    // VIET HOA van khop (UUID parse khong phan biet hoa thuong).
     @Test
-    void execute_phieutrinhtdChoDuyet_shouldDispatchToApproverWaiting() {
-        when(phieuTrinhTdDocumentRepository.findApproverWaiting(eq("nguyenvanb"), any()))
-            .thenReturn(new PageImpl<>(List.of()));
-
-        var request = new ViewQueryRequest();
-        request.setViewname("phieutrinhtd_choduyet");
-        request.setKeys(List.of("nguyenvanb"));
-
-        service.execute("phieutrinhtd", request);
-
-        verify(phieuTrinhTdDocumentRepository).findApproverWaiting(eq("nguyenvanb"), any());
-    }
-
-    @Test
-    void execute_phieutrinhtdThamKhao_shouldDispatchToThamKhaoChoYKien() {
-        when(phieuTrinhTdDocumentRepository.findThamKhaoChoYKien(eq("hueltm"), any()))
-            .thenReturn(new PageImpl<>(List.of()));
-
-        var request = new ViewQueryRequest();
-        request.setViewname("phieutrinhtd_thamkhao");
-        request.setKeys(List.of("hueltm"));
-
-        service.execute("phieutrinhtd", request);
-
-        verify(phieuTrinhTdDocumentRepository).findThamKhaoChoYKien(eq("hueltm"), any());
-    }
-
-    @Test
-    void execute_phieutrinhtdThungRac_shouldDispatchToTrash() {
-        when(phieuTrinhTdDocumentRepository.findTrash(any())).thenReturn(new PageImpl<>(List.of()));
-
-        var request = new ViewQueryRequest();
-        request.setViewname("phieutrinhtd_thungrac");
-
-        service.execute("phieutrinhtd", request);
-
-        verify(phieuTrinhTdDocumentRepository).findTrash(any());
-    }
-
-    @Test
-    void execute_phieutrinhtdChoThongQua_shouldFilterByLanhdaovanphongAndStatusTrinhThongQua() {
-        when(phieuTrinhTdDocumentRepository.findByAnyFieldContainsMemberAndStatusIn(any(), any(), any(), any()))
-            .thenReturn(new PageImpl<>(List.of()));
-
-        var request = new ViewQueryRequest();
-        request.setViewname("phieutrinhtd_chothongqua");
-        request.setKeys(List.of("lanhdaovp01"));
-
-        service.execute("phieutrinhtd", request);
-
-        verify(phieuTrinhTdDocumentRepository).findByAnyFieldContainsMemberAndStatusIn(
-            eq(List.of("user_lanhdaovanphong")), eq("lanhdaovp01"),
-            eq(List.of(PhieuTrinhTdDocument.STATUS_TRINH_THONG_QUA)), any());
-    }
-
-    private AppUser newUser(String username, String fullName, String email) {
-        return new AppUser(UUID.randomUUID().toString(), username, fullName, email, null, null, true);
-    }
-
-    private AppUser newUserWithIdentifier(String username, String fullName, String email, String identifier) {
-        return new AppUser(
-            UUID.randomUUID().toString(), username, fullName, email, null, null, true,
-            null, 0, null, null, null, null, null, null, identifier, false, null);
-    }
-
-    // 02/10/2026 (cutover tab "VAN BAN LIEN QUAN" ho so cong viec): vwDocument_Profiles_ID - FE gui id
-    // ho so VIET HOA, Java luu UUID viet thuong -> ha thuong; vbdi khong loc status.
-    @Test
-    void execute_vbdiDocumentProfilesId_shouldQueryDocumentProfilesIdLowercasedWithoutStatus() {
+    void execute_vbdiDocumentProfilesId_shouldReadHoSoVbdiLinks() {
         UUID hosocvId = UUID.randomUUID();
+        UUID vbdiId = UUID.randomUUID();
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI, hosocvId, vbdiId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI_PHATHANH, hosocvId, UUID.randomUUID());
         VbdiDocument document = new VbdiDocument("VB di gan ho so", "vbdi", VbdiStatus.ISSUED, null, null, null, null);
-        when(vbdiDocumentRepository.findByFieldContainsMemberAnySeparator(
-                eq("vbdi"), isNull(), eq("document_profiles_id"), eq(hosocvId.toString()), any(), any()))
+        when(vbdiDocumentRepository.findByIds(eq("vbdi"), eq(List.of(vbdiId)), any(), any()))
             .thenReturn(new PageImpl<>(List.of(document), PageRequest.of(0, 20), 1));
 
         ViewQueryRequest request = new ViewQueryRequest();
@@ -4392,11 +4398,11 @@ class ViewQueryServiceTest {
     }
 
     @Test
-    void execute_vbdenDocumentProfilesId_shouldQueryNewestCreatedFirst() {
+    void execute_vbdenDocumentProfilesId_shouldReadHoSoVbdenLinks() {
         UUID hosocvId = UUID.randomUUID();
-        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
-        when(documentRepository.findByAnyFieldContains(
-                eq("vbden"), eq(List.of("document_profiles_id")), eq(hosocvId.toString()), filterCaptor.capture(), any()))
+        UUID vbdenId = UUID.randomUUID();
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDEN, hosocvId, vbdenId);
+        when(documentRepository.findByIds(eq("vbden"), eq(List.of(vbdenId)), any(), any(), any()))
             .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         ViewQueryRequest request = new ViewQueryRequest();
@@ -4405,7 +4411,95 @@ class ViewQueryServiceTest {
 
         service.execute("vbden", request);
 
-        assertThat(filterCaptor.getValue().isNewestCreatedFirst()).isTrue();
+        verify(documentRepository).findByIds(eq("vbden"), eq(List.of(vbdenId)), any(), any(), any());
+    }
+
+    @Test
+    void execute_duthaoDocumentProfilesId_shouldReadHoSoDuThaoLinks() {
+        UUID hosocvId = UUID.randomUUID();
+        UUID duThaoId = UUID.randomUUID();
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_DUTHAO, hosocvId, duThaoId);
+        when(duThaoDocumentRepository.findByIds(eq("duthao"), eq(List.of(duThaoId)), any(), any(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwDocument_Profiles_ID");
+        request.setKeys(List.of(hosocvId.toString().toUpperCase()));
+
+        assertThat(service.execute("duthao", request).getTotalItems()).isZero();
+        verify(duThaoDocumentRepository).findByIds(eq("duthao"), eq(List.of(duThaoId)), any(), any(), any());
+    }
+
+    @Test
+    void execute_documentProfilesId_withoutLinks_shouldNotQueryRepository() {
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwDocument_Profiles_ID");
+        request.setKeys(List.of(UUID.randomUUID().toString()));
+
+        assertThat(service.execute("duthao", request).getTotalItems()).isZero();
+        verify(duThaoDocumentRepository, org.mockito.Mockito.never()).findByIds(any(), any(), any(), any(), any());
+    }
+
+    // Tab "Van ban phat hanh": chi loai hoso_vbdi_phathanh (gom ca van ban di phat hanh tu du thao cua
+    // ho so - ChuyenThanhVanBanDi/GanKemVanBan ghi tuong minh).
+    @Test
+    void execute_vbdiIssuanceDocumentProfilesId_shouldReadIssuanceLinksOnly() {
+        UUID hosocvId = UUID.randomUUID();
+        UUID issuedId = UUID.randomUUID();
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI_PHATHANH, hosocvId, issuedId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI, hosocvId, UUID.randomUUID());
+        when(vbdiDocumentRepository.findByIds(eq("vbdi"), eq(List.of(issuedId)), any(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwIssuance_Document_Profiles_ID");
+        request.setKeys(List.of(hosocvId.toString().toUpperCase()));
+
+        service.execute("vbdi", request);
+
+        verify(vbdiDocumentRepository).findByIds(eq("vbdi"), eq(List.of(issuedId)), any(), any());
+    }
+
+    // vwSelect_Drafts_Groups_By_Document_Profiles_ID: ho so CHUA 1 van ban (khoa = id van ban dich),
+    // bo ho so da xoa.
+    @Test
+    void execute_hosocvByLinkedDocument_shouldReturnHoSoContainingDocument() {
+        UUID duThaoId = UUID.randomUUID();
+        com.td.domain.hosocv.HoSoCVDocument hoso = new com.td.domain.hosocv.HoSoCVDocument(
+            "Ho so A", "hosocv", "0", null, null, null, null);
+        com.td.domain.hosocv.HoSoCVDocument deleted = new com.td.domain.hosocv.HoSoCVDocument(
+            "Ho so da xoa", "hosocv", "0", null, null, null, null);
+        deleted.markAsDeleted(null);
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_DUTHAO, hoso.getId(), duThaoId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_DUTHAO, deleted.getId(), duThaoId);
+        when(hoSoCVDocumentRepository.findById(hoso.getId())).thenReturn(java.util.Optional.of(hoso));
+        when(hoSoCVDocumentRepository.findById(deleted.getId())).thenReturn(java.util.Optional.of(deleted));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwSelect_Drafts_Groups_By_Document_Profiles_ID");
+        request.setKeys(List.of(duThaoId.toString()));
+
+        var result = service.execute("hosocv", request);
+
+        assertThat(result.getTotalItems()).isEqualTo(1L);
+        assertThat(result.getItems().get(0)).containsEntry("title", "Ho so A");
+    }
+
+    @Test
+    void execute_vbdenDocumentProfilesHandlingId_shouldReadHandlingLinks() {
+        UUID hosocvId = UUID.randomUUID();
+        UUID vbdenId = UUID.randomUUID();
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDEN_XULY, hosocvId, vbdenId);
+        when(documentRepository.findByIds(eq("vbden"), eq(List.of(vbdenId)), any(), any(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwDocument_Profiles_Handling_ID");
+        request.setKeys(List.of(hosocvId.toString()));
+
+        service.execute("vbden", request);
+
+        verify(documentRepository).findByIds(eq("vbden"), eq(List.of(vbdenId)), any(), any(), any());
     }
 
     @Test
@@ -4424,6 +4518,10 @@ class ViewQueryServiceTest {
         assertThat(filterCaptor.getValue().getOrgFieldNames()).containsExactly("document_profiles_id");
         assertThat(filterCaptor.getValue().getOrgValue()).isEqualTo(hosocvId.toString());
         assertThat(filterCaptor.getValue().isNewestCreatedFirst()).isTrue();
+    }
+
+    private AppUser newUser(String username, String fullName, String email) {
+        return new AppUser(UUID.randomUUID().toString(), username, fullName, email, null, null, true);
     }
 
     private AppUser newLeaderUser(String username, String fullName, int sortOrder, String capLanhDao) {

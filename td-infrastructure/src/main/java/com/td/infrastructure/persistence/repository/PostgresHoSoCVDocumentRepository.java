@@ -33,6 +33,12 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String STATUS_FIELD_NAME = "status";
+    // 02/10/2026 (yêu cầu người dùng "các danh sách xử lý hồ sơ sắp theo ngày tạo mới nhất lên trên"):
+    // MỌI danh sách hồ sơ (kể cả thùng rác, "văn bản khác") dùng chung 1 thứ tự — trước đây lẫn lộn
+    // created_on ASC (hàng đợi cá nhân - cũ nhất lên đầu), last_modified_on DESC (hồ sơ cũ bị sửa là
+    // nhảy lên đầu) và deleted_on DESC. FE vẫn gửi orderBy "createdOn DESC" (Domino) nhưng Java bỏ qua
+    // tham số đó nên phải chốt ở đây.
+    static final String NEWEST_CREATED_FIRST = "d.created_on DESC NULLS LAST, d.last_modified_on DESC NULLS LAST";
     private static final String DD_MM_YYYY_REGEX = "^[0-9]{2}/[0-9]{2}/[0-9]{4}$";
 
     private final HoSoCVDocumentJpaRepository jpaRepository;
@@ -74,7 +80,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         appendAnyFieldContainsPredicate(sql, parameters, fieldNames, value);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        return executeQuery(sql, parameters, pageable, "d.created_on ASC NULLS LAST");
+        return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
     }
 
     @Override
@@ -134,11 +140,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             "minStoragedDate", filter.getMinStoragedDate(), "maxStoragedDate", filter.getMaxStoragedDate());
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        // 02/10/2026: "van ban khac" cua ho so (vwOther_Related_Document_Document_Profiles_ID) sap
-        // @Created giam dan nhu Domino - xem VbdenOrgViewFilter#newestCreatedFirst.
-        return executeQuery(sql, parameters, pageable, filter.isNewestCreatedFirst()
-            ? "d.created_on DESC NULLS LAST"
-            : "d.last_modified_on DESC NULLS LAST");
+        return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
     }
 
     @Override
@@ -167,7 +169,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        return executeQuery(sql, parameters, pageable, "d.last_modified_on DESC NULLS LAST");
+        return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
     }
 
     @Override
@@ -188,7 +190,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        return executeQuery(sql, parameters, pageable, "d.deleted_on DESC NULLS LAST");
+        return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
     }
 
     @Override
@@ -247,7 +249,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        return executeQuery(sql, parameters, pageable, "d.last_modified_on DESC NULLS LAST");
+        return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
     }
 
     // ---- helpers (copy tu PostgresDuThaoDocumentRepository, chi doi ten bang) ----

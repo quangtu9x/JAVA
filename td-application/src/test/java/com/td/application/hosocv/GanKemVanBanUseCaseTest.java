@@ -1,23 +1,25 @@
 package com.td.application.hosocv;
 
-import com.td.application.documents.DocumentCacheService;
-import com.td.application.documents.DocumentLogService;
+import com.td.application.documentlinks.InMemoryDocumentLinkRepository;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.application.duthao.DuThaoDocumentRepository;
+import com.td.application.phieutrinhtd.PhieuTrinhTdDocumentRepository;
 import com.td.application.vbdi.VbdiDocumentRepository;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.domain.documents.BusinessDocument;
 import com.td.domain.duthao.DuThaoDocument;
 import com.td.domain.hosocv.HoSoCVDocument;
+import com.td.domain.phieutrinhtd.PhieuTrinhTdDocument;
 import com.td.domain.vbdi.VbdiDocument;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,18 +31,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * BL-240 (HoSoCV Core) — DoD (2): gắn văn bản đến/đi/dự thảo vào hồ sơ qua
- * {@link GanKemVanBanUseCase}.
- *
- * <p><b>Mở rộng — sửa bug tra sai bảng (xem javadoc {@link GanKemVanBanUseCase})</b>: bản test
- * trước đây mock DUY NHẤT {@code DocumentRepository} và trả thẳng {@code BusinessDocument} bất kể
- * {@code documentType} (kể cả cho {@code duthao}/{@code vbdi}) — che giấu hoàn toàn bug tra sai
- * bảng vì Mockito không biết/không quan tâm bảng vật lý thật. Bản này mock ĐÚNG 4 repository theo
- * đúng bảng vật lý thật ({@link HoSoCVDocumentRepository} cho hồ sơ, {@link DuThaoDocumentRepository}
- * cho dự thảo, {@link VbdiDocumentRepository} cho văn bản đi, {@link DocumentRepository} chỉ còn cho
- * văn bản đến/phiếu trình — 2 loại CHƯA tách bảng riêng) — nếu bug tra sai bảng tái diễn (vd. tra
- * dự thảo qua {@code documentRepository}), các test {@code ganKemDuThao}/{@code ganvanbandi} sẽ ĐỎ
- * ngay vì mock tương ứng không được stub.
+ * BL-240 (HoSoCV Core) — gắn / gỡ văn bản vào hồ sơ qua {@link GanKemVanBanUseCase}. Từ 06/10/2026 liên
+ * kết lưu ở bảng {@code document_links} (docs/architecture/document-links.md) - test kiểm tra dòng liên
+ * kết (fake {@link InMemoryDocumentLinkRepository}) và việc tra tồn tại ĐÚNG bảng vật lý theo actionName
+ * (bug tra sai bảng cũ: tra dự thảo/văn bản đi qua documentRepository luôn rỗng).
  */
 @ExtendWith(MockitoExtension.class)
 class GanKemVanBanUseCaseTest {
@@ -54,260 +48,174 @@ class GanKemVanBanUseCaseTest {
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
-    private DocumentLogService documentLogService;
-    @Mock
-    private DocumentCacheService documentCacheService;
+    private PhieuTrinhTdDocumentRepository phieuTrinhTdDocumentRepository;
 
-    private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
+    private final InMemoryDocumentLinkRepository linkRepository = new InMemoryDocumentLinkRepository();
     private GanKemVanBanUseCase useCase;
+    private HoSoCVDocument hosocv;
 
     @BeforeEach
     void setUp() {
         useCase = new GanKemVanBanUseCase(
-            hoSoCVDocumentRepository, documentRepository, duThaoDocumentRepository, vbdiDocumentRepository,
-            dynamicDocumentFieldsService, documentLogService, documentCacheService);
-        lenient().when(vbdiDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        lenient().when(hoSoCVDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            hoSoCVDocumentRepository, InMemoryDocumentLinkRepository.newService(linkRepository),
+            documentRepository, duThaoDocumentRepository, vbdiDocumentRepository, phieuTrinhTdDocumentRepository,
+            new DynamicDocumentFieldsService());
+        hosocv = withId(new HoSoCVDocument("Ho so", "hosocv", "0", null, null, null, null), UUID.randomUUID());
+        lenient().when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(Optional.of(hosocv));
     }
 
     @Test
     void execute_withUnknownActionName_shouldReturnFailure() {
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(UUID.randomUUID());
-        request.setActionName("khongtontai");
-
-        var result = useCase.execute(request);
+        var result = useCase.execute(request("khongtontai", null, UUID.randomUUID()));
 
         assertThat(result.isSuccess()).isFalse();
+        assertThat(linkRepository.activeRows()).isEmpty();
     }
 
     @Test
     void execute_withUnknownHoSoCV_shouldReturnFailure() {
-        UUID hosocvId = UUID.randomUUID();
-        when(hoSoCVDocumentRepository.findById(hosocvId)).thenReturn(Optional.empty());
+        var request = request("ganvanbandi", null, UUID.randomUUID());
+        request.setHosocvId(UUID.randomUUID());
+        when(hoSoCVDocumentRepository.findById(request.getHosocvId())).thenReturn(Optional.empty());
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocvId);
-        request.setActionName("ganvanbandi");
-
-        var result = useCase.execute(request);
-
-        assertThat(result.isSuccess()).isFalse();
+        assertThat(useCase.execute(request).isSuccess()).isFalse();
     }
 
     @Test
     void execute_withNonHoSoCVDocument_shouldReturnFailure() {
-        HoSoCVDocument notHoSo = newHoSoCVDocument(UUID.randomUUID(), "vbdi_typo", "{}");
-        when(hoSoCVDocumentRepository.findById(notHoSo.getId())).thenReturn(Optional.of(notHoSo));
+        HoSoCVDocument vanBanKhac = withId(
+            new HoSoCVDocument("VB khac", "hosocv_vbkhac", "0", null, null, null, null), UUID.randomUUID());
+        when(hoSoCVDocumentRepository.findById(vanBanKhac.getId())).thenReturn(Optional.of(vanBanKhac));
+        var request = request("ganvanbandi", null, UUID.randomUUID());
+        request.setHosocvId(vanBanKhac.getId());
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(notHoSo.getId());
-        request.setActionName("ganvanbandi");
-
-        var result = useCase.execute(request);
-
-        assertThat(result.isSuccess()).isFalse();
+        assertThat(useCase.execute(request).isSuccess()).isFalse();
     }
 
-    // Bugfix xac nhan: "ganvanbandi" phai tra VbdiDocumentRepository (bang vbdi_documents rieng),
-    // KHONG con dung documentRepository (bang documents chung) nhu ban truoc day.
     @Test
-    void execute_addAction_ganVanBanDi_shouldResolveThroughVbdiDocumentRepository() {
-        HoSoCVDocument hosocv = newHoSoCVDocument(UUID.randomUUID(), "hosocv", "{}");
-        VbdiDocument vbdi = newVbdiDocument(UUID.randomUUID(), "vbdi", "{}");
-        when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(Optional.of(hosocv));
-        when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
+    void execute_ganVanBanDi_shouldResolveThroughVbdiRepositoryAndLink() {
+        VbdiDocument vbdi = vbdi(UUID.randomUUID(), "{}");
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocv.getId());
-        request.setVanBanIds(List.of(vbdi.getId()));
-        request.setActionName("ganvanbandi");
-        request.setAction("add");
-
-        var result = useCase.execute(request);
+        var result = useCase.execute(request("ganvanbandi", null, vbdi.getId()));
 
         assertThat(result.isSuccess()).isTrue();
-        assertThat(result.getData()).isEqualTo(hosocv.getId());
-
-        Map<String, Object> vbdiFields = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        assertThat(vbdiFields.get("document_profiles_id")).isEqualTo(hosocv.getId().toString());
-        assertThat(vbdiFields.get("hoso_attached_id")).isEqualTo(hosocv.getId().toString());
-
-        Map<String, Object> hosocvFields = dynamicDocumentFieldsService.parseDynamicFields(hosocv.getDynamicFieldsJson());
-        assertThat(hosocvFields.get("document_out_attached_id")).isEqualTo(vbdi.getId().toString());
-        verify(hoSoCVDocumentRepository).save(hosocv);
-        verify(documentRepository, never()).findById(any());
-    }
-
-    // Bugfix xac nhan: "gankemduthao" phai tra DuThaoDocumentRepository (bang duthao_documents rieng).
-    @Test
-    void execute_addAction_ganKemDuThao_shouldResolveThroughDuThaoDocumentRepository() {
-        HoSoCVDocument hosocv = newHoSoCVDocument(UUID.randomUUID(), "hosocv", "{}");
-        DuThaoDocument duThao = newDuThaoDocument(UUID.randomUUID(), "duthao", "{}");
-        when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(Optional.of(hosocv));
-        when(duThaoDocumentRepository.findById(duThao.getId())).thenReturn(Optional.of(duThao));
-
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocv.getId());
-        request.setVanBanIds(List.of(duThao.getId()));
-        request.setActionName("gankemduthao");
-        request.setAction("add");
-
-        var result = useCase.execute(request);
-
-        assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> duThaoFields = dynamicDocumentFieldsService.parseDynamicFields(duThao.getDynamicFieldsJson());
-        assertThat(duThaoFields.get("document_profiles_id")).isEqualTo(hosocv.getId().toString());
+        assertThat(links()).containsExactly("hoso_vbdi:" + vbdi.getId());
         verify(documentRepository, never()).findById(any());
     }
 
     @Test
-    void execute_addAction_whenAlreadyLinked_shouldNotDuplicateOrSaveAgain() {
-        UUID hosocvId = UUID.randomUUID();
-        UUID vbdiId = UUID.randomUUID();
-        HoSoCVDocument hosocv = newHoSoCVDocument(hosocvId, "hosocv",
-            "{\"document_out_attached_id\":\"" + vbdiId + "\"}");
-        VbdiDocument vbdi = newVbdiDocument(vbdiId, "vbdi",
-            "{\"document_profiles_id\":\"" + hosocvId + "\",\"hoso_attached_id\":\"" + hosocvId + "\"}");
-        when(hoSoCVDocumentRepository.findById(hosocvId)).thenReturn(Optional.of(hosocv));
-        when(vbdiDocumentRepository.findById(vbdiId)).thenReturn(Optional.of(vbdi));
-
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocvId);
-        request.setVanBanIds(List.of(vbdiId));
-        request.setActionName("ganvanbandi");
-
-        useCase.execute(request);
-
-        verify(vbdiDocumentRepository, never()).save(vbdi);
-        verify(hoSoCVDocumentRepository, never()).save(hosocv);
-    }
-
-    // "ganvanbanden"/"ganvanbandenxuly" van chua tach bang rieng (vbden con o bang documents chung).
-    @Test
-    void execute_removeAction_ganVanBanDen_shouldUpdateBothSidesAndClearHosoAttachedId() {
-        UUID hosocvId = UUID.randomUUID();
+    void execute_ganVanBanDen_twice_shouldNotDuplicate_andRemoveShouldSoftDelete() {
         UUID vbdenId = UUID.randomUUID();
-        HoSoCVDocument hosocv = newHoSoCVDocument(hosocvId, "hosocv",
-            "{\"document_in_attached_id\":\"" + vbdenId + "\"}");
-        BusinessDocument vbden = newBusinessDocument(vbdenId, "vbden",
-            "{\"document_profiles_id\":\"" + hosocvId + "\",\"hoso_attached_id\":\"" + hosocvId + "\"}");
-        when(hoSoCVDocumentRepository.findById(hosocvId)).thenReturn(Optional.of(hosocv));
-        when(documentRepository.findById(vbdenId)).thenReturn(Optional.of(vbden));
+        when(documentRepository.findById(vbdenId)).thenReturn(Optional.of(
+            withId(new BusinessDocument("VB den", "vbden", "0", null, null, null, null), vbdenId)));
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocvId);
-        request.setVanBanIds(List.of(vbdenId));
-        request.setActionName("ganvanbanden");
-        request.setAction("remove");
+        useCase.execute(request("ganvanbanden", null, vbdenId));
+        useCase.execute(request("ganvanbanden", null, vbdenId));
+        assertThat(links()).containsExactly("hoso_vbden:" + vbdenId);
 
-        var result = useCase.execute(request);
-
-        assertThat(result.isSuccess()).isTrue();
-
-        Map<String, Object> vbdenFields = dynamicDocumentFieldsService.parseDynamicFields(vbden.getDynamicFieldsJson());
-        assertThat(vbdenFields.get("document_profiles_id")).isEqualTo("");
-        assertThat(vbdenFields.get("hoso_attached_id")).isEqualTo("");
-
-        Map<String, Object> hosocvFields = dynamicDocumentFieldsService.parseDynamicFields(hosocv.getDynamicFieldsJson());
-        assertThat(hosocvFields.get("document_in_attached_id")).isEqualTo("");
-        verify(documentLogService, org.mockito.Mockito.atLeastOnce()).logUpdate(any(), any(), any());
+        useCase.execute(request("ganvanbanden", "remove", vbdenId));
+        assertThat(links()).isEmpty();
     }
 
     @Test
-    void execute_ganKemDuThao_add_shouldSyncLinkedVbdiDocumentProfilesFromDraftId() {
-        UUID hosocvId = UUID.randomUUID();
-        UUID vbdiId = UUID.randomUUID();
-        HoSoCVDocument hosocv = newHoSoCVDocument(hosocvId, "hosocv", "{}");
-        DuThaoDocument duThao = newDuThaoDocument(UUID.randomUUID(), "duthao",
-            "{\"document_out_id\":\"" + vbdiId + "\"}");
-        VbdiDocument vbdi = newVbdiDocument(vbdiId, "vbdi", "{}");
-        when(hoSoCVDocumentRepository.findById(hosocvId)).thenReturn(Optional.of(hosocv));
-        when(duThaoDocumentRepository.findById(duThao.getId())).thenReturn(Optional.of(duThao));
-        when(vbdiDocumentRepository.findById(vbdiId)).thenReturn(Optional.of(vbdi));
+    void execute_ganVanBanDenXuLy_shouldUseHandlingLinkType() {
+        UUID vbdenId = UUID.randomUUID();
+        when(documentRepository.findById(vbdenId)).thenReturn(Optional.of(
+            withId(new BusinessDocument("VB den", "vbden", "0", null, null, null, null), vbdenId)));
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocvId);
-        request.setVanBanIds(List.of(duThao.getId()));
-        request.setActionName("gankemduthao");
-        request.setAction("add");
+        useCase.execute(request("ganvanbandenxuly", null, vbdenId));
 
-        useCase.execute(request);
+        assertThat(links()).containsExactly("hoso_vbden_xuly:" + vbdenId);
+    }
 
-        Map<String, Object> vbdiFields = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        assertThat(vbdiFields.get("document_profiles_from_draft_id")).isEqualTo(hosocvId.toString());
+    // Dự thảo đã phát hành: văn bản đi (liên kết duthao_vbdi HOẶC field document_out_id) cũng vào tab
+    // "Văn bản phát hành"; gỡ dự thảo gỡ luôn.
+    @Test
+    void execute_ganKemDuThao_shouldAlsoLinkIssuedVbdi_andRemoveBoth() {
+        VbdiDocument issuedByLink = vbdi(UUID.randomUUID(), "{}");
+        VbdiDocument issuedByField = vbdi(UUID.randomUUID(), "{}");
+        DuThaoDocument duThao = duThao(UUID.randomUUID(), "{\"document_out_id\":\"" + issuedByField.getId() + "\"}");
+        linkRepository.seed(DocumentLinkType.DUTHAO_VBDI, duThao.getId(), issuedByLink.getId());
+
+        useCase.execute(request("gankemduthao", null, duThao.getId()));
+
+        assertThat(links()).containsExactlyInAnyOrder(
+            "duthao_vbdi:" + issuedByLink.getId(),
+            "hoso_duthao:" + duThao.getId(),
+            "hoso_vbdi_phathanh:" + issuedByLink.getId(),
+            "hoso_vbdi_phathanh:" + issuedByField.getId());
+
+        useCase.execute(request("gankemduthao", "remove", duThao.getId()));
+
+        assertThat(links()).containsExactly("duthao_vbdi:" + issuedByLink.getId());
+    }
+
+    // Liên kết không còn ghi vào dynamic_fields của văn bản lẫn hồ sơ.
+    @Test
+    void execute_shouldNotRewriteDynamicFields() {
+        DuThaoDocument duThao = duThao(UUID.randomUUID(), "{}");
+
+        useCase.execute(request("gankemduthao", null, duThao.getId()));
+
+        verify(duThaoDocumentRepository, never()).save(any());
+        verify(hoSoCVDocumentRepository, never()).save(any());
+        assertThat(duThao.getDynamicFieldsJson()).isEqualTo("{}");
     }
 
     @Test
-    void execute_ganKemDuThao_remove_shouldRemoveFromLinkedVbdiDocumentProfilesFromDraftId() {
-        UUID hosocvId = UUID.randomUUID();
-        UUID vbdiId = UUID.randomUUID();
-        HoSoCVDocument hosocv = newHoSoCVDocument(hosocvId, "hosocv",
-            "{\"duthao_attached_id\":\"" + UUID.randomUUID() + "\"}");
-        DuThaoDocument duThao = newDuThaoDocument(UUID.randomUUID(), "duthao",
-            "{\"document_out_id\":\"" + vbdiId + "\",\"document_profiles_id\":\"" + hosocvId + "\"}");
-        VbdiDocument vbdi = newVbdiDocument(vbdiId, "vbdi",
-            "{\"document_profiles_from_draft_id\":\"" + hosocvId + "\"}");
-        when(hoSoCVDocumentRepository.findById(hosocvId)).thenReturn(Optional.of(hosocv));
-        when(duThaoDocumentRepository.findById(duThao.getId())).thenReturn(Optional.of(duThao));
-        when(vbdiDocumentRepository.findById(vbdiId)).thenReturn(Optional.of(vbdi));
+    void execute_ganKemPhieuTrinh_shouldResolveThroughPhieuTrinhTdRepository() {
+        UUID phieuTrinhId = UUID.randomUUID();
+        when(phieuTrinhTdDocumentRepository.findById(phieuTrinhId)).thenReturn(Optional.of(
+            withId(new PhieuTrinhTdDocument("Phieu trinh", "0", null), phieuTrinhId)));
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocvId);
-        request.setVanBanIds(List.of(duThao.getId()));
-        request.setActionName("gankemduthao");
-        request.setAction("remove");
+        useCase.execute(request("gankemphieutrinh", null, phieuTrinhId));
 
-        useCase.execute(request);
-
-        Map<String, Object> vbdiFields = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        assertThat(vbdiFields.get("document_profiles_from_draft_id")).isEqualTo("");
+        assertThat(links()).containsExactly("hoso_phieutrinh:" + phieuTrinhId);
+        verify(documentRepository, never()).findById(any());
     }
 
     @Test
     void execute_withUnknownVanBanId_shouldSkipGracefully() {
-        HoSoCVDocument hosocv = newHoSoCVDocument(UUID.randomUUID(), "hosocv", "{}");
         UUID unknownId = UUID.randomUUID();
-        when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(Optional.of(hosocv));
         when(vbdiDocumentRepository.findById(unknownId)).thenReturn(Optional.empty());
 
-        var request = new GanKemVanBanRequest();
-        request.setHosocvId(hosocv.getId());
-        request.setVanBanIds(List.of(unknownId));
-        request.setActionName("ganvanbandi");
-
-        var result = useCase.execute(request);
+        var result = useCase.execute(request("ganvanbandi", null, unknownId));
 
         assertThat(result.isSuccess()).isTrue();
+        assertThat(links()).isEmpty();
     }
 
-    private HoSoCVDocument newHoSoCVDocument(UUID id, String documentType, String dynamicFieldsJson) {
-        HoSoCVDocument document = new HoSoCVDocument("Test", documentType, "0", null, null, null, null);
+    private List<String> links() {
+        return linkRepository.activeRows().stream()
+            .map(link -> link.getLinkType() + ":" + link.getTargetId())
+            .toList();
+    }
+
+    private GanKemVanBanRequest request(String actionName, String action, UUID vanBanId) {
+        var request = new GanKemVanBanRequest();
+        request.setHosocvId(hosocv.getId());
+        request.setVanBanIds(List.of(vanBanId));
+        request.setActionName(actionName);
+        request.setAction(action);
+        return request;
+    }
+
+    private VbdiDocument vbdi(UUID id, String dynamicFieldsJson) {
+        VbdiDocument document = withId(new VbdiDocument("VB di", "vbdi", "0", null, null, null, null), id);
         document.replaceDynamicFields(dynamicFieldsJson);
-        org.springframework.test.util.ReflectionTestUtils.setField(document, "id", id);
+        lenient().when(vbdiDocumentRepository.findById(id)).thenReturn(Optional.of(document));
         return document;
     }
 
-    private DuThaoDocument newDuThaoDocument(UUID id, String documentType, String dynamicFieldsJson) {
-        DuThaoDocument document = new DuThaoDocument("Test", documentType, "0", null, null, null, null);
+    private DuThaoDocument duThao(UUID id, String dynamicFieldsJson) {
+        DuThaoDocument document = withId(new DuThaoDocument("Du thao", "duthao", "0", null, null, null, null), id);
         document.replaceDynamicFields(dynamicFieldsJson);
-        org.springframework.test.util.ReflectionTestUtils.setField(document, "id", id);
+        lenient().when(duThaoDocumentRepository.findById(id)).thenReturn(Optional.of(document));
         return document;
     }
 
-    private VbdiDocument newVbdiDocument(UUID id, String documentType, String dynamicFieldsJson) {
-        VbdiDocument document = new VbdiDocument("Test", documentType, "0", null, null, null, null);
-        document.replaceDynamicFields(dynamicFieldsJson);
-        org.springframework.test.util.ReflectionTestUtils.setField(document, "id", id);
-        return document;
-    }
-
-    private BusinessDocument newBusinessDocument(UUID id, String documentType, String dynamicFieldsJson) {
-        BusinessDocument document = new BusinessDocument("Test", documentType, "0", null, null, null, null);
-        document.replaceDynamicFields(dynamicFieldsJson);
-        org.springframework.test.util.ReflectionTestUtils.setField(document, "id", id);
+    private static <T> T withId(T document, UUID id) {
+        ReflectionTestUtils.setField(document, "id", id);
         return document;
     }
 }

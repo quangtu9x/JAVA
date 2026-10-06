@@ -14,6 +14,9 @@ public interface DraftProcessDocumentRepository {
 
     <S extends DraftProcessDocument> S save(S entity);
 
+    /** 03/10/2026: xoá vết / xoá tệp của vết quá trình dự thảo (XoaVetDuThaoUseCase, XoaTepVetDuThaoUseCase). */
+    java.util.Optional<DraftProcessDocument> findById(java.util.UUID id);
+
     /**
      * DT-007 (26/08/2026, port {@code vwGroup_process_by_draft_id} — tab "Quá trình xử lý",
      * {@code duthaofile.jsx}): lịch sử xử lý theo dự thảo cha, khoá field động {@code parentid}

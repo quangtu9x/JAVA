@@ -68,6 +68,7 @@ public class LuuDuThaoUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final CurrentUserProvider currentUserProvider;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(LuuDuThaoRequest request) {
         if (request == null || request.getId() == null) {
@@ -84,6 +85,10 @@ public class LuuDuThaoUseCase {
         // loại khỏi incoming TRƯỚC merge để client không thể ghi đè giá trị hiện có; bản ghi HỎNG
         // (trống) sẽ được backfillUserCreatorIfBlank gán bằng người đang lưu bên dưới.
         fields.remove(USER_CREATOR_FIELD);
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): documentin_obj /
+        // vanban_lienquan_obj KHONG luu trong dynamic_fields nua - bo khoi payload (FE tung gui lai ca
+        // mang 1 phan tu moi lan luu du thao tao tu van ban den, ghi de mat cac van ban tra loi gan sau).
+        relatedDocumentSnapshots.strip(fields);
 
         mergeFieldsIntoDocument(document, fields, request);
         duThaoDocumentRepository.save(document);

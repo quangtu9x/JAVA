@@ -340,6 +340,8 @@ public class CapNhatKetQuaXuLyUseCase {
             ObjectNode node = OBJECT_MAPPER.createObjectNode();
             node.put("id", ref.getId() != null ? ref.getId().toString() : "");
             node.put("code", ref.getCode() != null ? ref.getCode() : "");
+            // 05/10/2026: giữ "action" (FE mở chi tiết theo key này) - xem VbdenReplyDocumentRef#action.
+            node.put("action", ref.resolvedAction());
             if (ref.getPromulgationDate() != null && !ref.getPromulgationDate().isBlank()) {
                 node.put("promulgationDate", ref.getPromulgationDate());
             }

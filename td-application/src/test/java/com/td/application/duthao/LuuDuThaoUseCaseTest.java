@@ -28,6 +28,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LuuDuThaoUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private DuThaoDocumentRepository duThaoDocumentRepository;
     @Mock
@@ -225,7 +227,8 @@ class LuuDuThaoUseCaseTest {
         // failure-path o tren khong luu document).
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("system_test"));
         return new LuuDuThaoUseCase(
-            duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider, authorAclFieldsService);
+            duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider, authorAclFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
     }
 
     private DuThaoDocument newDocument(String documentType, String dynamicFieldsJson) {

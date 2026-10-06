@@ -87,6 +87,7 @@ public class GetUserOrganizationProfileUseCase {
         dto.setUsername(user.getUsername());
         dto.setFullName(user.getFullName());
         dto.setAppUserId(user.getId() == null ? "" : user.getId().toString());
+        dto.setActive(user.isActive());
         dto.setPhoneNumber(nullToEmpty(user.getPhoneNumber()));
         dto.setCapLanhDao(nullToEmpty(user.getCapLanhDao()));
         dto.setIdentifier(nullToEmpty(user.getIdentifier()));

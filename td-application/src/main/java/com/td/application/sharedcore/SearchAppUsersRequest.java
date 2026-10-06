@@ -18,6 +18,10 @@ public class SearchAppUsersRequest {
     // (mặc định danh sách "Người dùng" vẫn trộn chung chính+kiêm nhiệm, đúng hành vi Domino gốc).
     private UUID parentUserId;
 
+    // 06/10/2026: chỉ lấy các tài khoản trong danh sách này (null/rỗng = không lọc) - xem
+    // PostgresAppUserRepository#usernamesFilter.
+    private java.util.List<String> usernames;
+
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
 

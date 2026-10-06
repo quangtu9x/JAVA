@@ -32,6 +32,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SendVbdiDocumentUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -52,7 +54,8 @@ class SendVbdiDocumentUseCaseTest {
     void setUp() {
         useCase = new SendVbdiDocumentUseCase(vbdiDocumentRepository, vbdiSendLogDocumentRepository,
             addVbdiSendLogUseCase, dynamicDocumentFieldsService, prepareVbdiDeliveryFilesUseCase,
-            organizationRepository, organizationAgencyResolver);
+            organizationRepository, organizationAgencyResolver,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
     }
 
     private VbdiDocument issuedDocument() {
@@ -187,6 +190,8 @@ class SendVbdiDocumentUseCaseTest {
         UUID vbdenId = UUID.randomUUID();
         document.replaceDynamicFields(("{\"phathanhkemvbden\":\"1\",\"documentin_obj\":"
             + "[{\"id\":\"%s\",\"code\":\"123/CV-UBND\"}]}").formatted(vbdenId));
+        // 06/10/2026: van ban den "tra loi" doc tu bang document_links (vbdi_traloi_vbden).
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.VBDI_TRALOI_VBDEN, document.getId(), vbdenId);
         when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
         when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         when(prepareVbdiDeliveryFilesUseCase.execute(any())).thenReturn(Result.success(List.of()));

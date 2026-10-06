@@ -40,6 +40,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class TraLoiVanBanDenUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -65,7 +67,8 @@ class TraLoiVanBanDenUseCaseTest {
         useCase = new TraLoiVanBanDenUseCase(
             vbdiDocumentRepository, documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, resolveIdentifierByLevelUseCase,
-            authorAclFieldsService);
+            authorAclFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
         lenient().when(vbdiDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
@@ -152,13 +155,13 @@ class TraLoiVanBanDenUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> documentIn = (List<Object>) updated.get("documentin_obj");
-        assertThat(documentIn).hasSize(1);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> savedItem = (Map<String, Object>) documentIn.get(0);
-        assertThat(savedItem).containsEntry("id", vbdenId.toString()).containsEntry("code", "10/CV-VBDEN");
+        // 06/10/2026: luu o bang document_links (vbdi_traloi_vbden), ban chup phan tu o link_data.
+        assertThat(linkRepository.activeRows()).singleElement().satisfies(link -> {
+            assertThat(link.getLinkType()).isEqualTo("vbdi_traloi_vbden");
+            assertThat(link.getTargetId()).isEqualTo(vbdenId);
+            assertThat(link.getLinkDataJson()).contains("10/CV-VBDEN");
+        });
+        verify(vbdiDocumentRepository, never()).save(any());
     }
 
     @Test
@@ -311,10 +314,8 @@ class TraLoiVanBanDenUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> documentIn = (List<Object>) updated.get("documentin_obj");
-        assertThat(documentIn).hasSize(2);
+        assertThat(linkRepository.activeRows()).extracting(link -> link.getTargetId())
+            .containsExactly(vbdenId1, vbdenId2);
         verify(documentRepository, times(1)).save(vbden1);
         verify(documentRepository, never()).save(vbden2);
         verify(addVbdenResDocumentUseCase, times(2)).execute(any());

@@ -65,11 +65,20 @@ public class AccountProvisioningFilter extends OncePerRequestFilter {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         String username = extractUsername(authentication);
-        if (username != null && !accountProvisioningChecker.isProvisioned(username, extractRoles(authentication))) {
+        Set<String> roles = username == null ? Set.of() : extractRoles(authentication);
+        if (username != null && !accountProvisioningChecker.isProvisioned(username, roles)) {
             log.warn("Chan request {} {}: tai khoan '{}' chua duoc khai bao trong danh muc nguoi dung (app_users)",
                 request.getMethod(), request.getRequestURI(), username);
             SecurityResponseWriter.writeError(response, objectMapper, HttpServletResponse.SC_FORBIDDEN,
                 "Tài khoản chưa được khai báo và cấp quyền truy cập trong hệ thống.");
+            return;
+        }
+        // 06/10/2026: tài khoản bị Khoá giữa phiên - token cũ còn hạn cũng không dùng tiếp được.
+        if (username != null && accountProvisioningChecker.isLocked(username, roles)) {
+            log.warn("Chan request {} {}: tai khoan '{}' dang bi khoa",
+                request.getMethod(), request.getRequestURI(), username);
+            SecurityResponseWriter.writeError(response, objectMapper, HttpServletResponse.SC_FORBIDDEN,
+                "Tài khoản đã bị khoá.");
             return;
         }
 

@@ -59,4 +59,13 @@ public interface DuThaoDocumentRepository extends IRepository<DuThaoDocument> {
     Page<DuThaoDocument> findReturnedByClerkForUser(
             String documentType, Map<String, String> statusByReturnFor, String username,
             String keyword, List<String> keywordColumns, Pageable pageable);
+
+    /**
+     * 06/10/2026 (bảng document_links - docs/architecture/document-links.md): danh sách văn bản theo
+     * TẬP id (id lấy từ DocumentLinkService), phân trang + lọc từ khoá, mới tạo nhất trước. Rỗng nếu
+     * {@code ids} rỗng.
+     */
+    Page<DuThaoDocument> findByIds(
+        String documentType, java.util.Collection<java.util.UUID> ids, String keyword, List<String> keywordColumns,
+        Pageable pageable);
 }

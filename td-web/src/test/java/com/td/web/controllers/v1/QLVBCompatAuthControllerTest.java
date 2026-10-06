@@ -357,6 +357,35 @@ class QLVBCompatAuthControllerTest {
         verify(getUserRoleGroupConfigUseCase, org.mockito.Mockito.never()).execute(anyString());
     }
 
+    // 06/10/2026: tài khoản đã khai báo nhưng đang bị Khoá - không cấp token, trả accountLocked=true.
+    @Test
+    void authen_and_profile_forLockedAccount_shouldRejectWithAccountLocked() {
+        var lockedProfile = new UserOrganizationProfileDto();
+        lockedProfile.setUsername("bikhoa01");
+        lockedProfile.setActive(false);
+        when(getUserOrganizationProfileUseCase.execute("bikhoa01")).thenReturn(lockedProfile);
+        var controller = newController();
+
+        Jwt jwt = Jwt.withTokenValue("token")
+            .header("alg", "none")
+            .claim("preferred_username", "bikhoa01")
+            .claim("realm_access", Map.of("roles", List.of("USER")))
+            .issuedAt(Instant.now())
+            .expiresAt(Instant.now().plusSeconds(3600))
+            .build();
+        JwtAuthenticationToken authentication = new JwtAuthenticationToken(
+            jwt, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+
+        var authen = controller.authen(null, authentication);
+        assertThat(authen.getBody().get("accountLocked")).isEqualTo(Boolean.TRUE);
+        assertThat(authen.getBody().get("token")).isNull();
+
+        var profile = controller.profile(authentication);
+        assertThat(profile.getBody().get("accountLocked")).isEqualTo(Boolean.TRUE);
+        assertThat(profile.getBody()).doesNotContainKey("tdtoken");
+        verify(tdTokenService, org.mockito.Mockito.never()).issue(any(), anyMap());
+    }
+
     @Test
     void authen_forAccountWithoutAppUserRecord_shouldRejectWithoutIssuingToken() {
         when(getUserOrganizationProfileUseCase.execute("chuakhaibao02")).thenReturn(new UserOrganizationProfileDto());

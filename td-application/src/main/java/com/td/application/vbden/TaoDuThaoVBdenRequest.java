@@ -46,4 +46,10 @@ public class TaoDuThaoVBdenRequest {
     private String resObjDbpath;
 
     private String resObjCode;
+
+    /**
+     * 06/10/2026 (cutover FE phiếu trình): action Domino dùng chung logic này - {@code "taoduthao"} (mặc
+     * định) hoặc {@code "taophieutrinh"} (tạo phiếu trình từ văn bản đến). Giá trị khác bị từ chối.
+     */
+    private String action;
 }

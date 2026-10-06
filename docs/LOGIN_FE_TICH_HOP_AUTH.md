@@ -133,6 +133,25 @@ Response `200` (body phẳng = UserModel + `tdtoken`):
 }
 ```
 
+### Tài khoản không được vào hệ thống: chưa khai báo / đang bị khoá (cập nhật 06/10/2026)
+
+Cả `POST /qlvb/authen` và `GET /qlvb/profile` vẫn trả HTTP `200`, nhưng không cấp token và có cờ báo lý do. FE (`Auth.tsx#getTDAuth`) đọc cờ này trước khi lưu phiên rồi chuyển sang trang thông báo tĩnh:
+
+| Trường hợp | Điều kiện (BE) | Cờ trả về | Trang FE |
+|---|---|---|---|
+| Chưa khai báo | Không có `AppUser` (chưa xoá) cùng username | `accountProvisioned: false` | `taikhoanchuakhaibao.html` |
+| Đang bị khoá | Có `AppUser` nhưng `isActive = false` (khoá ở màn Người dùng) | `accountLocked: true` | `taikhoanbikhoa.html` |
+
+```json
+{ "token": null, "isAuthSuccessful": false, "accountLocked": true,
+  "message": "Tài khoản của bạn đã bị khoá. Vui lòng liên hệ quản trị viên để được mở khoá." }
+```
+
+- **Quản trị tối cao** (username `admin` hoặc role Keycloak `ADMIN`) luôn được miễn cả hai luật, để không tự khoá mất quyền quản trị.
+- **Token cấp trước khi bị khoá:** `AccountProvisioningFilter` chặn mọi `/api/v1/*` với lỗi `403` "Tài khoản đã bị khoá.", kể cả token còn hạn (`AccountProvisioningChecker#isLocked`). FE chưa tự chuyển sang trang thông báo khi nhận 403 này; người dùng thấy trang ở lần đăng nhập kế tiếp.
+- **Nút "Đăng nhập lại"** trên 2 trang tĩnh: trang tự đăng xuất Keycloak. Trang đọc khoá localStorage `oidc.user:<authority>:<client_id>` để lấy `id_token`, xoá phiên cục bộ, rồi gọi `<authority>/protocol/openid-connect/logout` với `post_logout_redirect_uri` = origin. Chỉ chuyển về `/` thì không đủ: phiên Keycloak còn sống nên SPA tự đăng nhập lại và quay về đúng trang thông báo.
+- Mã: `QLVBCompatAuthController#isAccountLocked`, `UserOrganizationProfileDto.active`, `AppUserRepository#existsLockedByUsername`. Test: `QLVBCompatAuthControllerTest#authen_and_profile_forLockedAccount_shouldRejectWithAccountLocked`, `AccountProvisioningCheckerTest#isLocked_*`.
+
 ### `GET /qlvb/danhmuc/GetCauHinh?t=<timestamp>`
 Response `200`:
 ```json

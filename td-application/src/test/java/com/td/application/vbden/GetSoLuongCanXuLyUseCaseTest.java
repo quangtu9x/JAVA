@@ -107,7 +107,7 @@ class GetSoLuongCanXuLyUseCaseTest {
         assertThat(counts.get("vanbantralai")).isEqualTo(0L);
         assertThat(counts.get("draft_vanthu_tralai")).isEqualTo(0L);
         // duthao 12 + 1 (01/10/2026: draft_vanthu_tralai - route gop "Van thu tra lai").
-        assertThat(counts).hasSize(15 + 13 + 7 + 6 + 4); // vbden + duthao + hosocv + phieutrinhtd + vbdi
+        assertThat(counts).hasSize(15 + 13 + 7 + 7 + 4); // vbden + duthao + hosocv + phieutrinhtd (7/7 tu 06/10/2026) + vbdi
         verify(resolveIdentifierByLevelUseCase, never()).resolveForCurrentUser();
     }
 

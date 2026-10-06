@@ -157,6 +157,10 @@ class DuThaoPermissionIntegrationTest {
     @MockBean
     private XoaVanBanLienQuanDuThaoUseCase xoaVanBanLienQuanDuThaoUseCase;
     @MockBean
+    private com.td.application.duthao.XoaVetDuThaoUseCase xoaVetDuThaoUseCase;
+    @MockBean
+    private com.td.application.duthao.XoaTepVetDuThaoUseCase xoaTepVetDuThaoUseCase;
+    @MockBean
     private ViewQueryService viewQueryService;
 
     @Test

@@ -3,6 +3,8 @@ package com.td.application.vbdi;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.td.application.common.models.Result;
+import com.td.application.documentlinks.RelatedDocumentSnapshots;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.AddDynamicDocumentRequest;
 import com.td.application.documents.AuthorAclFieldsService;
@@ -21,10 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -80,7 +80,6 @@ public class TraLoiVanBanDenUseCase {
     public static final String ACTION_GAN_DU_THAO_TRA_LOI = "ganduthaotraloi";
     private static final String VBDEN_DOCUMENT_TYPE = "vbden";
     private static final String CHILD_DOCUMENT_TYPE = "vbden_res";
-    private static final String DOCUMENT_IN_FIELD = "documentin_obj";
     private static final String CODE_FULL_FIELD = "code_full";
     private static final String USER_PROCESS_FIELD = "user_process";
     private static final String USER_RETURNED_FIELD = "user_returned";
@@ -99,6 +98,7 @@ public class TraLoiVanBanDenUseCase {
     private final DocumentCacheService documentCacheService;
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(TraLoiVanBanDenRequest request) {
         if (request == null || request.getVbdiId() == null) {
@@ -143,21 +143,12 @@ public class TraLoiVanBanDenUseCase {
         return Result.success(vbdiDocument.getId());
     }
 
-    // Domino: qlvb/add?id={vbdiId} luu field documentin_obj (JSON array, dedup theo id ngay o FE
-    // truoc khi gui - GanVanBanModal.jsx dong 269-284). Server tu dedup lai o day (khong tin FE da
-    // dedup dung, va vi 1 request co the goi nhieu lan).
+    // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): moi phan tu
+    // "Tra loi cho van ban den" = 1 lien ket vbdi_traloi_vbden (ban chup phan tu o link_data), KHONG ghi
+    // documentin_obj vao dynamic_fields nua - API dung lai field tu bang (RelatedDocumentSnapshots).
+    // Dedup theo id van ban den (lien ket dang co giu nguyen ban chup cu, nhu truoc). Tra ve MOI id hop le
+    // trong request (ke ca da co) - side effect van ban den chay lai nhu Domino.
     private List<UUID> updateDocumentInObj(VbdiDocument vbdiDocument, List<Map<String, Object>> documentIn) {
-        Map<String, Object> vbdiFields = new LinkedHashMap<>(
-            dynamicDocumentFieldsService.parseDynamicFields(vbdiDocument.getDynamicFieldsJson()));
-        List<Object> existingList = toObjectList(vbdiFields.get(DOCUMENT_IN_FIELD));
-        Set<String> existingIds = new LinkedHashSet<>();
-        for (Object item : existingList) {
-            if (item instanceof Map<?, ?> map && map.get("id") != null) {
-                existingIds.add(map.get("id").toString());
-            }
-        }
-
-        var beforeSnapshot = buildVbdiSnapshot(vbdiDocument);
         List<UUID> vbdenIds = new ArrayList<>();
         for (Map<String, Object> item : documentIn) {
             UUID vbdenId = parseUuid(item == null ? null : item.get("id"));
@@ -165,23 +156,12 @@ public class TraLoiVanBanDenUseCase {
                 continue;
             }
             vbdenIds.add(vbdenId);
-            String vbdenIdText = vbdenId.toString();
-            if (existingIds.add(vbdenIdText)) {
-                Map<String, Object> entry = new LinkedHashMap<>(item);
-                entry.put("id", vbdenIdText);
-                existingList.add(entry);
-            }
+            relatedDocumentSnapshots.linkItem(DocumentLinkType.VBDI_TRALOI_VBDEN, vbdiDocument.getId(), item);
         }
-        if (vbdenIds.isEmpty()) {
-            return vbdenIds;
+        if (!vbdenIds.isEmpty()) {
+            documentCacheService.evict(vbdiDocument.getId());
+            documentCacheService.evictAllListCaches();
         }
-
-        vbdiFields.put(DOCUMENT_IN_FIELD, existingList);
-        vbdiDocument.replaceDynamicFields(toJson(vbdiFields));
-        var saved = vbdiDocumentRepository.save(vbdiDocument);
-        documentCacheService.evict(saved.getId());
-        documentCacheService.evictAllListCaches();
-        documentLogService.logUpdate(saved.getId(), beforeSnapshot, buildVbdiSnapshot(saved));
         return vbdenIds;
     }
 
@@ -273,14 +253,6 @@ public class TraLoiVanBanDenUseCase {
         return vbdiDocument.getTitle() == null ? "" : vbdiDocument.getTitle();
     }
 
-    private Map<String, Object> buildVbdiSnapshot(VbdiDocument document) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("title", document.getTitle());
-        snapshot.put("documentType", document.getDocumentType());
-        snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
-        return snapshot;
-    }
-
     private Map<String, Object> buildParentSnapshot(BusinessDocument document) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("title", document.getTitle());
@@ -288,14 +260,6 @@ public class TraLoiVanBanDenUseCase {
         snapshot.put("status", document.getStatus());
         snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
         return snapshot;
-    }
-
-    private List<Object> toObjectList(Object value) {
-        List<Object> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            result.addAll(list);
-        }
-        return result;
     }
 
     private List<String> toStringList(Object value) {

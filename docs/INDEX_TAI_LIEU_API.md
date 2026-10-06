@@ -29,6 +29,14 @@ Nếu anh muốn sửa nhanh một API đang có:
 - Mở [CHECKLIST_SUA_API_NHANH.md](CHECKLIST_SUA_API_NHANH.md)
 - Nếu sửa sâu hoặc thay schema, mở thêm [HUONG_DAN_NHAN_BAN_VA_SUA_API.md](HUONG_DAN_NHAN_BAN_VA_SUA_API.md)
 
+Nếu cần liên kết giữa các văn bản (gắn văn bản vào hồ sơ, dự thảo → văn bản đi...):
+
+- Mở [architecture/document-links.md](architecture/document-links.md) — bảng `document_links`, không ghi id vào `dynamic_fields`
+
+Nếu làm với module phiếu trình (đã cutover FE sang Java 06/10/2026):
+
+- Mở [PHIEU_TRINH_CUTOVER_FE.md](PHIEU_TRINH_CUTOVER_FE.md) — ánh xạ Domino → Java, view, chuyển trạng thái, giới hạn
+
 ## 4. Gợi ý dùng thực tế
 
 - Feature có `parentId`, `level`, `fullPath`: dùng template hierarchy

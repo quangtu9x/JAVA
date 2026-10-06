@@ -28,6 +28,9 @@ import com.td.application.duthao.GanVanBanLienQuanDuThaoRequest;
 import com.td.application.duthao.GanVanBanLienQuanDuThaoUseCase;
 import com.td.application.duthao.XoaVanBanLienQuanDuThaoRequest;
 import com.td.application.duthao.XoaVanBanLienQuanDuThaoUseCase;
+import com.td.application.duthao.XoaTepVetDuThaoRequest;
+import com.td.application.duthao.XoaTepVetDuThaoUseCase;
+import com.td.application.duthao.XoaVetDuThaoUseCase;
 import com.td.application.duthao.GetDuThaoDetailRequest;
 import com.td.application.duthao.GetDuThaoDetailUseCase;
 import com.td.application.duthao.LuuDuThaoRequest;
@@ -98,6 +101,9 @@ public class DuThaoController extends BaseController {
     private final XoaTraLoiVanBanDenDuThaoUseCase xoaTraLoiVanBanDenDuThaoUseCase;
     private final GanVanBanLienQuanDuThaoUseCase ganVanBanLienQuanDuThaoUseCase;
     private final XoaVanBanLienQuanDuThaoUseCase xoaVanBanLienQuanDuThaoUseCase;
+    // 03/10/2026: xoa vet / xoa tep cua vet "Qua trinh du thao" (chi nguoi tao dong).
+    private final XoaVetDuThaoUseCase xoaVetDuThaoUseCase;
+    private final XoaTepVetDuThaoUseCase xoaTepVetDuThaoUseCase;
     private final ViewQueryService viewQueryService;
     private final AddDuThaoEditHistoryUseCase addDuThaoEditHistoryUseCase;
     private final ListDuThaoEditHistoryUseCase listDuThaoEditHistoryUseCase;
@@ -329,6 +335,31 @@ public class DuThaoController extends BaseController {
             + "vanban_lienquan_obj theo documentId (server tự tìm, không tin nguyên mảng FE gửi lên)")
     public ResponseEntity<ApiResponse<UUID>> xoaVanBanLienQuan(@Valid @RequestBody XoaVanBanLienQuanDuThaoRequest request) {
         return ok(xoaVanBanLienQuanDuThaoUseCase.execute(request));
+    }
+
+    @PostMapping("/XoaVet")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xoá 1 dòng 'Quá trình dự thảo' (chỉ người tạo dòng)",
+        description = "Thay qlvb/add?databasetype=duthao_res (delete=1) — KHÔNG xoá bản ghi, ghi cờ delete/"
+            + "delete_user/delete_name/delele_time như Domino. Body: {id} = id dòng draft_process")
+    public ResponseEntity<ApiResponse<UUID>> xoaVet(@RequestBody Map<String, String> body) {
+        return ok(xoaVetDuThaoUseCase.execute(parseUuidOrNull(body == null ? null : body.get("id"))));
+    }
+
+    @PostMapping("/XoaTepVet")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xoá 1 tệp đính kèm của dòng 'Quá trình dự thảo' (chỉ người tạo dòng)",
+        description = "Thay qlvb/add (file_xoa) + qlvb/removefile — xoá mềm (ẩn tệp), ghi thêm 1 dòng file_xoa")
+    public ResponseEntity<ApiResponse<UUID>> xoaTepVet(@Valid @RequestBody XoaTepVetDuThaoRequest request) {
+        return ok(xoaTepVetDuThaoUseCase.execute(request));
+    }
+
+    private static UUID parseUuidOrNull(String value) {
+        try {
+            return value == null || value.isBlank() ? null : UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     @PostMapping("/LuuVetHieuChinh")

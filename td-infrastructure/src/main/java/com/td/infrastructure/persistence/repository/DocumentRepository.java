@@ -29,6 +29,19 @@ public abstract class DocumentRepository implements com.td.application.documents
         this.jpaRepository = jpaRepository;
     }
 
+    // 06/10/2026 (yêu cầu người dùng "văn bản đến: ngày mới nhất lên trên - ngày tạo hệ thống"): MỌI
+    // danh sách vbden không tự chọn thứ tự (primarySortField - vd sổ văn bản theo số, theo dõi theo
+    // hạn/ngày đến) sắp created_on DESC. Trước đây lẫn created_on ASC (hàng đợi cá nhân - cũ nhất lên
+    // đầu) và last_modified_on DESC (văn bản cũ vừa xử lý nhảy lên đầu). Chỉ áp cho document_type
+    // "vbden" — bảng documents dùng chung với module khác (vbcddh, vbden_res...) giữ thứ tự cũ.
+    static final String NEWEST_CREATED_FIRST = " ORDER BY d.created_on DESC NULLS LAST, d.last_modified_on DESC NULLS LAST";
+    private static final String VBDEN_DOCUMENT_TYPE = "vbden";
+
+    static String defaultOrderBy(String documentType, String legacyOrderBy) {
+        return documentType != null && VBDEN_DOCUMENT_TYPE.equalsIgnoreCase(documentType.trim())
+            ? NEWEST_CREATED_FIRST : legacyOrderBy;
+    }
+
     @Override
     public Optional<BusinessDocument> findById(UUID id) {
         return ((org.springframework.data.jpa.repository.JpaRepository<BusinessDocument, UUID>) jpaRepository).findById(id);
@@ -121,7 +134,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(defaultOrderBy(documentType, " ORDER BY d.last_modified_on DESC NULLS LAST")).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -161,7 +174,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(defaultOrderBy(documentType, " ORDER BY d.last_modified_on DESC NULLS LAST")).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -226,7 +239,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.created_on ASC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(defaultOrderBy(documentType, " ORDER BY d.created_on ASC NULLS LAST")).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -270,7 +283,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.created_on ASC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(defaultOrderBy(documentType, " ORDER BY d.created_on ASC NULLS LAST")).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -330,7 +343,7 @@ public abstract class DocumentRepository implements com.td.application.documents
         boolean filterSorted = advancedFilter != null
             && ((advancedFilter.getPrimarySortField() != null && !advancedFilter.getPrimarySortField().isBlank())
                 || advancedFilter.isNewestCreatedFirst());
-        String orderBy = filterSorted ? buildOrderByClause(advancedFilter) : " ORDER BY d.created_on ASC NULLS LAST";
+        String orderBy = filterSorted ? buildOrderByClause(advancedFilter, documentType) : defaultOrderBy(documentType, " ORDER BY d.created_on ASC NULLS LAST");
         sql.append(orderBy).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
@@ -458,7 +471,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(buildOrderByClause(filter)).append(" LIMIT :limit OFFSET :offset");
+        sql.append(buildOrderByClause(filter, documentType)).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -562,12 +575,12 @@ public abstract class DocumentRepository implements com.td.application.documents
 
     // Slice 9: ORDER BY dong theo VbdenOrgViewFilter.primarySortField/secondarySortField (sovanban)
     // - fallback ve mac dinh cu (last_modified_on DESC) khi khong set, giu nguyen hanh vi truoc do.
-    private String buildOrderByClause(VbdenOrgViewFilter filter) {
+    private String buildOrderByClause(VbdenOrgViewFilter filter, String documentType) {
         if (filter.getPrimarySortField() == null || filter.getPrimarySortField().isBlank()) {
             // 01/10/2026: xem javadoc VbdenOrgViewFilter#newestCreatedFirst.
             return filter.isNewestCreatedFirst()
-                ? " ORDER BY d.created_on DESC NULLS LAST, d.last_modified_on DESC NULLS LAST"
-                : " ORDER BY d.last_modified_on DESC NULLS LAST";
+                ? NEWEST_CREATED_FIRST
+                : defaultOrderBy(documentType, " ORDER BY d.last_modified_on DESC NULLS LAST");
         }
         String direction = filter.isSortDescending() ? " DESC NULLS LAST" : " ASC NULLS LAST";
         StringBuilder orderBy = new StringBuilder(" ORDER BY ")
@@ -615,7 +628,7 @@ public abstract class DocumentRepository implements com.td.application.documents
 
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.last_modified_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        sql.append(defaultOrderBy(documentType, " ORDER BY d.last_modified_on DESC NULLS LAST")).append(" LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());
@@ -688,5 +701,41 @@ public abstract class DocumentRepository implements com.td.application.documents
             sql.append(" AND LOWER(COALESCE(d.status, '')) = :status");
             parameters.put("status", request.getStatus().trim().toLowerCase());
         }
+    }
+
+    // 06/10/2026 (bang document_links - docs/architecture/document-links.md): van ban theo TAP id lay tu
+    // DocumentLinkService (khong con khop field id noi ";" trong dynamic_fields).
+    @Override
+    public Page<BusinessDocument> findByIds(
+            String documentType, java.util.Collection<UUID> ids, String keyword, List<String> keywordColumns, Pageable pageable) {
+        if (ids == null || ids.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, 0);
+        }
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM documents d
+            WHERE d.deleted_on IS NULL
+              AND d.id IN (:ids)
+            """);
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        parameters.put("ids", ids);
+        if (documentType != null && !documentType.isBlank()) {
+            sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
+            parameters.put("documentType", documentType.trim().toLowerCase());
+        }
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendNotRevokedPredicate(sql, parameters, null);
+
+        long total = countNative(sql.toString(), parameters);
+
+        sql.append(" ORDER BY d.created_on DESC NULLS LAST").append(" LIMIT :limit OFFSET :offset");
+        Query query = entityManager.createNativeQuery(sql.toString(), BusinessDocument.class);
+        parameters.forEach(query::setParameter);
+        query.setParameter("limit", pageable.getPageSize());
+        query.setParameter("offset", pageable.getOffset());
+
+        @SuppressWarnings("unchecked")
+        List<BusinessDocument> content = query.getResultList();
+        return new PageImpl<>(content, pageable, total);
     }
 }

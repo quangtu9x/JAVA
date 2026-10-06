@@ -1,16 +1,16 @@
 package com.td.application.hosocv;
 
 import com.td.application.common.models.Result;
-import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.documentlinks.DocumentLinkService;
 import com.td.application.documents.ListDocumentFilesUseCase;
 import lombok.RequiredArgsConstructor;
+import com.td.domain.documentlinks.DocumentLinkType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -46,7 +46,7 @@ public class DownloadFilesHoSoCVUseCase {
 
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final HoSoCVDocumentRepository hoSoCVDocumentRepository;
-    private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final DocumentLinkService documentLinkService;
     private final HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
     public Result<List<HoSoFileGroupDto>> execute(DownloadFilesHoSoCVRequest request) {
@@ -77,31 +77,18 @@ public class DownloadFilesHoSoCVUseCase {
         if (hosocv.isEmpty()) {
             return List.of();
         }
-        Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(hosocv.get().getDynamicFieldsJson());
+        // 06/10/2026: đọc bảng document_links (docs/architecture/document-links.md) thay field
+        // document_out_attached_id/document_in_attached_id trên hồ sơ.
         List<HoSoFileRefDto> refs = new ArrayList<>();
-        addRefs(refs, "vbdi", fields.get("document_out_attached_id"));
-        addRefs(refs, "vbden", fields.get("document_in_attached_id"));
+        documentLinkService.findTargetIds(hosocvId,
+                List.of(DocumentLinkType.HOSO_VBDI, DocumentLinkType.HOSO_VBDI_PHATHANH))
+            .forEach(id -> refs.add(ref("vbdi", id)));
+        documentLinkService.findTargetIds(hosocvId,
+                List.of(DocumentLinkType.HOSO_VBDEN, DocumentLinkType.HOSO_VBDEN_XULY))
+            .forEach(id -> refs.add(ref("vbden", id)));
         hoSoVanBanKhacFinder.findByHoSo(hosocvId)
             .forEach(vanBanKhac -> refs.add(ref(vanBanKhac.getDocumentType(), vanBanKhac.getId())));
         return refs;
-    }
-
-    private void addRefs(List<HoSoFileRefDto> refs, String documentType, Object value) {
-        List<String> ids = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            list.forEach(item -> ids.add(String.valueOf(item)));
-        } else if (value instanceof String str) {
-            ids.addAll(List.of(str.split(";")));
-        }
-        for (String id : ids) {
-            try {
-                if (!id.isBlank()) {
-                    refs.add(ref(documentType, UUID.fromString(id.trim())));
-                }
-            } catch (IllegalArgumentException ex) {
-                // id Domino cũ (không phải UUID) - không có tệp phía Java, bỏ qua.
-            }
-        }
     }
 
     private HoSoFileRefDto ref(String documentType, UUID documentId) {

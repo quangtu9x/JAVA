@@ -31,6 +31,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class GanVanBanLienQuanUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -44,7 +46,8 @@ class GanVanBanLienQuanUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new GanVanBanLienQuanUseCase(
-            vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService, documentLogService);
+            vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService, documentLogService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
         lenient().when(vbdiDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -109,6 +112,7 @@ class GanVanBanLienQuanUseCaseTest {
     // ganvanbanden: chon van ban DEN lien quan.
     @Test
     void execute_ganVanBanDen_shouldAppendRelatedDocumentWithVbdenType() {
+        // 06/10/2026: "Van ban kem theo" luu o bang document_links (vbdi_kemtheo_vbden), ban chup o link_data.
         VbdiDocument vbdi = newVbdiDocument("{}");
         when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
         String vbdenId = UUID.randomUUID().toString();
@@ -120,14 +124,12 @@ class GanVanBanLienQuanUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> relatedList = (List<Object>) updated.get("vanban_lienquan_obj");
-        assertThat(relatedList).hasSize(1);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> saved = (Map<String, Object>) relatedList.get(0);
-        assertThat(saved).containsEntry("id", vbdenId).containsEntry("database_type", "vbden");
-        verify(documentLogService).logUpdate(any(), any(), any());
+        assertThat(linkRepository.activeRows()).singleElement().satisfies(link -> {
+            assertThat(link.getLinkType()).isEqualTo("vbdi_kemtheo_vbden");
+            assertThat(link.getTargetId().toString()).isEqualTo(vbdenId);
+            assertThat(link.getLinkDataJson()).contains("\"database_type\":\"vbden\"");
+        });
+        verify(vbdiDocumentRepository, never()).save(any());
         verify(documentCacheService).evict(vbdi.getId());
         verify(documentCacheService).evictAllListCaches();
     }
@@ -145,57 +147,46 @@ class GanVanBanLienQuanUseCaseTest {
 
         useCase.execute(request);
 
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> relatedList = (List<Object>) updated.get("vanban_lienquan_obj");
-        assertThat(relatedList).hasSize(1);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> saved = (Map<String, Object>) relatedList.get(0);
-        assertThat(saved).containsEntry("database_type", "vbdi");
+        assertThat(linkRepository.activeRows()).extracting(link -> link.getLinkType())
+            .containsExactly("vbdi_kemtheo_vbdi");
     }
 
     @Test
     void execute_withAlreadyLinkedDocument_shouldNotDuplicate() {
         String id = UUID.randomUUID().toString();
-        VbdiDocument vbdi = newVbdiDocument(
-            "{\"vanban_lienquan_obj\":[{\"id\":\"" + id + "\",\"code\":\"OLD\"}]}");
+        VbdiDocument vbdi = newVbdiDocument("{}");
         when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
 
         var request = new GanVanBanLienQuanRequest();
         request.setVbdiId(vbdi.getId());
         request.setRelatedDocuments(List.of(relatedItem(id, "vbden")));
-
+        useCase.execute(request);
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> relatedList = (List<Object>) updated.get("vanban_lienquan_obj");
-        assertThat(relatedList).hasSize(1);
-        // Toan bo la trung -> khong co gi de luu, khong goi save/log.
+        assertThat(linkRepository.activeRows()).hasSize(1);
         verify(vbdiDocumentRepository, never()).save(any());
-        verify(documentLogService, never()).logUpdate(any(), any(), any());
     }
 
     @Test
     void execute_withMixedNewAndExistingDocuments_shouldOnlyAppendNewOnes() {
         String existingId = UUID.randomUUID().toString();
-        VbdiDocument vbdi = newVbdiDocument(
-            "{\"vanban_lienquan_obj\":[{\"id\":\"" + existingId + "\",\"code\":\"OLD\"}]}");
+        VbdiDocument vbdi = newVbdiDocument("{}");
         when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
         String newId = UUID.randomUUID().toString();
+
+        var first = new GanVanBanLienQuanRequest();
+        first.setVbdiId(vbdi.getId());
+        first.setRelatedDocuments(List.of(relatedItem(existingId, "vbden")));
+        useCase.execute(first);
 
         var request = new GanVanBanLienQuanRequest();
         request.setVbdiId(vbdi.getId());
         request.setRelatedDocuments(List.of(relatedItem(existingId, "vbden"), relatedItem(newId, "vbden")));
-
         useCase.execute(request);
 
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> relatedList = (List<Object>) updated.get("vanban_lienquan_obj");
-        assertThat(relatedList).hasSize(2);
-        verify(vbdiDocumentRepository, times(1)).save(vbdi);
+        assertThat(linkRepository.activeRows()).extracting(link -> link.getTargetId().toString())
+            .containsExactly(existingId, newId);
     }
 
     @Test
@@ -217,7 +208,8 @@ class GanVanBanLienQuanUseCaseTest {
 
     @Test
     void execute_withDominoLegacyUnidId_shouldAcceptNonUuidId() {
-        // id co the la UNID Domino (32 hex, khong dau gach) - server KHONG ep kieu UUID (xem javadoc).
+        // 06/10/2026: bang document_links chi nhan id van ban Java (UUID) - phan tu UNID Domino bi bo qua
+        // (khong loi), dung chu truong khong mang du lieu Domino cu.
         VbdiDocument vbdi = newVbdiDocument("{}");
         when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
         String legacyUnid = "AB12CD34EF56AB12CD34EF56AB12CD34";
@@ -229,9 +221,6 @@ class GanVanBanLienQuanUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> relatedList = (List<Object>) updated.get("vanban_lienquan_obj");
-        assertThat(relatedList).hasSize(1);
+        assertThat(linkRepository.activeRows()).isEmpty();
     }
 }

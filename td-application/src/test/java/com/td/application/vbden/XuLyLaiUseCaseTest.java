@@ -47,6 +47,10 @@ class XuLyLaiUseCaseTest {
     private ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     @Mock
     private com.td.application.documents.AuthorAclFieldsService authorAclFieldsService;
+    @Mock
+    private com.td.application.sharedcore.UserFullNameResolver userFullNameResolver;
+    @Mock
+    private com.td.application.sharedcore.GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
     private final VbdenStatusService vbdenStatusService = new VbdenStatusService();
@@ -57,7 +61,13 @@ class XuLyLaiUseCaseTest {
         useCase = new XuLyLaiUseCase(
             documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
-            resolveIdentifierByLevelUseCase, authorAclFieldsService);
+            resolveIdentifierByLevelUseCase, authorAclFieldsService, userFullNameResolver,
+            getUserOrganizationProfileUseCase);
+        var profile = new com.td.application.sharedcore.UserOrganizationProfileDto();
+        profile.setPosition("Chuyên viên");
+        lenient().when(getUserOrganizationProfileUseCase.execute(any())).thenReturn(profile);
+        lenient().when(userFullNameResolver.resolveForWrite(any(), any()))
+            .thenAnswer(invocation -> "Tên " + invocation.getArgument(0));
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
     }
@@ -192,6 +202,25 @@ class XuLyLaiUseCaseTest {
         assertThat(childRequest.getFields()).containsEntry("action", "xulylai");
         assertThat(childRequest.getFields()).containsEntry("nguoi_thuc_hien", "vanthu01");
         assertThat(childRequest.getFields()).containsEntry("opinion", "Ghi sai y kien, can xu ly lai");
+        // 05/10/2026: tên đầy đủ + chức danh (từ hồ sơ khi FE không gửi).
+        assertThat(childRequest.getFields()).containsEntry("creator", "Tên vanthu01");
+        assertThat(childRequest.getFields()).containsEntry("position", "Chuyên viên");
+    }
+
+    @Test
+    void execute_withPositionFromClient_shouldPreferClientPosition() {
+        BusinessDocument parent = newDocument("vbden", "{}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));
+        var request = new XuLyLaiRequest();
+        request.setParentid(parent.getId());
+        request.setPosition("Trưởng phòng");
+
+        useCase.execute(request);
+
+        ArgumentCaptor<AddDynamicDocumentRequest> captor = ArgumentCaptor.forClass(AddDynamicDocumentRequest.class);
+        verify(addVbdenResDocumentUseCase).execute(captor.capture());
+        assertThat(captor.getValue().getFields()).containsEntry("position", "Trưởng phòng");
     }
 
     // Bo sung 03/09/2026 (cung gap voi ChuyenXuLyVbdenUseCase - xem javadoc lop do).

@@ -51,6 +51,7 @@ public class TaoDuThaoUseCase {
 
     private final AddDuThaoDynamicDocumentUseCase addDuThaoDynamicDocumentUseCase;
     private final CurrentUserProvider currentUserProvider;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(TaoDuThaoRequest request) {
         var addRequest = new AddDynamicDocumentRequest();
@@ -59,11 +60,20 @@ public class TaoDuThaoUseCase {
         addRequest.setStatus(request.getStatus() == null || request.getStatus().isBlank()
             ? DuThaoStatus.DRAFTING
             : request.getStatus());
-        addRequest.setFields(stampUserCreator(request.getFields()));
+        Map<String, String> fields = stampUserCreator(request.getFields());
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): documentin_obj /
+        // vanban_lienquan_obj KHONG luu trong dynamic_fields nua - tao moi
+        // thi chuyen phan tu thanh lien ket (luong "tao du thao tu van ban den" gui documentin_obj).
+        Map<String, Object> relatedPayload = relatedDocumentSnapshots.strip(fields);
+        addRequest.setFields(fields);
         addRequest.setDateFields(request.getDateFields());
         addRequest.setNumberFields(request.getNumberFields());
         addRequest.setRichtextFields(request.getRichtextFields());
-        return addDuThaoDynamicDocumentUseCase.execute(addRequest);
+        Result<UUID> result = addDuThaoDynamicDocumentUseCase.execute(addRequest);
+        if (result.isSuccess()) {
+            relatedDocumentSnapshots.importFromPayload(relatedPayload, result.getData(), com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_DUTHAO);
+        }
+        return result;
     }
 
     // 26/08/2026 (đảo chiều): SERVER-AUTHORITATIVE — LUÔN GHI ĐÈ user_creator bằng username người

@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -27,4 +29,17 @@ public class ChuyenTrangThaiPhieuTrinhTdRequest {
 
     /** Ý kiến tại bước chuyển (tuỳ chọn) — ghi vào log {@code quatrinh} + field {@code ykientrinh<N>}. */
     private String opinion;
+
+    /**
+     * 06/10/2026 (cutover FE): field bổ sung ghi lên phiếu trình cùng lần chuyển - các field nghiệp vụ FE
+     * vẫn tự tính như bản Domino (người thông qua chọn ở bước "Trình thông qua", receivers_agree/refuse,
+     * ý kiến/ngày theo từng người {@code trinh<N>_<user>_date}, người nhận khi thu hồi...). Gộp TRƯỚC khi
+     * xác định người nhận. Không ghi đè được status/form/người tạo (server-authoritative).
+     */
+    private Map<String, String> fields = new LinkedHashMap<>();
+
+    /** Người nhận ghi vào dòng quá trình - để trống thì server tự lấy theo trạng thái đích. */
+    private String receiver;
+    private String userReceiver;
+    private String receiverObj;
 }

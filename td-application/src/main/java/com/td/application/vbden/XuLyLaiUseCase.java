@@ -80,6 +80,9 @@ public class XuLyLaiUseCase {
     private final VbdenStatusService vbdenStatusService;
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    // 05/10/2026: ghi "creator" (tên đầy đủ) + "position" (chức danh) như mọi thao tác vbden_res khác.
+    private final com.td.application.sharedcore.UserFullNameResolver userFullNameResolver;
+    private final com.td.application.sharedcore.GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
 
     public Result<UUID> execute(XuLyLaiRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -148,6 +151,16 @@ public class XuLyLaiUseCase {
         childFields.put("parentid", request.getParentid().toString());
         childFields.put("action", ACTION_XU_LY_LAI);
         childFields.put("nguoi_thuc_hien", actingUsername);
+        // 05/10/2026 (lpha báo "Xử lý lại -> quá trình xử lý thiếu chức danh"): trước đây chỉ ghi
+        // nguoi_thuc_hien. Tên đầy đủ tra server-side (quy ước vbden_res creator = tên đầy đủ); chức danh
+        // ưu tiên giá trị FE gửi (cùng cách KetThucXuLy/LayLaiVanBan), không có thì lấy hồ sơ tổ chức.
+        childFields.put("creator", userFullNameResolver.resolveForWrite(actingUsername, request.getCreatorName()));
+        String position = !isBlank(request.getPosition())
+            ? request.getPosition().trim()
+            : getUserOrganizationProfileUseCase.execute(actingUsername).getPosition();
+        if (!isBlank(position)) {
+            childFields.put("position", position);
+        }
         if (request.getOpinion() != null && !request.getOpinion().isBlank()) {
             childFields.put("opinion", request.getOpinion());
         }

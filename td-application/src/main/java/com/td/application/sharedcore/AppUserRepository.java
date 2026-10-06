@@ -13,6 +13,14 @@ public interface AppUserRepository extends IRepository<AppUser> {
 
     boolean existsByUsernameAndDeletedOnIsNull(String username);
 
+    // 06/10/2026: tài khoản đã khai báo (chưa xoá) nhưng đang bị khoá (isActive=false) - chặn đăng
+    // nhập, xem AccountProvisioningChecker#isLocked.
+    boolean existsLockedByUsername(String username);
+
+    // 06/10/2026: trong tập username cho trước, trả về những username còn dùng được (chưa xoá, không
+    // bị khoá) - lọc thành viên "nhóm người nhận" (ảnh chụp receiver_obj), xem ActiveGroupMembersFilter.
+    java.util.Set<String> findActiveUsernamesIn(java.util.Collection<String> usernames);
+
     boolean existsByUsernameAndIdNotAndDeletedOnIsNull(String username, UUID id);
 
     boolean existsByKeycloakSubjectAndDeletedOnIsNull(String keycloakSubject);

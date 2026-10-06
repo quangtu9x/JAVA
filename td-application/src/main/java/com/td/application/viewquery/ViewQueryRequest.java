@@ -71,4 +71,12 @@ public class ViewQueryRequest {
      * {@code theodoi}/{@code datheodoi} đọc field này.
      */
     private String sortOrder;
+
+    /**
+     * 06/10/2026 (tra cứu nhóm - GroupTable.jsx/TableInGroup.jsx, hiện chỉ phiếu trình đọc): {@code false}
+     * = danh sách nhóm {@code {key, name, count}}, {@code true} = văn bản trong nhóm {@code navposition}
+     * (key nhóm GroupTable trả về, vd "3"). Cùng tên tham số Domino {@code qlvb/view/query&viewaction=group}.
+     */
+    private Boolean ischild;
+    private String navposition;
 }

@@ -27,6 +27,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class HieuChinhVbdiUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -43,7 +45,8 @@ class HieuChinhVbdiUseCaseTest {
     void setUp() {
         useCase = new HieuChinhVbdiUseCase(
             vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService, documentLogService,
-            authorAclFieldsService);
+            authorAclFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
         lenient().when(vbdiDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 

@@ -32,6 +32,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class CapNhatVanBanDiUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -48,7 +50,8 @@ class CapNhatVanBanDiUseCaseTest {
     void setUp() {
         useCase = new CapNhatVanBanDiUseCase(
             vbdiDocumentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
-            currentUserProvider, resolveIdentifierByLevelUseCase);
+            currentUserProvider, resolveIdentifierByLevelUseCase,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));
     }
@@ -56,6 +59,13 @@ class CapNhatVanBanDiUseCaseTest {
     private VbdiDocument newVbdiDocument(String dynamicFieldsJson) {
         VbdiDocument document = new VbdiDocument("CV so 1", "vbdi", "2", null, null, null, null);
         document.replaceDynamicFields(dynamicFieldsJson);
+        // 06/10/2026: "tra loi van ban den" doc tu bang document_links - seed lien ket tu documentin_obj
+        // cua du lieu test (tuong duong migration V1.0.70 backfill; id khong phai UUID bi bo qua).
+        com.td.application.documentlinks.RelatedDocumentSnapshots.toItems(
+                new com.td.application.documents.DynamicDocumentFieldsService()
+                    .parseDynamicFields(dynamicFieldsJson).get("documentin_obj"))
+            .forEach(item -> com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository)
+                .linkItem(com.td.domain.documentlinks.DocumentLinkType.VBDI_TRALOI_VBDEN, document.getId(), item));
         return document;
     }
 

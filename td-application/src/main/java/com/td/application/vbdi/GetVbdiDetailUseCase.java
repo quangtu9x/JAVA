@@ -59,6 +59,7 @@ public class GetVbdiDetailUseCase {
     private final VbdiDocumentRepository vbdiDocumentRepository;
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<Map<String, Object>> execute(GetVbdiDetailRequest request) {
         UUID id = parseUuid(request == null ? null : request.getId());
@@ -87,6 +88,9 @@ public class GetVbdiDetailUseCase {
         allFields.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
         allFields.putIfAbsent(SUBJECT_FIELD, document.getTitle());
         allFields.put("files", collectFiles(document.getId()));
+        // 06/10/2026: documentin_obj / vanban_lienquan_obj dung lai tu bang document_links (giai doan 2 -
+        // docs/architecture/document-links.md), ghi de gia tri cu con sot trong dynamic_fields.
+        relatedDocumentSnapshots.decorate(allFields, document.getId(), com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_VBDI);
 
         Map<String, Object> filtered = dynamicDocumentFieldsService.filterItems(allFields, request.getItems());
         return Result.success(filtered);

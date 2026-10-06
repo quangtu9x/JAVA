@@ -3,6 +3,8 @@ package com.td.application.duthao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.td.application.common.models.Result;
+import com.td.application.documentlinks.RelatedDocumentSnapshots;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.AddDynamicDocumentRequest;
 import com.td.application.documents.AuthorAclFieldsService;
@@ -22,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,7 +73,6 @@ public class TraLoiVanBanDenDuThaoUseCase {
     private static final String DOCUMENT_TYPE = ChuyenThanhVanBanDiUseCase.DOCUMENT_TYPE;
     private static final String VBDEN_DOCUMENT_TYPE = "vbden";
     private static final String CHILD_DOCUMENT_TYPE = "vbden_res";
-    private static final String DOCUMENT_IN_FIELD = "documentin_obj";
     private static final String NAME_FIELD = "name";
     private static final String USER_PROCESS_FIELD = "user_process";
     private static final String USER_RETURNED_FIELD = "user_returned";
@@ -91,6 +91,7 @@ public class TraLoiVanBanDenDuThaoUseCase {
     private final DocumentCacheService documentCacheService;
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(TraLoiVanBanDenDuThaoRequest request) {
         if (request == null || request.getDraftId() == null) {
@@ -135,21 +136,10 @@ public class TraLoiVanBanDenDuThaoUseCase {
         return Result.success(draft.getId());
     }
 
-    // Domino: qlvb/add?id={draftId} luu field documentin_obj (JSON array) - server tu dedup theo id
-    // (khong tin FE da loc trung dung, va vi 1 request co the goi nhieu lan) - cung quy uoc
-    // TraLoiVanBanDenUseCase#updateDocumentInObj (vbdi).
+    // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): moi phan tu =
+    // 1 lien ket duthao_traloi_vbden (ban chup o link_data), khong ghi documentin_obj vao dynamic_fields -
+    // cung quy uoc TraLoiVanBanDenUseCase#updateDocumentInObj (vbdi).
     private List<UUID> updateDocumentInObj(DuThaoDocument draft, List<Map<String, Object>> documentIn) {
-        Map<String, Object> draftFields = new LinkedHashMap<>(
-            dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson()));
-        List<Object> existingList = toObjectList(draftFields.get(DOCUMENT_IN_FIELD));
-        Set<String> existingIds = new LinkedHashSet<>();
-        for (Object item : existingList) {
-            if (item instanceof Map<?, ?> map && map.get("id") != null) {
-                existingIds.add(map.get("id").toString());
-            }
-        }
-
-        var beforeSnapshot = buildDraftSnapshot(draft);
         List<UUID> vbdenIds = new ArrayList<>();
         for (Map<String, Object> item : documentIn) {
             UUID vbdenId = parseUuid(item == null ? null : item.get("id"));
@@ -157,23 +147,12 @@ public class TraLoiVanBanDenDuThaoUseCase {
                 continue;
             }
             vbdenIds.add(vbdenId);
-            String vbdenIdText = vbdenId.toString();
-            if (existingIds.add(vbdenIdText)) {
-                Map<String, Object> entry = new LinkedHashMap<>(item);
-                entry.put("id", vbdenIdText);
-                existingList.add(entry);
-            }
+            relatedDocumentSnapshots.linkItem(DocumentLinkType.DUTHAO_TRALOI_VBDEN, draft.getId(), item);
         }
-        if (vbdenIds.isEmpty()) {
-            return vbdenIds;
+        if (!vbdenIds.isEmpty()) {
+            documentCacheService.evict(draft.getId());
+            documentCacheService.evictAllListCaches();
         }
-
-        draftFields.put(DOCUMENT_IN_FIELD, existingList);
-        draft.replaceDynamicFields(toJson(draftFields));
-        var saved = duThaoDocumentRepository.save(draft);
-        documentCacheService.evict(saved.getId());
-        documentCacheService.evictAllListCaches();
-        documentLogService.logUpdate(saved.getId(), beforeSnapshot, buildDraftSnapshot(saved));
         return vbdenIds;
     }
 
@@ -264,14 +243,6 @@ public class TraLoiVanBanDenDuThaoUseCase {
         return draft.getTitle() == null ? "" : draft.getTitle();
     }
 
-    private Map<String, Object> buildDraftSnapshot(DuThaoDocument document) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("title", document.getTitle());
-        snapshot.put("documentType", document.getDocumentType());
-        snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
-        return snapshot;
-    }
-
     private Map<String, Object> buildParentSnapshot(BusinessDocument document) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("title", document.getTitle());
@@ -279,14 +250,6 @@ public class TraLoiVanBanDenDuThaoUseCase {
         snapshot.put("status", document.getStatus());
         snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
         return snapshot;
-    }
-
-    private List<Object> toObjectList(Object value) {
-        List<Object> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            result.addAll(list);
-        }
-        return result;
     }
 
     private List<String> toStringList(Object value) {

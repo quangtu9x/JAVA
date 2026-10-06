@@ -20,4 +20,10 @@ public class XuLyLaiRequest {
 
     /** Lý do "xử lý lại" — FE ({@code ItemsActiveList.jsx#thuhoivanban}) BẮT BUỘC nhập trước khi gửi. */
     private String opinion;
+
+    /** 05/10/2026: tên hiển thị người thực hiện (tuỳ chọn, server vẫn ưu tiên tên trong hồ sơ). */
+    private String creatorName;
+
+    /** 05/10/2026: chức danh người thực hiện (tuỳ chọn, rỗng thì server lấy từ hồ sơ tổ chức). */
+    private String position;
 }

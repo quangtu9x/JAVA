@@ -55,7 +55,11 @@ public class ChuyenTrangThaiPhieuTrinhTdUseCase {
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
 
-    public Result<UUID> execute(ChuyenTrangThaiPhieuTrinhTdRequest request) {
+    // 06/10/2026 (cutover FE): field FE KHONG duoc ghi de qua "fields" (server-authoritative).
+    private static final java.util.Set<String> PROTECTED_FIELDS =
+        java.util.Set.of("status", "form", "user_creator", "creator", "id", "parentid");
+
+    public Result<ChuyenTrangThaiPhieuTrinhTdResult> execute(ChuyenTrangThaiPhieuTrinhTdRequest request) {
         if (request == null || request.getId() == null || request.getTargetStatus() == null
                 || request.getTargetStatus().isBlank()) {
             return Result.failure("Thiếu id hoặc targetStatus");
@@ -67,15 +71,30 @@ public class ChuyenTrangThaiPhieuTrinhTdUseCase {
         }
 
         String targetStatus = request.getTargetStatus().trim();
-        Map<String, Object> parentFields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        Map<String, Object> updatedFields = new LinkedHashMap<>(
+            dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
+        // 06/10/2026: gop field FE gui kem TRUOC khi xac dinh nguoi nhan (vd "Trinh thong qua" chon nguoi
+        // thong qua ngay trong cung thao tac).
+        if (request.getFields() != null) {
+            request.getFields().forEach((key, value) -> {
+                if (key != null && !PROTECTED_FIELDS.contains(key.toLowerCase())) {
+                    updatedFields.put(key, value == null ? "" : value);
+                }
+            });
+        }
 
         String username = currentUserProvider.currentUsername().orElse("");
         String fullName = appUserRepository.findByUsernameAndDeletedOnIsNull(username)
             .map(AppUser::getFullName).orElse(username);
 
-        var receiver = resolveReceiver(targetStatus, parentFields);
+        var receiver = hasText(request.getUserReceiver()) || hasText(request.getReceiver())
+            ? new Receiver(nullToEmpty(request.getReceiver()), nullToEmpty(request.getUserReceiver()),
+                nullToEmpty(request.getReceiverObj()))
+            : resolveReceiver(targetStatus, updatedFields);
+        String opinion = request.getOpinion() == null ? "" : request.getOpinion();
 
-        // 1. Ghi log "quatrinh" (append-only, form=quatrinh, action_type=targetStatus).
+        // 1. Ghi log "quatrinh" (append-only, form=quatrinh, action_type=targetStatus). "subject" = ten
+        // field y kien FE (QuaTrinhItemsList) doc - giu ca "opinion" cho tuong thich.
         Map<String, Object> logFields = new LinkedHashMap<>();
         logFields.put("form", "quatrinh");
         logFields.put("action_type", targetStatus);
@@ -84,20 +103,20 @@ public class ChuyenTrangThaiPhieuTrinhTdUseCase {
         logFields.put("receiver", receiver.name());
         logFields.put("user_receiver", receiver.username());
         logFields.put("receiver_obj", receiver.obj());
-        logFields.put("opinion", request.getOpinion() == null ? "" : request.getOpinion());
+        logFields.put("opinion", opinion);
+        logFields.put("subject", opinion);
         String createDate = java.time.LocalDateTime.now().format(CREATE_DATE_FORMAT);
         logFields.put("create_date", createDate);
         logFields.put("parentid", document.getId().toString());
 
         var processDocument = new PhieuTrinhTdProcessDocument("Quá trình phiếu trình " + document.getId())
             .replaceDynamicFields(toJson(logFields));
-        phieuTrinhTdProcessDocumentRepository.save(processDocument);
+        var savedProcess = phieuTrinhTdProcessDocumentRepository.save(processDocument);
 
         // 2. Cap nhat status + trinh<N>_date/ykientrinh<N> tren ban ghi cha.
-        Map<String, Object> updatedFields = new LinkedHashMap<>(parentFields);
         updatedFields.put("trinh" + targetStatus + "_date", createDate);
-        if (request.getOpinion() != null && !request.getOpinion().isBlank()) {
-            updatedFields.put("ykientrinh" + targetStatus, request.getOpinion());
+        if (!opinion.isBlank()) {
+            updatedFields.put("ykientrinh" + targetStatus, opinion);
         }
         for (Integer downstream : DOWNSTREAM_RESET.getOrDefault(targetStatus, List.of())) {
             updatedFields.put("trinh" + downstream + "_date", "");
@@ -107,7 +126,15 @@ public class ChuyenTrangThaiPhieuTrinhTdUseCase {
         document.changeStatus(targetStatus);
 
         var saved = phieuTrinhTdDocumentRepository.save(document);
-        return Result.success(saved.getId());
+        return Result.success(new ChuyenTrangThaiPhieuTrinhTdResult(saved.getId(), savedProcess.getId()));
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private static String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private record Receiver(String name, String username, String obj) {

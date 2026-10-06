@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Yêu cầu người dùng 14/09/2026 ("modal Câp nhật kết quả xử lý văn bản -> Đồng ý chưa cutoverFE (gọi
+ * Yêu cầu người dùng 14/09/2026 ("modal Cập nhật kết quả xử lý văn bản -> Đồng ý chưa cutoverFE (gọi
  * qlvb/vbden/CapNhatVanBanDen cũ)") — tương thích 1 PHẦN {@code qlvb/vbden/CapNhatVanBanDen?
  * action=capnhatykien} (nút "Cho ý kiến"/"Bổ sung ý kiến", {@code VBDenButtonActionXuLy.jsx}) — xem
  * javadoc {@link CapNhatYKienVbdenUseCase}.

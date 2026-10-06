@@ -1,6 +1,7 @@
 package com.td.infrastructure.persistence.repository;
 
 import com.td.application.phieutrinhtd.PhieuTrinhTdDocumentRepository;
+import com.td.application.phieutrinhtd.PhieuTrinhTdListCriteria;
 import com.td.domain.phieutrinhtd.PhieuTrinhTdDocument;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -227,6 +228,120 @@ public class PostgresPhieuTrinhTdDocumentRepository implements PhieuTrinhTdDocum
         @SuppressWarnings("unchecked")
         List<PhieuTrinhTdDocument> content = query.getResultList();
         return new PageImpl<>(content, pageable, total);
+    }
+
+    // ===== 06/10/2026 (cutover FE phieu trinh): truy van tong quat theo tieu chi =====
+    // Khop "thanh vien" 1 field danh sach: tach ";" hoac "," (user_coordinator dung ","), khong phan biet
+    // hoa thuong, bo khoang trang, neo bien ";" de "nam" khong khop nham "an;nam".
+    private static String memberOf(String fieldName) {
+        return "(';' || UPPER(REPLACE(REPLACE(COALESCE(d.dynamic_fields->>'" + fieldName + "', ''), ',', ';'), ' ', '')) || ';')"
+            + " LIKE '%;' || UPPER(REPLACE(:member, ' ', '')) || ';%'";
+    }
+
+    private static String notBlank(String fieldName) {
+        return "COALESCE(d.dynamic_fields->>'" + fieldName + "', '') <> ''";
+    }
+
+    // Moi nguoi phoi hop (user_coordinator) deu da co trong user_coordinated (Domino @Contains tho -
+    // vwUser_Creator_Coordinated_Status cot 2 = "1").
+    private static final String ALL_COORDINATORS_RESPONDED = """
+        NOT EXISTS (
+          SELECT 1 FROM regexp_split_to_table(REPLACE(COALESCE(d.dynamic_fields->>'user_coordinator', ''), ',', ';'), ';') AS c(u)
+          WHERE TRIM(c.u) <> ''
+            AND POSITION(UPPER(TRIM(c.u)) IN UPPER(COALESCE(d.dynamic_fields->>'user_coordinated', ''))) = 0
+        )""";
+
+    @Override
+    public Page<PhieuTrinhTdDocument> findByCriteria(PhieuTrinhTdListCriteria criteria, Pageable pageable) {
+        StringBuilder sql = new StringBuilder("SELECT d.* FROM phieutrinhtd_documents d WHERE ");
+        sql.append(criteria.isTrash() ? "d.deleted_on IS NOT NULL" : "d.deleted_on IS NULL");
+        Map<String, Object> parameters = new LinkedHashMap<>();
+
+        if (criteria.getIds() != null) {
+            if (criteria.getIds().isEmpty()) {
+                return new PageImpl<>(List.of(), pageable, 0);
+            }
+            sql.append(" AND d.id IN (:ids)");
+            parameters.put("ids", criteria.getIds());
+        }
+        if (criteria.getMemberRule() != null) {
+            if (criteria.getMember() == null || criteria.getMember().isBlank()) {
+                return new PageImpl<>(List.of(), pageable, 0);
+            }
+            parameters.put("member", criteria.getMember().trim());
+            sql.append(" AND (").append(memberPredicate(criteria.getMemberRule())).append(")");
+        }
+        appendStatusInFilter(sql, parameters, criteria.getStatuses());
+        if (Boolean.TRUE.equals(criteria.getStoraged())) {
+            sql.append(" AND COALESCE(d.dynamic_fields->>'storaged', '') = '1'");
+        } else if (Boolean.FALSE.equals(criteria.getStoraged())) {
+            appendNotStoragedFilter(sql);
+        }
+        if (criteria.getCoordinatedStatus() != null) {
+            sql.append(" AND ").append(notBlank("user_coordinator"));
+            switch (criteria.getCoordinatedStatus()) {
+                case DA_DU -> sql.append(" AND ").append(ALL_COORDINATORS_RESPONDED);
+                case CON_CHUA -> sql.append(" AND NOT ").append(ALL_COORDINATORS_RESPONDED);
+                default -> { }
+            }
+        }
+        KeywordSql.append(sql, parameters, criteria.getKeyword(), criteria.getKeywordColumns(), "d");
+        if (criteria.getContainsFields() != null) {
+            int index = 0;
+            for (var entry : criteria.getContainsFields().entrySet()) {
+                // Ten field noi thang vao SQL -> chi nhan ten an toan (chong SQL injection, cung quy tac KeywordSql).
+                if (entry.getKey() == null || !KeywordSql.SAFE_FIELD_NAME.matcher(entry.getKey()).matches()
+                        || entry.getValue() == null || entry.getValue().isBlank()) {
+                    continue;
+                }
+                String param = "contains" + index++;
+                sql.append(" AND LOWER(COALESCE(d.dynamic_fields->>'").append(entry.getKey())
+                    .append("', '')) LIKE :").append(param);
+                parameters.put(param, "%" + entry.getValue().trim().toLowerCase() + "%");
+            }
+        }
+        if (criteria.getCreatedFrom() != null) {
+            sql.append(" AND d.created_on >= :createdFrom");
+            parameters.put("createdFrom", criteria.getCreatedFrom().atStartOfDay());
+        }
+        if (criteria.getCreatedTo() != null) {
+            sql.append(" AND d.created_on < :createdTo");
+            parameters.put("createdTo", criteria.getCreatedTo().plusDays(1).atStartOfDay());
+        }
+
+        long total = countNative(sql.toString(), parameters);
+        sql.append(" ORDER BY d.created_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
+        Query query = entityManager.createNativeQuery(sql.toString(), PhieuTrinhTdDocument.class);
+        parameters.forEach(query::setParameter);
+        query.setParameter("limit", pageable.getPageSize());
+        query.setParameter("offset", pageable.getOffset());
+        @SuppressWarnings("unchecked")
+        List<PhieuTrinhTdDocument> content = query.getResultList();
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    // Package-private de unit test SQL goi truc tiep.
+    static String memberPredicate(PhieuTrinhTdListCriteria.MemberRule rule) {
+        return switch (rule) {
+            case CREATOR -> memberOf("user_creator");
+            case NGUOI_THONG_QUA -> memberOf("user_lanhdaovanphong");
+            case NGUOI_DUYET_DANG_CHO -> "(d.status = '5' AND " + memberOf("user_lanhdao1") + ")"
+                + " OR (d.status = '25' AND " + memberOf("user_lanhdao2") + ")";
+            // vwUser_All/vwStoraged (view_phieutrinh.dxl): nguoi tao + thong qua (khi da trinh2) + dong y/
+            // tu choi + lanh dao duyet cap 1/2 (khi da trinh5/25) + phoi hop.
+            case THAM_GIA -> memberOf("user_creator")
+                + " OR (" + notBlank("trinh2_date") + " AND " + memberOf("user_lanhdaovanphong") + ")"
+                + " OR " + memberOf("user_receivers_agree")
+                + " OR " + memberOf("user_receivers_refuse")
+                + " OR (" + notBlank("trinh25_date") + " AND " + memberOf("user_lanhdao2") + ")"
+                + " OR (" + notBlank("trinh5_date") + " AND " + memberOf("user_lanhdao1") + ")"
+                + " OR " + memberOf("user_coordinator");
+            case PHOI_HOP -> memberOf("user_coordinator");
+            case PHOI_HOP_CHUA -> memberOf("user_coordinator")
+                + " AND POSITION(UPPER(TRIM(:member)) IN UPPER(COALESCE(d.dynamic_fields->>'user_coordinated', ''))) = 0";
+            case PHOI_HOP_DA -> memberOf("user_coordinator")
+                + " AND POSITION(UPPER(TRIM(:member)) IN UPPER(COALESCE(d.dynamic_fields->>'user_coordinated', ''))) > 0";
+        };
     }
 
     private long countNative(String sql, Map<String, Object> parameters) {

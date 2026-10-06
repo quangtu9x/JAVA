@@ -44,13 +44,15 @@ class GetHoSoChiTietUseCaseTest {
     private HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
     private GetHoSoChiTietUseCase useCase;
 
     @BeforeEach
     void setUp() {
         useCase = new GetHoSoChiTietUseCase(
             hoSoCVDocumentRepository, hoSoCVProcessDocumentRepository, documentRepository,
-            duThaoDocumentRepository, vbdiDocumentRepository, dynamicDocumentFieldsService, hoSoVanBanKhacFinder);
+            duThaoDocumentRepository, vbdiDocumentRepository, dynamicDocumentFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository), hoSoVanBanKhacFinder);
     }
 
     @Test
@@ -77,9 +79,11 @@ class GetHoSoChiTietUseCaseTest {
         UUID duThaoId = UUID.randomUUID();
         UUID vbdiId = UUID.randomUUID();
         UUID vbdenId = UUID.randomUUID();
-        HoSoCVDocument hosocv = newHoSoCVDocument(id, "hosocv",
-            "{\"duthao_attached_id\":\"" + duThaoId + "\",\"document_out_attached_id\":\"" + vbdiId
-                + "\",\"document_in_attached_id\":\"" + vbdenId + "\"}");
+        HoSoCVDocument hosocv = newHoSoCVDocument(id, "hosocv", "{}");
+        // 06/10/2026: lien ket doc tu bang document_links (khong con tu field *_attached_id).
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_DUTHAO, id, duThaoId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI, id, vbdiId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDEN, id, vbdenId);
         when(hoSoCVDocumentRepository.findById(id)).thenReturn(Optional.of(hosocv));
         when(duThaoDocumentRepository.findById(duThaoId))
             .thenReturn(Optional.of(newDuThaoDocument(duThaoId, "duthao", "{}")));

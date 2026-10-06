@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Yêu cầu người dùng 14/09/2026 ("modal Câp nhật kết quả xử lý văn bản -> Đồng ý chưa cutoverFE (gọi
+ * Yêu cầu người dùng 14/09/2026 ("modal Cập nhật kết quả xử lý văn bản -> Đồng ý chưa cutoverFE (gọi
  * qlvb/vbden/CapNhatVanBanDen cũ)") — xem javadoc {@link CapNhatYKienVbdenUseCase}.
  */
 @ExtendWith(MockitoExtension.class)

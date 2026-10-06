@@ -80,7 +80,6 @@ public class CapNhatVanBanDiUseCase {
 
     public static final String ACTION_CAP_NHAT_VAN_BAN_DI = "capnhatvanbandi";
     private static final String CHILD_DOCUMENT_TYPE = "vbden_res";
-    private static final String DOCUMENT_IN_FIELD = "documentin_obj";
     private static final String CODE_FULL_FIELD = "code_full";
     private static final String PROMULGATION_DATE_FIELD = "promulgation_date";
     private static final String DEFAULT_OPINION = "Cập nhật văn bản đi";
@@ -91,6 +90,7 @@ public class CapNhatVanBanDiUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final CurrentUserProvider currentUserProvider;
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(CapNhatVanBanDiRequest request) {
         if (request == null || request.getVbdiId() == null) {
@@ -111,7 +111,10 @@ public class CapNhatVanBanDiUseCase {
 
         Map<String, Object> vbdiFields = dynamicDocumentFieldsService.parseDynamicFields(
             vbdiDocument.getDynamicFieldsJson());
-        List<Object> documentIn = toObjectList(vbdiFields.get(DOCUMENT_IN_FIELD));
+        // 06/10/2026: van ban den "tra loi" doc tu bang document_links (vbdi_traloi_vbden) - khong con
+        // field documentin_obj trong dynamic_fields (docs/architecture/document-links.md).
+        List<UUID> documentIn = relatedDocumentSnapshots.replyTargetIds(
+            vbdiDocument.getId(), com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_VBDI);
         if (documentIn.isEmpty()) {
             return Result.success(vbdiDocument.getId());
         }
@@ -121,16 +124,7 @@ public class CapNhatVanBanDiUseCase {
         String opinion = (request.getOpinion() != null && !request.getOpinion().isBlank())
             ? request.getOpinion().trim() : DEFAULT_OPINION;
 
-        for (Object item : documentIn) {
-            if (!(item instanceof Map<?, ?> map)) {
-                continue;
-            }
-            UUID vbdenId = parseUuid(map.get("id"));
-            if (vbdenId == null) {
-                // UNID Domino (van ban den legacy) - khong the tao ban ghi vbden_res Java cho van ban
-                // chi ton tai ben Domino, bo qua (khong phai loi).
-                continue;
-            }
+        for (UUID vbdenId : documentIn) {
             var childResult = createProcessingRecord(
                 vbdenId, actingUsername, request, vbdiDocument, vbdiDisplayCode, vbdiPromulgationDate, opinion);
             if (!childResult.isSuccess()) {
@@ -184,25 +178,6 @@ public class CapNhatVanBanDiUseCase {
             return codeFull.toString();
         }
         return vbdiDocument.getTitle() == null ? "" : vbdiDocument.getTitle();
-    }
-
-    private List<Object> toObjectList(Object value) {
-        List<Object> result = new java.util.ArrayList<>();
-        if (value instanceof List<?> list) {
-            result.addAll(list);
-        }
-        return result;
-    }
-
-    private UUID parseUuid(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return UUID.fromString(value.toString().trim());
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
     }
 
     private String asString(Object value) {

@@ -31,7 +31,7 @@ class SearchPrivateCategoriesUseCaseTest {
     void execute_defaultSort_isSortOrderThenNameThenCode() {
         when(privateCategoryRepository.search(any(), any(Pageable.class))).thenReturn(new PageImpl<>(List.of()));
 
-        new SearchPrivateCategoriesUseCase(privateCategoryRepository, dynamicDocumentFieldsService)
+        new SearchPrivateCategoriesUseCase(privateCategoryRepository, dynamicDocumentFieldsService, null)
             .execute(new SearchPrivateCategoriesRequest());
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);

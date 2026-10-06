@@ -29,6 +29,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class XoaTraLoiVanBanDenUseCaseTest {
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
+
     @Mock
     private VbdiDocumentRepository vbdiDocumentRepository;
     @Mock
@@ -42,7 +44,8 @@ class XoaTraLoiVanBanDenUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new XoaTraLoiVanBanDenUseCase(
-            vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService, documentLogService);
+            vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService, documentLogService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository));
         lenient().when(vbdiDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -95,13 +98,13 @@ class XoaTraLoiVanBanDenUseCaseTest {
 
     @Test
     void execute_shouldRemoveMatchingItemFromDocumentInObj() {
+        // 06/10/2026: go = xoa mem dong lien ket vbdi_traloi_vbden (bang document_links), khong ghi dynamic_fields.
         String targetId = UUID.randomUUID().toString();
         String keepId = UUID.randomUUID().toString();
-        VbdiDocument vbdi = newVbdiDocument("{\"documentin_obj\":["
-            + "{\"id\":\"" + targetId + "\",\"code\":\"A\"},"
-            + "{\"id\":\"" + keepId + "\",\"code\":\"B\"}"
-            + "]}");
+        VbdiDocument vbdi = newVbdiDocument("{}");
         when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.VBDI_TRALOI_VBDEN, vbdi.getId(), UUID.fromString(targetId))
+            .seed(com.td.domain.documentlinks.DocumentLinkType.VBDI_TRALOI_VBDEN, vbdi.getId(), UUID.fromString(keepId));
 
         var request = new XoaTraLoiVanBanDenRequest();
         request.setVbdiId(vbdi.getId());
@@ -110,14 +113,9 @@ class XoaTraLoiVanBanDenUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> documentIn = (List<Object>) updated.get("documentin_obj");
-        assertThat(documentIn).hasSize(1);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> remaining = (Map<String, Object>) documentIn.get(0);
-        assertThat(remaining).containsEntry("id", keepId);
-        verify(documentLogService).logUpdate(any(), any(), any());
+        assertThat(linkRepository.activeRows()).extracting(link -> link.getTargetId().toString())
+            .containsExactly(keepId);
+        verify(vbdiDocumentRepository, never()).save(any());
         verify(documentCacheService).evict(vbdi.getId());
         verify(documentCacheService).evictAllListCaches();
     }
@@ -155,9 +153,9 @@ class XoaTraLoiVanBanDenUseCaseTest {
 
     @Test
     void execute_withDominoLegacyUnidId_shouldMatchByStringEquality() {
+        // 06/10/2026: bang document_links chi co id UUID - UNID Domino khong co lien ket nao de go, tra success.
         String legacyUnid = "AB12CD34EF56AB12CD34EF56AB12CD34";
-        VbdiDocument vbdi = newVbdiDocument(
-            "{\"documentin_obj\":[{\"id\":\"" + legacyUnid + "\",\"code\":\"A\"}]}");
+        VbdiDocument vbdi = newVbdiDocument("{}");
         when(vbdiDocumentRepository.findById(vbdi.getId())).thenReturn(Optional.of(vbdi));
 
         var request = new XoaTraLoiVanBanDenRequest();
@@ -167,9 +165,6 @@ class XoaTraLoiVanBanDenUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isTrue();
-        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(vbdi.getDynamicFieldsJson());
-        @SuppressWarnings("unchecked")
-        List<Object> documentIn = (List<Object>) updated.get("documentin_obj");
-        assertThat(documentIn).isEmpty();
+        verify(vbdiDocumentRepository, never()).save(any());
     }
 }

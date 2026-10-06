@@ -54,6 +54,9 @@ class PhieuTrinhTdControllerTest {
     private TrinhThamKhaoPhieuTrinhTdUseCase trinhThamKhaoPhieuTrinhTdUseCase;
     @MockBean
     private ChuyenTrangThaiPhieuTrinhTdUseCase chuyenTrangThaiPhieuTrinhTdUseCase;
+    // 06/10/2026: dependency moi cua controller (MockBean drift - thieu la sap ca context WebMvcTest).
+    @MockBean
+    private com.td.application.phieutrinhtd.ChoYKienPhieuTrinhTdUseCase choYKienPhieuTrinhTdUseCase;
     @MockBean
     private ViewQueryService viewQueryService;
 
@@ -134,11 +137,24 @@ class PhieuTrinhTdControllerTest {
     @Test
     void chuyenTrangThai_shouldDelegateAndReturn200() throws Exception {
         UUID id = UUID.randomUUID();
-        when(chuyenTrangThaiPhieuTrinhTdUseCase.execute(any())).thenReturn(Result.success(id));
+        when(chuyenTrangThaiPhieuTrinhTdUseCase.execute(any())).thenReturn(Result.success(
+            new com.td.application.phieutrinhtd.ChuyenTrangThaiPhieuTrinhTdResult(id, UUID.randomUUID())));
 
         mockMvc.perform(post("/api/v1/phieutrinhtd/ChuyenTrangThai")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"id\":\"" + id + "\",\"targetStatus\":\"5\"}"))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void choYKien_shouldDelegateAndReturn200() throws Exception {
+        UUID id = UUID.randomUUID();
+        when(choYKienPhieuTrinhTdUseCase.execute(any())).thenReturn(Result.success(
+            new com.td.application.phieutrinhtd.ChuyenTrangThaiPhieuTrinhTdResult(id, UUID.randomUUID())));
+
+        mockMvc.perform(post("/api/v1/phieutrinhtd/ChoYKien")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"id\":\"" + id + "\",\"subject\":\"Dong y\"}"))
             .andExpect(status().isOk());
     }
 

@@ -103,4 +103,13 @@ public interface DocumentRepository extends IRepository<BusinessDocument> {
      * {@code denhan_cuatochuc}, {@code daxuly_quahan_cuatochuc}, {@code daxuly_dunghan_cuatochuc}).
      */
     Page<BusinessDocument> findByVbdenOrgView(String documentType, VbdenOrgViewFilter filter, Pageable pageable);
+
+    /**
+     * 06/10/2026 (bảng document_links - docs/architecture/document-links.md): danh sách văn bản theo
+     * TẬP id (id lấy từ DocumentLinkService), phân trang + lọc từ khoá, mới tạo nhất trước. Rỗng nếu
+     * {@code ids} rỗng.
+     */
+    Page<BusinessDocument> findByIds(
+        String documentType, java.util.Collection<java.util.UUID> ids, String keyword, List<String> keywordColumns,
+        Pageable pageable);
 }

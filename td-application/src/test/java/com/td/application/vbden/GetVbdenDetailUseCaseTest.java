@@ -366,12 +366,15 @@ class GetVbdenDetailUseCaseTest {
     }
 
     // Dedupe THEO USERNAME (dung Domino goc): lan xem THU HAI cua CUNG 1 nguoi KHONG ghi them dong
-    // moi - khong con field nao thay doi nen KHONG save luon (khac voi lan dau).
+    // log_read_obj moi. 05/10/2026: van SAVE vi log_seen_document_detail cap nhat "lastSeen" moi lan xem,
+    // "created" (lan dau) giu nguyen.
     @Test
     void execute_plainDocument_shouldNotDuplicateLogReadEntry_onSecondViewBySameUser() {
         useCase = newUseCase();
         BusinessDocument parent = newDocument("vbden",
-            "{\"databasetype\":\"vbden\",\"log_read_obj\":\"xuanlt.skhcn|18/09/2026 08:00:00\"}");
+            "{\"databasetype\":\"vbden\",\"log_read_obj\":\"xuanlt.skhcn|18/09/2026 08:00:00\","
+                + "\"log_seen_document_detail\":[{\"username\":\"xuanlt.skhcn\",\"created\":\"18/09/2026 08:00:00\","
+                + "\"lastSeen\":\"18/09/2026 08:00:00\"}]}");
         UUID id = parent.getId();
         Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
         when(getDynamicDocumentUseCase.execute(any())).thenReturn(Result.success(fields));
@@ -383,7 +386,15 @@ class GetVbdenDetailUseCaseTest {
 
         useCase.execute(request);
 
-        verify(documentRepository, never()).save(any());
+        verify(documentRepository).save(any());
+        Map<String, Object> saved = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat(saved.get("log_read_obj")).isEqualTo("xuanlt.skhcn|18/09/2026 08:00:00");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> detail = (List<Map<String, Object>>) saved.get("log_seen_document_detail");
+        assertThat(detail).singleElement().satisfies(entry -> {
+            assertThat(entry).containsEntry("created", "18/09/2026 08:00:00").containsEntry("name", "Ten day du");
+            assertThat(entry.get("lastSeen")).isNotEqualTo("18/09/2026 08:00:00");
+        });
     }
 
     // Xac nhan field khac dedupe rieng: nguoi MOI xem lan dau van duoc noi them (";" - joined), giu
@@ -728,7 +739,15 @@ class GetVbdenDetailUseCaseTest {
             .thenReturn(new PaginationResponse<>(List.of(), 0, 20, 0L, 0, true, true));
         return new GetVbdenDetailUseCase(getDynamicDocumentUseCase, documentRepository, xinYKienDocumentRepository,
             dynamicDocumentFieldsService, currentUserProvider, appUserRepository, listDocumentFilesUseCase,
-            authorAclFieldsService);
+            authorAclFieldsService, newSeenRecorder());
+    }
+
+    // 05/10/2026: recorder that + UserDisplayInfoService gia lap (ten/don vi co dinh).
+    private com.td.application.documents.SeenDocumentDetailRecorder newSeenRecorder() {
+        var displayInfoService = org.mockito.Mockito.mock(com.td.application.sharedcore.UserDisplayInfoService.class);
+        lenient().when(displayInfoService.resolve(any()))
+            .thenReturn(new com.td.application.sharedcore.UserDisplayInfoService.UserDisplayInfo("Ten day du", "Phong A"));
+        return new com.td.application.documents.SeenDocumentDetailRecorder(displayInfoService);
     }
 
     private BusinessDocument newDocument(String documentType, String dynamicFieldsJson) {

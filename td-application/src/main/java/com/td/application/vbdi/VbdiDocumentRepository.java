@@ -164,4 +164,12 @@ public interface VbdiDocumentRepository extends IRepository<VbdiDocument> {
     Page<VbdiDocument> findTrashedByUsernameOrDeleter(
         String documentType, String username, java.util.UUID deletedByUserId,
         String keyword, List<String> keywordColumns, Pageable pageable);
+
+    /**
+     * 06/10/2026 (bảng document_links - docs/architecture/document-links.md): danh sách văn bản theo
+     * TẬP id (id lấy từ DocumentLinkService), phân trang + lọc từ khoá, thứ tự danh sách vbdi chung (ISSUED_ORDER_BY). Rỗng nếu
+     * {@code ids} rỗng.
+     */
+    Page<VbdiDocument> findByIds(
+        String documentType, java.util.Collection<java.util.UUID> ids, VbdiDocumentOutFilter filter, Pageable pageable);
 }

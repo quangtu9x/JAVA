@@ -415,6 +415,12 @@ public class LegacyDanhMucController extends BaseController {
         if ("users_by_parentids".equalsIgnoreCase(viewname)) {
             return ok(getLegacyOrgLookupForDungChungUseCase.getOrganizationMembers(firstKey, true));
         }
+        // 06/10/2026: vwunitleaders (truoc la Domino qlvb/danhmuc/GetLanhDao) - keys [orgId, level, nhom cap lanh dao].
+        if ("vwunitleaders".equalsIgnoreCase(viewname)) {
+            List<String> keys = request.getKeys() == null ? List.of() : request.getKeys();
+            return ok(getLegacyOrgLookupForDungChungUseCase.getUnitLeaders(
+                firstKey, keys.size() > 1 ? keys.get(1) : null, keys.size() > 2 ? keys.get(2) : null));
+        }
 
         var searchRequest = new SearchCategoriesRequest();
         searchRequest.setForms(request.getKeys());

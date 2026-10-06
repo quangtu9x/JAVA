@@ -26,6 +26,9 @@ public class UserOrganizationProfileDto {
     // images) bằng currentUser.id (số giả lập) luôn thất bại âm thầm (parse UUID lỗi -> catch rỗng),
     // dù dữ liệu đã cấu hình đúng. "" nếu không tìm thấy AppUser tương ứng (cùng điều kiện username null).
     private String appUserId = "";
+    // 06/10/2026: AppUser.isActive - false = tài khoản đang bị Khoá (QLVBCompatAuthController chặn
+    // đăng nhập). Mặc định true cho hồ sơ rỗng (không tìm thấy AppUser - đã có luật "chưa khai báo").
+    private boolean active = true;
     // Bổ sung 22/09/2026 (bugfix): AppUser.phoneNumber (cột "phone_number" có sẵn trong DB) TỪNG
     // KHÔNG BAO GIỜ được đưa vào qlvb/profile - FE (TdPdfViewerSignModal.jsx và tdsimsign/tdsimpki.jsx
     // cũ) điền sẵn SĐT ký SIM-PKI từ `currentUser.phonenumber` nhưng field này luôn undefined với MỌI

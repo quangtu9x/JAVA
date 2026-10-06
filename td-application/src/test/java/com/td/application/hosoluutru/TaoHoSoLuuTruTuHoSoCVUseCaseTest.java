@@ -56,6 +56,7 @@ class TaoHoSoLuuTruTuHoSoCVUseCaseTest {
     private com.td.application.documents.AuthorAclFieldsService authorAclFieldsService;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
     private TaoHoSoLuuTruTuHoSoCVUseCase useCase;
 
     @BeforeEach
@@ -63,7 +64,8 @@ class TaoHoSoLuuTruTuHoSoCVUseCaseTest {
         useCase = new TaoHoSoLuuTruTuHoSoCVUseCase(
             hoSoCVDocumentRepository, recordsStorageCatalogRepository, hoSoLuuTruDocumentRepository,
             hoSoLuuTruVanBanDocumentRepository, documentRepository, vbdiDocumentRepository,
-            dynamicDocumentFieldsService, currentUserProvider, authorAclFieldsService);
+            dynamicDocumentFieldsService, currentUserProvider, authorAclFieldsService,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("khols01"));
         lenient().when(hoSoLuuTruDocumentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(hoSoLuuTruVanBanDocumentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -116,8 +118,10 @@ class TaoHoSoLuuTruTuHoSoCVUseCaseTest {
     void execute_withAttachedVbdenAndVbdi_shouldCopyVanBan() {
         UUID vbdenId = UUID.randomUUID();
         UUID vbdiId = UUID.randomUUID();
-        HoSoCVDocument hosocv = newHosoCV(UUID.randomUUID(),
-            "{\"document_in_attached_id\":\"" + vbdenId + "\",\"document_out_attached_id\":\"" + vbdiId + "\"}");
+        HoSoCVDocument hosocv = newHosoCV(UUID.randomUUID(), "{}");
+        // 06/10/2026: lien ket doc tu bang document_links.
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDEN, hosocv.getId(), vbdenId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI, hosocv.getId(), vbdiId);
         RecordsStorageCatalog catalog = newCatalog();
         when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(Optional.of(hosocv));
         when(recordsStorageCatalogRepository.findByIdAndDeletedOnIsNull(catalog.getId())).thenReturn(Optional.of(catalog));

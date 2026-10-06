@@ -3,6 +3,7 @@ package com.td.application.duthao;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
+import com.td.application.documentlinks.DocumentLinkService;
 import com.td.application.documents.AddDynamicDocumentRequest;
 import com.td.application.documents.CopyDocumentFilesRequest;
 import com.td.application.documents.CopyDocumentFilesUseCase;
@@ -13,6 +14,7 @@ import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.application.vbdi.AddVbdiDynamicDocumentUseCase;
 import com.td.application.vbdi.VbdiStatus;
 import com.td.domain.documents.BusinessDocument;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.domain.duthao.DuThaoDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,13 +55,9 @@ import java.util.UUID;
  *
  * <p><b>Field KHÔNG port (có bằng chứng rõ, không phải bỏ sót)</b>:</p>
  * <ul>
- *   <li>{@code internal_unit_rtext}/{@code external_unit_rtext}/{@code contact_unit_rtext}/
- *   {@code coordinator_rtext} và các {@code *_obj_log_rtext} — Domino tự sinh richtext HIỂN THỊ từ
- *   JSON {@code internal_unit_obj}/{@code external_unit_obj}/{@code contact_unit_obj}/
- *   {@code individual_obj} (nối chuỗi "name" các phần tử, dòng ~168-296) — bản thân các field
- *   {@code *_obj} này KHÔNG nằm trong whitelist nên KHÔNG sang văn bản đi; phần richtext dẫn xuất từ
- *   chúng cũng vậy vì đây là khái niệm hiển thị riêng của Notes RichTextItem, Java không có field
- *   tương đương (FE đọc thẳng JSON `*_obj`, không đọc richtext).</li>
+ *   <li>(ĐÍNH CHÍNH 06/10/2026: mục này từng ghi "không port {@code *_rtext}/{@code *_obj_log_rtext}"
+ *   — SAI, FE vbdi đọc chính các field đó cho tab Phát hành; nay đã port, xem
+ *   {@code applyRecipientMappings}.)</li>
  *   <li>{@code unit_publish_identifier_other} — CHỈ port nhánh copy trực tiếp field đã có sẵn trên
  *   dự thảo (dòng 341-344); KHÔNG port nhánh fallback tra cứu chéo database {@code danh_muc_chung}
  *   theo {@code unit_publish_id} (dòng 345-355) — cần 1 catalog/DB riêng chưa có evidence tương ứng
@@ -139,7 +137,7 @@ public class ChuyenThanhVanBanDiUseCase {
         "mc_thamsoan", "mc_madv", "mc_id", "mc_thutuc", "creator_cccd", "signer_cccd", "ldkyso",
         "phathanhkemvbden", "list_tvub_obj", "list_tvnb_obj", "is_tvub_opinion", "is_tvnb_opinion",
         "is_btv_opinion", "is_bch_opinion", "is_ttdu_opinion", "deadline_date", "archives_info",
-        "category", "documentin_obj", "vanban_lienquan_obj", "assignment_of_ubnd_document",
+        "category", "assignment_of_ubnd_document",
         "ketthucnhiemvuubtinh", "ketthucnhiemvuubtinh_id");
 
     // Field gan tay RIENG BIET sau vong lap whitelist (DraftToDocumentOut.java dong 160-359) - moi
@@ -148,8 +146,6 @@ public class ChuyenThanhVanBanDiUseCase {
     private static final String USER_CREATOR_FIELD = "user_creator";
     private static final String CREATOR_FIELD = "creator";
     private static final String CREATOR_ID_FIELD = "creator_id";
-    private static final String DOCUMENT_PROFILES_ID_FIELD = "document_profiles_id";
-    private static final String DOCUMENT_PROFILES_FROM_DRAFT_ID_FIELD = "document_profiles_from_draft_id";
     private static final String UNIT_PUBLISH_ID_FIELD = "unit_publish_id";
     private static final String UNIT_PUBLISH_IDENTIFIER_FIELD = "unit_publish_identifier";
     private static final String UNIT_PUBLISH_IDENTIFIER_OTHER_FIELD = "unit_publish_identifier_other";
@@ -185,6 +181,8 @@ public class ChuyenThanhVanBanDiUseCase {
     private static final int MAX_VBCDDH_SIBLINGS = 2000;
 
     private final DuThaoDocumentRepository duThaoDocumentRepository;
+    private final DocumentLinkService documentLinkService;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
     private final AddVbdiDynamicDocumentUseCase addVbdiDynamicDocumentUseCase;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentLogService documentLogService;
@@ -226,9 +224,24 @@ public class ChuyenThanhVanBanDiUseCase {
         markDraftAsPublished(draft, draftFields, vbdiId);
         copyAttachedFiles(draft.getId(), vbdiId, draftFields);
         syncVbcddhIdVbdi(draft.getId(), vbdiId);
+        linkIssuedDocument(draft.getId(), vbdiId);
         writeProcessTrail(draft.getId(), previousStatus, request.getOpinion());
 
         return targetResult;
+    }
+
+    // 06/10/2026 (bang document_links - docs/architecture/document-links.md): du thao -> van ban di
+    // (duthao_vbdi) + moi ho so dang chua du thao -> van ban di nay (hoso_vbdi_phathanh, thay field cu
+    // document_profiles_from_draft_id) - de tab "Van ban phat hanh" cua ho so hien van ban di.
+    // draft_id/document_out_id van ghi vi la field nghiep vu (thu hoi, ket thuc du thao... doc).
+    private void linkIssuedDocument(UUID draftId, UUID vbdiId) {
+        documentLinkService.link(DocumentLinkType.DUTHAO_VBDI, draftId, vbdiId);
+        // Giai doan 2: "Tra loi cho van ban den"/"Van ban kem theo" (truoc chep qua whitelist
+        // documentin_obj/vanban_lienquan_obj) - chep lien ket + ban chup sang van ban di.
+        relatedDocumentSnapshots.copyFromDraftToVbdi(draftId, vbdiId);
+        for (UUID hosocvId : documentLinkService.findSourceIds(draftId, List.of(DocumentLinkType.HOSO_DUTHAO))) {
+            documentLinkService.link(DocumentLinkType.HOSO_VBDI_PHATHANH, hosocvId, vbdiId);
+        }
     }
 
     // Xem dinh chinh lan 2 o javadoc lop + CopyDocumentFilesRequest: LOC theo ten tep trong
@@ -346,10 +359,11 @@ public class ChuyenThanhVanBanDiUseCase {
         putIfPresent(targetFields, draftFields, CREATOR_FIELD, DRAFTOR_FIELD);
         putIfPresent(targetFields, draftFields, CREATOR_ID_FIELD, DRAFTOR_ID_FIELD);
         putIfPresent(targetFields, draftFields, CREATOR_FIELD, RECIPIENTS_COPY_FIELD);
-        putIfPresent(targetFields, draftFields, DOCUMENT_PROFILES_ID_FIELD, DOCUMENT_PROFILES_FROM_DRAFT_ID_FIELD);
         putIfPresent(targetFields, draftFields, UNIT_PUBLISH_ID_FIELD, UNIT_PUBLISH_ID_FIELD);
         putIfPresent(targetFields, draftFields, UNIT_PUBLISH_IDENTIFIER_FIELD, UNIT_PUBLISH_IDENTIFIER_FIELD);
         putIfPresent(targetFields, draftFields, UNIT_PUBLISH_IDENTIFIER_OTHER_FIELD, UNIT_PUBLISH_IDENTIFIER_OTHER_FIELD);
+        // 3) Tab "Noi nhan van ban" cua du thao -> tab "Phat hanh" cua van ban di (Domino dong 168-296).
+        applyRecipientMappings(targetFields, draftFields);
         // "author" (field vua ACL vua khoa view "vanbandi_by_author" — xem javadoc
         // com.td.application.documents.AuthorAclFieldsService): KHÔNG tự tính ở đây nữa (16/09/2026,
         // bản vá hẹp lúc đầu) — addVbdiDynamicDocumentUseCase.execute() bên dưới ĐÃ tự áp dụng
@@ -358,6 +372,55 @@ public class ChuyenThanhVanBanDiUseCase {
         targetRequest.setFields(targetFields);
 
         return addVbdiDynamicDocumentUseCase.execute(targetRequest);
+    }
+
+    // 06/10/2026 (bao loi "Chuyen van thu chua copy tab Noi nhan van ban sang van ban di"): Domino
+    // DraftToDocumentOut dong 168-296 doi tung nhom noi nhan "<nguon>_obj" cua du thao thanh 2 field
+    // tren van ban di: "<dich>_rtext" (ten noi chuoi - tab Phat hanh hien thi) + "<dich>_obj_log_rtext"
+    // (JSON danh sach da chon - FE vbdi nap lai vao modal Phat hanh/Nguoi nhan, ControllModal.jsx
+    // updatevalue*). Ban port dau bo sot (javadoc lop tung ghi nham "FE khong doc richtext").
+    // Ten noi bang "; " - dung quy uoc FE updatevalue* + SendVbdiDocumentUseCase#mergeRecipientNamesIntoField.
+    private static final Map<String, String> RECIPIENT_FIELD_MAPPINGS = Map.of(
+        "internal_unit_obj", "internal_unit",
+        "external_unit_obj", "external_unit",
+        "contact_unit_obj", "contact_unit",
+        "individual_obj", "coordinator");
+
+    private void applyRecipientMappings(Map<String, String> target, Map<String, Object> source) {
+        RECIPIENT_FIELD_MAPPINGS.forEach((sourceKey, targetPrefix) -> {
+            List<?> items = asJsonList(source.get(sourceKey));
+            if (items.isEmpty()) {
+                return;
+            }
+            List<String> names = new ArrayList<>();
+            for (Object item : items) {
+                if (item instanceof Map<?, ?> map && map.get(NAME_FIELD) != null) {
+                    String name = map.get(NAME_FIELD).toString().trim();
+                    if (!name.isEmpty()) {
+                        names.add(name);
+                    }
+                }
+            }
+            target.put(targetPrefix + "_rtext", String.join("; ", names));
+            target.put(targetPrefix + "_obj_log_rtext", toJsonValue(items));
+        });
+    }
+
+    // Field "_obj" da duoc parse san thanh List (FieldTypeInferrer) hoac van la chuoi JSON (du lieu
+    // cu) - chap nhan ca 2 dang, dang khac/loi -> rong.
+    private List<?> asJsonList(Object value) {
+        if (value instanceof List<?> list) {
+            return list;
+        }
+        if (value instanceof String str && !str.isBlank()) {
+            try {
+                Object parsed = OBJECT_MAPPER.readValue(str, Object.class);
+                return parsed instanceof List<?> list ? list : List.of();
+            } catch (Exception ex) {
+                return List.of();
+            }
+        }
+        return List.of();
     }
 
     // Domino: "if(docParentDocument.hasItem(x)) copyToDoc.copyItem(...)" - CHI copy khi field nguon

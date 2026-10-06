@@ -62,6 +62,7 @@ public class PhieuTrinhTdController extends BaseController {
     private final TrinhThamKhaoPhieuTrinhTdUseCase trinhThamKhaoPhieuTrinhTdUseCase;
     private final ChuyenTrangThaiPhieuTrinhTdUseCase chuyenTrangThaiPhieuTrinhTdUseCase;
     private final ViewQueryService viewQueryService;
+    private final com.td.application.phieutrinhtd.ChoYKienPhieuTrinhTdUseCase choYKienPhieuTrinhTdUseCase;
 
     @PostMapping("/TaoPhieuTrinh")
     @PreAuthorize("isAuthenticated()")
@@ -113,9 +114,19 @@ public class PhieuTrinhTdController extends BaseController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Chuyển trạng thái phiếu trình (trình duyệt/trình thông qua/duyệt/không duyệt/thu hồi...)",
         description = "Dùng chung cho mọi target status — xem javadoc ChuyenTrangThaiPhieuTrinhTdUseCase")
-    public ResponseEntity<ApiResponse<UUID>> chuyenTrangThai(
+    public ResponseEntity<ApiResponse<com.td.application.phieutrinhtd.ChuyenTrangThaiPhieuTrinhTdResult>> chuyenTrangThai(
             @Valid @RequestBody ChuyenTrangThaiPhieuTrinhTdRequest request) {
         return ok(chuyenTrangThaiPhieuTrinhTdUseCase.execute(request));
+    }
+
+    // 06/10/2026 (cutover FE): nguoi phoi hop cho y kien gop y - xem javadoc ChoYKienPhieuTrinhTdUseCase.
+    @PostMapping("/ChoYKien")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Cho ý kiến góp ý phiếu trình (người phối hợp)",
+        description = "Thay qlvb/add form=document_coordinated_opinion - ghi dòng ý kiến + thêm người vào user_coordinated")
+    public ResponseEntity<ApiResponse<com.td.application.phieutrinhtd.ChuyenTrangThaiPhieuTrinhTdResult>> choYKien(
+            @Valid @RequestBody com.td.application.phieutrinhtd.ChoYKienPhieuTrinhTdRequest request) {
+        return ok(choYKienPhieuTrinhTdUseCase.execute(request));
     }
 
     @PostMapping("/GetView")

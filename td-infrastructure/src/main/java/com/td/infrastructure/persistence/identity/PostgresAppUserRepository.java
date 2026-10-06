@@ -55,6 +55,19 @@ public class PostgresAppUserRepository implements AppUserRepository {
     }
 
     @Override
+    public boolean existsLockedByUsername(String username) {
+        return jpa.existsLockedByUsername(username);
+    }
+
+    @Override
+    public java.util.Set<String> findActiveUsernamesIn(java.util.Collection<String> usernames) {
+        if (usernames == null || usernames.isEmpty()) {
+            return java.util.Set.of();
+        }
+        return new java.util.HashSet<>(jpa.findActiveUsernamesIn(usernames));
+    }
+
+    @Override
     public boolean existsByUsernameAndIdNotAndDeletedOnIsNull(String username, UUID id) {
         return jpa.existsByUsernameAndIdNotAndDeletedOnIsNull(username, id);
     }
@@ -96,8 +109,18 @@ public class PostgresAppUserRepository implements AppUserRepository {
             .and(keywordFilter(request))
             .and(organizationFilter(request))
             .and(activeFilter(request))
-            .and(parentUserFilter(request));
+            .and(parentUserFilter(request))
+            .and(usernamesFilter(request));
         return jpa.findAll(spec, pageable);
+    }
+
+    // 06/10/2026: lọc theo danh sách tài khoản cho trước (vd dự thảo "Chọn người trả lại" lấy người
+    // từ lịch sử xử lý, cần bỏ người đã bị Khoá/Xoá) - null/rỗng = không lọc.
+    private static Specification<AppUser> usernamesFilter(SearchAppUsersRequest req) {
+        if (req.getUsernames() == null || req.getUsernames().isEmpty()) {
+            return null;
+        }
+        return (root, q, cb) -> root.get("username").in(req.getUsernames());
     }
 
     private static Specification<AppUser> notDeleted() {

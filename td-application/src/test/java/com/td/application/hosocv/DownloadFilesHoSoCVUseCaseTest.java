@@ -28,12 +28,13 @@ class DownloadFilesHoSoCVUseCaseTest {
     @Mock
     private HoSoVanBanKhacFinder hoSoVanBanKhacFinder;
 
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository = new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
     private DownloadFilesHoSoCVUseCase useCase;
 
     @BeforeEach
     void setUp() {
         useCase = new DownloadFilesHoSoCVUseCase(listDocumentFilesUseCase, hoSoCVDocumentRepository,
-            new com.td.application.documents.DynamicDocumentFieldsService(), hoSoVanBanKhacFinder);
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository), hoSoVanBanKhacFinder);
     }
 
     @Test
@@ -100,8 +101,10 @@ class DownloadFilesHoSoCVUseCaseTest {
         UUID vbdenId = UUID.randomUUID();
         com.td.domain.hosocv.HoSoCVDocument hosocv =
             new com.td.domain.hosocv.HoSoCVDocument("Hồ sơ", "hosocv", "0", null, null, null, null)
-                .replaceDynamicFields("{\"document_out_attached_id\":\"" + vbdiId + ";khong-phai-uuid\","
-                    + "\"document_in_attached_id\":\"" + vbdenId + "\"}");
+;
+        // 06/10/2026: lien ket doc tu bang document_links.
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDI, hosocv.getId(), vbdiId)
+            .seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_VBDEN, hosocv.getId(), vbdenId);
         com.td.domain.hosocv.HoSoCVDocument vanBanKhac = new com.td.domain.hosocv.HoSoCVDocument(
             "VB khác", LuuVanBanKhacUseCase.DOCUMENT_TYPE, "1", null, null, null, null);
         when(hoSoCVDocumentRepository.findById(hosocv.getId())).thenReturn(java.util.Optional.of(hosocv));

@@ -95,9 +95,13 @@ public class KiemTrungVbdenUseCase {
                 var dto = new VbdenDuplicateDto();
                 dto.setId(doc.getId());
                 dto.setCode(asString(fields.get(CODE_FIELD)));
-                dto.setSubject(asString(fields.get(SUBJECT_FIELD)));
+                // 05/10/2026 (báo lỗi modal "Phát hiện trùng văn bản" trống Trích yếu): trích yếu vbden
+                // nằm ở cột title, dynamic_fields.subject thường không có — fallback sang title.
+                String subject = asString(fields.get(SUBJECT_FIELD));
+                dto.setSubject(subject.isBlank() && doc.getTitle() != null ? doc.getTitle() : subject);
                 dto.setUnitInCharge(asString(fields.get(UNIT_IN_CHARGE_FIELD)));
-                dto.setDocumentNumber(asString(fields.get(DOCUMENT_NUMBER_FIELD)));
+                // 05/10/2026: document_number lưu dạng số trong JSONB -> Double -> "92.0"; hiển thị dạng text.
+                dto.setDocumentNumber(VbdenFieldText.asPlainText(fields.get(DOCUMENT_NUMBER_FIELD)));
                 dto.setPromulgationDate(asString(fields.get(PROMULGATION_DATE_FIELD)));
                 dto.setIdentifierCreator(identifierCreator);
                 duplicates.add(dto);

@@ -20,7 +20,7 @@ import java.util.UUID;
 /**
  * Nút "Cho ý kiến"/"Bổ sung ý kiến" ({@code VBDenButtonActionXuLy.jsx#btnChoYkienTVUB}/
  * {@code #btnChoYkien}, mở {@code ChoYKienModal.jsx} với {@code action="capnhatykien"} — modal DÙNG
- * CHUNG tiêu đề "Câp nhật kết quả xử lý văn bản" với {@link CapNhatKetQuaXuLyUseCase}/
+ * CHUNG tiêu đề "Cập nhật kết quả xử lý văn bản" với {@link CapNhatKetQuaXuLyUseCase}/
  * {@link KetThucXuLyUseCase}/{@link CapNhatPhoiHopUseCase}, xem
  * {@code ChoYKienModal.jsx#title}). Yêu cầu người dùng 14/09/2026 ("modal Câp nhật kết quả xử lý văn
  * bản -> Đồng ý chưa cutoverFE (gọi qlvb/vbden/CapNhatVanBanDen cũ)") — điều tra qua đọc trực tiếp
@@ -124,6 +124,8 @@ public class CapNhatYKienVbdenUseCase {
             ObjectNode node = OBJECT_MAPPER.createObjectNode();
             node.put("id", ref.getId() != null ? ref.getId().toString() : "");
             node.put("code", ref.getCode() != null ? ref.getCode() : "");
+            // 05/10/2026: giữ "action" (FE mở chi tiết theo key này) - xem VbdenReplyDocumentRef#action.
+            node.put("action", ref.resolvedAction());
             if (ref.getPromulgationDate() != null && !ref.getPromulgationDate().isBlank()) {
                 node.put("promulgationDate", ref.getPromulgationDate());
             }

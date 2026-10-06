@@ -589,6 +589,27 @@ class ChuyenXuLyVbdenUseCaseTest {
         assertThat(updatedFields.get("user_process")).asList().containsExactlyInAnyOrder("nguyenvana", "tranvanb");
     }
 
+    // 05/10/2026: người bị trả lại (user_returned) chuyển chủ trì tiếp -> rời user_returned, người khác giữ nguyên.
+    @Test
+    void execute_byReturnedUser_shouldRemoveActingUserFromUserReturned() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[],\"user_returned\":[\"demo1\",\"demo7\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo1"));
+        when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenxuly");
+        request.setUserProcess("demo3");
+
+        useCase.execute(request);
+
+        Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat(updatedFields.get("user_returned")).asList().containsExactly("demo7");
+        assertThat(updatedFields.get("user_process")).asList().containsExactly("demo3");
+    }
+
     // Bo sung 22/08/2026 (bugfix nghiem trong, cung dang D.14/R4): user_process luu dang SCALAR
     // TEXT (";"-joined) - truong hop nay xay ra sau khi DonViNguoiNhanXuLy.jsx (FE) duoc sua de
     // TiepNhan/Luu cung ghi user_process (truoc day chi ChuyenXuLy ghi, luon dang List). Neu

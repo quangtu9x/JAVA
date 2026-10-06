@@ -74,6 +74,30 @@ class KiemTrungVbdenUseCaseTest {
         assertThat(result.getData().get(0).getUnitInCharge()).isEqualTo("So Noi Vu");
     }
 
+    /** 05/10/2026: modal "Phát hiện trùng văn bản" hiện Số đến "92.0" + Trích yếu trống. */
+    @Test
+    void execute_numericDocumentNumberAndSubjectInTitle_shouldReturnPlainTextAndTitle() {
+        BusinessDocument doc = new BusinessDocument("Trich yeu o cot title", "vbden", "0", null, null, null, null);
+        when(documentRepository.findByFieldValue(eq("vbden"), eq("code"), eq("123/QD"), any()))
+            .thenReturn(new PageImpl<>(java.util.List.of(doc)));
+        when(dynamicDocumentFieldsService.parseDynamicFields(any())).thenReturn(Map.of(
+            "code", "123/QD",
+            "promulgation_date", "01/01/2026",
+            "document_number", 92.0d,
+            "document_register_id", "so-1"
+        ));
+
+        var request = new KiemTrungVbdenRequest();
+        request.setCode("123/QD");
+        request.setPromulgationDate("01/01/2026");
+
+        var result = useCase.execute(request);
+
+        assertThat(result.getData()).hasSize(1);
+        assertThat(result.getData().get(0).getDocumentNumber()).isEqualTo("92");
+        assertThat(result.getData().get(0).getSubject()).isEqualTo("Trich yeu o cot title");
+    }
+
     /**
      * Bugfix 07/09/2026 (báo lỗi người dùng: "snnmt" chưa có văn bản nào vẫn bị báo trùng mỗi lần
      * vào sổ — xem javadoc lớp): candidate cùng (code, promulgation_date) nhưng CHƯA vào sổ (không

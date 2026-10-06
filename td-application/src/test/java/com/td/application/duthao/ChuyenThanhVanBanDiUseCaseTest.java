@@ -68,12 +68,17 @@ class ChuyenThanhVanBanDiUseCaseTest {
     private DocumentRepository documentRepository;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
+    private final com.td.application.documentlinks.InMemoryDocumentLinkRepository linkRepository =
+        new com.td.application.documentlinks.InMemoryDocumentLinkRepository();
     private ChuyenThanhVanBanDiUseCase useCase;
 
     @BeforeEach
     void setUp() {
         useCase = new ChuyenThanhVanBanDiUseCase(
-            duThaoDocumentRepository, addVbdiDynamicDocumentUseCase, dynamicDocumentFieldsService,
+            duThaoDocumentRepository,
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository),
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
+            addVbdiDynamicDocumentUseCase, dynamicDocumentFieldsService,
             documentLogService, documentCacheService, copyDocumentFilesUseCase, addDraftProcessDocumentUseCase,
             currentUserProvider, documentRepository,
             new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
@@ -107,6 +112,28 @@ class ChuyenThanhVanBanDiUseCaseTest {
         var result = useCase.execute(request);
 
         assertThat(result.isSuccess()).isFalse();
+    }
+
+    // 06/10/2026 (bang document_links): phat hanh -> duthao_vbdi + hoso_vbdi_phathanh cho moi ho so dang
+    // chua du thao (tab "Van ban phat hanh" cua ho so hien van ban di moi).
+    @Test
+    void execute_shouldLinkDraftToNewVbdiAndHoSoIssuance() {
+        DuThaoDocument draft = newDraft("duthao", "{\"name\":\"DT-002\"}");
+        UUID hosocvId = UUID.randomUUID();
+        linkRepository.seed(com.td.domain.documentlinks.DocumentLinkType.HOSO_DUTHAO, hosocvId, draft.getId());
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        UUID vbdiId = UUID.randomUUID();
+        when(addVbdiDynamicDocumentUseCase.execute(any())).thenReturn(Result.success(vbdiId));
+
+        var request = new ChuyenThanhVanBanDiRequest();
+        request.setId(draft.getId());
+        useCase.execute(request);
+
+        assertThat(linkRepository.activeRows())
+            .extracting(link -> link.getLinkType() + ":" + link.getSourceId() + ">" + link.getTargetId())
+            .contains("duthao_vbdi:" + draft.getId() + ">" + vbdiId,
+                "hoso_vbdi_phathanh:" + hosocvId + ">" + vbdiId);
     }
 
     @Test
@@ -152,7 +179,8 @@ class ChuyenThanhVanBanDiUseCaseTest {
         assertThat(captured.getFields()).containsEntry("draftor", "Nguyen Van A");
         assertThat(captured.getFields()).containsEntry("draftor_id", "u-1");
         assertThat(captured.getFields()).containsEntry("recipients_copy", "Nguyen Van A");
-        assertThat(captured.getFields()).containsEntry("document_profiles_from_draft_id", "hs-1");
+        // 06/10/2026: lien ket ho so qua bang document_links, khong chep field document_profiles_from_draft_id.
+        assertThat(captured.getFields()).doesNotContainKey("document_profiles_from_draft_id");
         assertThat(captured.getFields()).containsEntry("unit_publish_id", "up-1");
         assertThat(captured.getFields()).containsEntry("unit_publish_identifier", "UP.01");
         assertThat(captured.getFields()).containsEntry("unit_publish_identifier_other", "UP.OTHER");
@@ -206,6 +234,38 @@ class ChuyenThanhVanBanDiUseCaseTest {
         verify(copyDocumentFilesUseCase, never()).execute(any());
     }
 
+    // 06/10/2026: tab "Noi nhan van ban" cua du thao phai sang tab "Phat hanh" cua van ban di
+    // (Domino DraftToDocumentOut dong 168-296).
+    @Test
+    void execute_shouldMapRecipientObjsToVbdiPhatHanhFields() throws Exception {
+        DuThaoDocument draft = newDraft("duthao", "{"
+            + "\"internal_unit_obj\":[{\"id\":\"i1\",\"name\":\"Phong A\",\"identifier\":\"PA\"},{\"id\":\"i2\",\"name\":\"Phong B\",\"identifier\":\"PB\"}],"
+            + "\"external_unit_obj\":\"[{\\\"id\\\":\\\"e1\\\",\\\"name\\\":\\\"Bo X\\\"}]\","
+            + "\"contact_unit_obj\":[],"
+            + "\"individual_obj\":[{\"id\":\"u1\",\"name\":\"Nguyen Van B\",\"username\":\"nvb\"}],"
+            + "\"recipient_other\":\"Luu VT\"}");
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(addVbdiDynamicDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenThanhVanBanDiRequest();
+        request.setId(draft.getId());
+        useCase.execute(request);
+
+        ArgumentCaptor<AddDynamicDocumentRequest> captor = ArgumentCaptor.forClass(AddDynamicDocumentRequest.class);
+        verify(addVbdiDynamicDocumentUseCase).execute(captor.capture());
+        var fields = captor.getValue().getFields();
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        assertThat(fields).containsEntry("internal_unit_rtext", "Phong A; Phong B");
+        assertThat(mapper.readTree(fields.get("internal_unit_obj_log_rtext")).get(1).get("identifier").asText()).isEqualTo("PB");
+        assertThat(fields).containsEntry("external_unit_rtext", "Bo X");
+        assertThat(mapper.readTree(fields.get("external_unit_obj_log_rtext")).get(0).get("id").asText()).isEqualTo("e1");
+        assertThat(fields).containsEntry("coordinator_rtext", "Nguyen Van B");
+        assertThat(mapper.readTree(fields.get("coordinator_obj_log_rtext")).get(0).get("username").asText()).isEqualTo("nvb");
+        assertThat(fields).doesNotContainKeys("contact_unit_rtext", "contact_unit_obj_log_rtext");
+        assertThat(fields).containsEntry("recipient_other", "Luu VT");
+    }
+
     // Bugfix 04/09/2026 (bao loi nguoi dung: "Chuyen van thu" lam mat documentin_obj cua van ban di
     // vua tao - xem javadoc putIfPresent()): documentin_obj (hau to "_obj") duoc
     // DynamicDocumentFieldsService PARSE SAN thanh List<Map> that (khong con la String) khi doc lai
@@ -214,8 +274,16 @@ class ChuyenThanhVanBanDiUseCaseTest {
     // hong vinh vien vao van ban di moi. Test nay xac nhan gia tri duoc RE-SERIALIZE dung JSON.
     @Test
     void execute_withDocumentinObjAsNestedJson_shouldReserializeAsValidJson() throws Exception {
-        DuThaoDocument draft = newDraft("duthao",
-            "{\"documentin_obj\":[{\"id\":\"vbden-1\",\"code\":\"DEN-01\",\"subject\":\"Kiem tra\"}]}");
+        // 06/10/2026 (bang document_links giai doan 2): "Tra loi cho van ban den" / "Van ban kem theo" cua du
+        // thao chep sang van ban di bang LIEN KET + ban chup (khong chep field _obj qua whitelist nua).
+        UUID vbdenId = UUID.randomUUID();
+        UUID relatedVbdiId = UUID.randomUUID();
+        DuThaoDocument draft = newDraft("duthao", "{}");
+        var snapshots = com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository);
+        snapshots.linkItem(com.td.domain.documentlinks.DocumentLinkType.DUTHAO_TRALOI_VBDEN, draft.getId(),
+            Map.of("id", vbdenId.toString(), "code", "DEN-01", "subject", "Kiem tra"));
+        snapshots.linkItem(com.td.domain.documentlinks.DocumentLinkType.DUTHAO_KEMTHEO_VBDI, draft.getId(),
+            Map.of("id", relatedVbdiId.toString(), "code", "DI-02", "database_type", "vbdi"));
         when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
         when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         UUID vbdiId = UUID.randomUUID();
@@ -223,18 +291,15 @@ class ChuyenThanhVanBanDiUseCaseTest {
 
         var request = new ChuyenThanhVanBanDiRequest();
         request.setId(draft.getId());
-
         useCase.execute(request);
 
         ArgumentCaptor<AddDynamicDocumentRequest> captor = ArgumentCaptor.forClass(AddDynamicDocumentRequest.class);
         verify(addVbdiDynamicDocumentUseCase).execute(captor.capture());
-        String documentinObj = captor.getValue().getFields().get("documentin_obj");
-        // Java Map/List toString() mac dinh dung "=" ("{id=vbden-1}") - JSON hop le dung ":".
-        assertThat(documentinObj).doesNotContain("=");
-        List<Map<String, Object>> parsed = new ObjectMapper()
-            .readValue(documentinObj, new TypeReference<List<Map<String, Object>>>() {});
-        assertThat(parsed).hasSize(1);
-        assertThat(parsed.get(0)).containsEntry("id", "vbden-1").containsEntry("code", "DEN-01");
+        assertThat(captor.getValue().getFields()).doesNotContainKeys("documentin_obj", "vanban_lienquan_obj");
+        assertThat(snapshots.replyItems(vbdiId, "vbdi")).singleElement()
+            .satisfies(item -> assertThat(item).containsEntry("id", vbdenId.toString()).containsEntry("code", "DEN-01"));
+        assertThat(snapshots.relatedItems(vbdiId, "vbdi")).singleElement()
+            .satisfies(item -> assertThat(item).containsEntry("id", relatedVbdiId.toString()).containsEntry("code", "DI-02"));
     }
 
     @Test

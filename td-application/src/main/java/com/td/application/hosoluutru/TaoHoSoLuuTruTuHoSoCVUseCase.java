@@ -2,10 +2,12 @@ package com.td.application.hosoluutru;
 
 import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
+import com.td.application.documentlinks.DocumentLinkService;
 import com.td.application.documents.AuthorAclFieldsService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.application.vbdi.VbdiDocumentRepository;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.domain.hosoluutru.HoSoLuuTruDocument;
 import com.td.domain.hosoluutru.HoSoLuuTruVanBanDocument;
 import com.td.domain.recordsstorage.RecordsStorageCatalog;
@@ -16,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -54,8 +55,6 @@ public class TaoHoSoLuuTruTuHoSoCVUseCase {
     public static final String VAN_BAN_DOCUMENT_TYPE = "vanban";
 
     private static final String HOSOCV_DOCUMENT_TYPE = "hosocv";
-    private static final String FIELD_DOCUMENT_IN_ATTACHED_ID = "document_in_attached_id";
-    private static final String FIELD_DOCUMENT_OUT_ATTACHED_ID = "document_out_attached_id";
     private static final String FALLBACK_USERNAME = "system";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
@@ -68,6 +67,7 @@ public class TaoHoSoLuuTruTuHoSoCVUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final CurrentUserProvider currentUserProvider;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final DocumentLinkService documentLinkService;
 
     public Result<UUID> execute(TaoHoSoLuuTruTuHoSoCVRequest request) {
         if (request == null || request.getHosocvId() == null || request.getDmhsId() == null) {
@@ -96,8 +96,8 @@ public class TaoHoSoLuuTruTuHoSoCVUseCase {
             .replaceDynamicFields(dynamicFieldsJson);
         var saved = hoSoLuuTruDocumentRepository.save(hoSoLuuTru);
 
-        copyVanBanTuVbden(saved.getId(), hosocvFields, actingUsername);
-        copyVanBanTuVbdi(saved.getId(), hosocvFields, actingUsername);
+        copyVanBanTuVbden(saved.getId(), hosocv.getId(), actingUsername);
+        copyVanBanTuVbdi(saved.getId(), hosocv.getId(), actingUsername);
 
         return Result.success(saved.getId());
     }
@@ -137,8 +137,11 @@ public class TaoHoSoLuuTruTuHoSoCVUseCase {
         return fields;
     }
 
-    private void copyVanBanTuVbden(UUID hosoId, Map<String, Object> hosocvFields, String actingUsername) {
-        for (UUID vanBanId : toIdList(hosocvFields.get(FIELD_DOCUMENT_IN_ATTACHED_ID))) {
+    // 06/10/2026: danh sach van ban doc bang document_links (docs/architecture/document-links.md) thay
+    // document_in_attached_id/document_out_attached_id tren ho so.
+    private void copyVanBanTuVbden(UUID hosoId, UUID hosocvId, String actingUsername) {
+        for (UUID vanBanId : documentLinkService.findTargetIds(hosocvId,
+                List.of(DocumentLinkType.HOSO_VBDEN, DocumentLinkType.HOSO_VBDEN_XULY))) {
             documentRepository.findById(vanBanId)
                 .filter(document -> !document.isDeleted())
                 .ifPresent(document -> saveVanBan(hosoId, "vbden", "document_in_id", vanBanId,
@@ -146,8 +149,9 @@ public class TaoHoSoLuuTruTuHoSoCVUseCase {
         }
     }
 
-    private void copyVanBanTuVbdi(UUID hosoId, Map<String, Object> hosocvFields, String actingUsername) {
-        for (UUID vanBanId : toIdList(hosocvFields.get(FIELD_DOCUMENT_OUT_ATTACHED_ID))) {
+    private void copyVanBanTuVbdi(UUID hosoId, UUID hosocvId, String actingUsername) {
+        for (UUID vanBanId : documentLinkService.findTargetIds(hosocvId,
+                List.of(DocumentLinkType.HOSO_VBDI, DocumentLinkType.HOSO_VBDI_PHATHANH))) {
             vbdiDocumentRepository.findById(vanBanId)
                 .filter(document -> !document.isDeleted())
                 .ifPresent(document -> saveVanBan(hosoId, "vbdi", "document_out_id", vanBanId,
@@ -194,36 +198,6 @@ public class TaoHoSoLuuTruTuHoSoCVUseCase {
 
     private Map<String, Object> documentFields(String dynamicFieldsJson) {
         return dynamicDocumentFieldsService.parseDynamicFields(dynamicFieldsJson);
-    }
-
-    private List<UUID> toIdList(Object value) {
-        List<UUID> result = new ArrayList<>();
-        for (String part : toSemicolonList(value)) {
-            try {
-                result.add(UUID.fromString(part.trim()));
-            } catch (IllegalArgumentException ex) {
-                log.warn("Bỏ qua id văn bản liên quan không hợp lệ khi tạo hồ sơ lưu trữ: {}", part);
-            }
-        }
-        return result;
-    }
-
-    private List<String> toSemicolonList(Object value) {
-        List<String> result = new ArrayList<>();
-        if (value instanceof List<?> list) {
-            for (Object item : list) {
-                if (item != null && !item.toString().isBlank()) {
-                    result.add(item.toString());
-                }
-            }
-        } else if (value instanceof String str && !str.isBlank()) {
-            for (String part : str.split(";")) {
-                if (!part.isBlank()) {
-                    result.add(part.trim());
-                }
-            }
-        }
-        return result;
     }
 
     private String stringField(Map<String, Object> fields, String key) {

@@ -62,9 +62,8 @@ import java.util.Set;
  *     </ul>
  *   </li>
  *   <li>{@code HOSOCV} (7/7 — xem {@link #buildHoSoCvPersonal}): đầy đủ từ đợt port đầu.</li>
- *   <li>{@code PHIEUTRINHTD} (6/7 — xem {@link #buildPhieuTrinhTdPersonal}): giữ nguyên đợt port đầu
- *       — field {@code phieutrinh_chuaphoihop} vẫn KHÔNG port (không có khái niệm "phối hợp" tương
- *       đương trong {@code phieutrinhtd}, xem lịch sử javadoc).</li>
+ *   <li>{@code PHIEUTRINHTD} (7/7 — xem {@link #buildPhieuTrinhTdPersonal}): 06/10/2026 thêm
+ *       {@code phieutrinh_chuaphoihop} (= view {@code vwUser_Coordinator_chua}, cutover FE phiếu trình).</li>
  *   <li>{@code VBDI} (4/4 — xem {@link #buildVbdiPersonal}): thêm {@code dakybanhanh}/
  *       {@code dakychuabanhanh} (dxl 2814-2884 — biến thể "Signer", khoá SCALAR field
  *       {@code user_signer}, KHÁC hẳn 2 view "Creator" đã port trước đó dùng khoá tổ chức
@@ -314,6 +313,9 @@ public class GetSoLuongCanXuLyUseCase {
         counts.put("phieutrinh_daduyet", countByView(DB_PHIEUTRINHTD, "phieutrinhtd_daduyet", username));
         counts.put("phieutrinh_chothongqua", countByView(DB_PHIEUTRINHTD, "phieutrinhtd_chothongqua", username));
         counts.put("phieutrinh_choduyet", countByView(DB_PHIEUTRINHTD, "phieutrinhtd_choduyet", username));
+        // 06/10/2026 (cutover FE phieu trinh): "Cho cho y kien" (nguoi phoi hop chua gop y) - view Domino
+        // vwUser_Coordinator_chua da co ben Java (PhieuTrinhTdViewQuery).
+        counts.put("phieutrinh_chuaphoihop", countByView(DB_PHIEUTRINHTD, "vwuser_coordinator_chua", username));
     }
 
     // MapsSoLuongCanXuLy.VBDI (4/4 - day du, xem javadoc lop).

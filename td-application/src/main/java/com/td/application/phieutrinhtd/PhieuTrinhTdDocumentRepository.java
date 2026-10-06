@@ -70,4 +70,10 @@ public interface PhieuTrinhTdDocumentRepository extends IRepository<PhieuTrinhTd
 
     /** Thùng rác — {@code deleted_on IS NOT NULL} (soft-delete Java-side, KHÔNG lọc storaged). */
     Page<PhieuTrinhTdDocument> findTrash(Pageable pageable);
+
+    /**
+     * 06/10/2026 (cutover FE phiếu trình): truy vấn danh sách theo tiêu chí tổng quát - dùng cho mọi view
+     * (xem {@link PhieuTrinhTdViewQuery}); mới tạo nhất trước.
+     */
+    Page<PhieuTrinhTdDocument> findByCriteria(PhieuTrinhTdListCriteria criteria, Pageable pageable);
 }

@@ -684,6 +684,15 @@ public class ChuyenXuLyVbdenUseCase {
         addAllDistinct(userProcess, newAssignees);
         fields.put(USER_PROCESS_FIELD, userProcess);
 
+        // 05/10/2026: người bị TRẢ LẠI (user_returned, TraLaiVanBanUseCase) đã xử lý tiếp bằng cách chuyển chủ
+        // trì -> gỡ khỏi user_returned (cùng cách KetThucXuLy/TaoDuThaoVBden). Trước đây còn sót nên văn bản
+        // vẫn nằm ở tab "Văn bản trả lại", và cột "Người / đơn vị xử lý" (FE coi user_returned là người
+        // đang giữ) hiện nhầm người đã chuyển đi.
+        List<String> userReturned = toStringList(fields.get("user_returned"));
+        if (userReturned.remove(actingUsername)) {
+            fields.put("user_returned", userReturned);
+        }
+
         List<String> unitProcess = splitSemicolon(request.getUnitProcess());
         if (!unitProcess.isEmpty()) {
             fields.put(UNIT_PROCESS_FIELD, unitProcess);

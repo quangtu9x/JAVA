@@ -49,6 +49,15 @@ class AccountProvisioningCheckerTest {
     }
 
     @Test
+    void isLocked_forLockedRegularUser_shouldReturnTrue_butNeverForSuperAdmin() {
+        when(appUserRepository.existsLockedByUsername("bikhoa01")).thenReturn(true);
+
+        assertThat(newChecker().isLocked("bikhoa01", Set.of("USER"))).isTrue();
+        assertThat(newChecker().isLocked("admin", Set.of())).isFalse();
+        verify(appUserRepository, never()).existsLockedByUsername("admin");
+    }
+
+    @Test
     void isProvisioned_forRegularUserWithAppUser_shouldReturnTrue() {
         when(appUserRepository.existsByUsernameAndDeletedOnIsNull("nhanvien01")).thenReturn(true);
 

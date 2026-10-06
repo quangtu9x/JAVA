@@ -1,7 +1,6 @@
 package com.td.application.phieutrinhtd;
 
 import com.td.application.common.models.Result;
-import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.domain.phieutrinhtd.PhieuTrinhTdDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,7 +25,7 @@ public class GetPhieuTrinhTdChiTietUseCase {
 
     private final PhieuTrinhTdDocumentRepository phieuTrinhTdDocumentRepository;
     private final PhieuTrinhTdProcessDocumentRepository phieuTrinhTdProcessDocumentRepository;
-    private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final PhieuTrinhTdFieldMapper fieldMapper;
 
     public Result<Map<String, Object>> execute(GetPhieuTrinhTdChiTietRequest request) {
         if (request == null || request.getId() == null || request.getId().isBlank()) {
@@ -41,28 +40,23 @@ public class GetPhieuTrinhTdChiTietUseCase {
         }
 
         PhieuTrinhTdDocument document = phieuTrinhTdDocumentRepository.findById(id).orElse(null);
-        if (document == null || document.isDeleted()) {
+        // 06/10/2026: phieu trinh trong thung rac van mo duoc (de "Phuc hoi") - mapper dat form
+        // "submission_dossier_Deleted" nhu Domino.
+        if (document == null) {
             return Result.failure(NOT_FOUND_MESSAGE);
         }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", document.getId());
-        result.put("title", document.getTitle());
-        result.put("status", document.getStatus());
-        result.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
+        // 06/10/2026 (cutover FE phieu trinh): kem danh sach tep Java (files) cua phieu trinh va tung dong
+        // qua trinh - dung chung PhieuTrinhTdFieldMapper voi danh sach.
+        Map<String, Object> result = new LinkedHashMap<>(fieldMapper.toDocumentMap(document, true));
 
         List<Map<String, Object>> quaTrinh = phieuTrinhTdProcessDocumentRepository.findByParentId(id).stream()
-            .map(this::toProcessMap)
+            .filter(process -> !process.isDeleted())
+            .map(process -> fieldMapper.toProcessMap(process, true))
             .toList();
         result.put("quatrinh", quaTrinh);
 
         return Result.success(result);
     }
 
-    private Map<String, Object> toProcessMap(com.td.domain.phieutrinhtd.PhieuTrinhTdProcessDocument process) {
-        Map<String, Object> map = new LinkedHashMap<>();
-        map.put("id", process.getId());
-        map.putAll(dynamicDocumentFieldsService.parseDynamicFields(process.getDynamicFieldsJson()));
-        return map;
-    }
 }

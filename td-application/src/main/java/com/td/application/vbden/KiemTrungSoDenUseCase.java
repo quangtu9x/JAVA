@@ -67,7 +67,9 @@ public class KiemTrungSoDenUseCase {
             List<VbdenDuplicateDto> duplicates = new ArrayList<>();
             for (BusinessDocument doc : candidates) {
                 Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(doc.getDynamicFieldsJson());
-                if (!request.getDocumentNumber().trim().equals(asString(fields.get(DOCUMENT_NUMBER_FIELD)))) {
+                // 05/10/2026: document_number có thể lưu dạng số (Double "92.0") — so khớp theo text gọn.
+                String documentNumber = VbdenFieldText.asPlainText(fields.get(DOCUMENT_NUMBER_FIELD));
+                if (!request.getDocumentNumber().trim().equals(documentNumber)) {
                     continue;
                 }
                 String identifierCreator = asString(fields.get(IDENTIFIER_CREATOR_FIELD));
@@ -77,8 +79,10 @@ public class KiemTrungSoDenUseCase {
                 var dto = new VbdenDuplicateDto();
                 dto.setId(doc.getId());
                 dto.setCode(asString(fields.get(CODE_FIELD)));
-                dto.setSubject(asString(fields.get(SUBJECT_FIELD)));
-                dto.setDocumentNumber(asString(fields.get(DOCUMENT_NUMBER_FIELD)));
+                // 05/10/2026: trích yếu vbden nằm ở cột title — fallback khi dynamic_fields.subject trống.
+                String subject = asString(fields.get(SUBJECT_FIELD));
+                dto.setSubject(subject.isBlank() && doc.getTitle() != null ? doc.getTitle() : subject);
+                dto.setDocumentNumber(documentNumber);
                 dto.setPromulgationDate(asString(fields.get(PROMULGATION_DATE_FIELD)));
                 dto.setIdentifierCreator(identifierCreator);
                 duplicates.add(dto);

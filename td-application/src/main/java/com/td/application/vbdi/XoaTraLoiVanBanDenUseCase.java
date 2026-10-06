@@ -2,6 +2,9 @@ package com.td.application.vbdi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
+import com.td.application.documentlinks.DocumentLinkService;
+import com.td.application.documentlinks.RelatedDocumentSnapshots;
+import com.td.domain.documentlinks.DocumentLinkType;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
@@ -52,6 +55,7 @@ public class XoaTraLoiVanBanDenUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentCacheService documentCacheService;
     private final DocumentLogService documentLogService;
+    private final DocumentLinkService documentLinkService;
 
     public Result<UUID> execute(XoaTraLoiVanBanDenRequest request) {
         if (request == null || request.getVbdiId() == null) {
@@ -67,34 +71,24 @@ public class XoaTraLoiVanBanDenUseCase {
         }
         var vbdiDocument = vbdiOptional.get();
 
-        Map<String, Object> fields = new LinkedHashMap<>(
-            dynamicDocumentFieldsService.parseDynamicFields(vbdiDocument.getDynamicFieldsJson()));
-        List<Object> existingList = toObjectList(fields.get(DOCUMENT_IN_FIELD));
-        String targetId = request.getDocumentId().trim();
-
-        List<Object> remaining = new ArrayList<>();
-        boolean removed = false;
-        for (Object item : existingList) {
-            if (!removed && item instanceof Map<?, ?> map && targetId.equals(String.valueOf(map.get("id")))) {
-                removed = true;
-                continue;
-            }
-            remaining.add(item);
-        }
-
-        if (!removed) {
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): go lien ket
+        // "Tra loi cho van ban den" (vbdi_traloi_vbden) = xoa mem 1 dong, khong ghi lai dynamic_fields. documentId khong phai UUID (phan tu
+        // Domino cu) -> khong co lien ket nao, tra success nhu truoc (khong co gi de go).
+        java.util.UUID targetId;
+        try {
+            targetId = java.util.UUID.fromString(request.getDocumentId().trim());
+        } catch (IllegalArgumentException ex) {
             return Result.success(vbdiDocument.getId());
         }
-
-        var before = buildSnapshot(vbdiDocument);
-        fields.put(DOCUMENT_IN_FIELD, remaining);
-        vbdiDocument.replaceDynamicFields(toJson(fields));
-        var saved = vbdiDocumentRepository.save(vbdiDocument);
-        documentCacheService.evict(saved.getId());
-        documentCacheService.evictAllListCaches();
-        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
-        log.info("Xoa van ban den {} khoi documentin_obj cua van ban di {}", targetId, saved.getId());
-        return Result.success(saved.getId());
+        boolean removed = false;
+        for (DocumentLinkType type : List.of(DocumentLinkType.VBDI_TRALOI_VBDEN)) {
+            removed |= documentLinkService.unlink(type, vbdiDocument.getId(), targetId);
+        }
+        if (removed) {
+            documentCacheService.evict(vbdiDocument.getId());
+            documentCacheService.evictAllListCaches();
+        }
+        return Result.success(vbdiDocument.getId());
     }
 
     private boolean isUsableVbdiDocument(VbdiDocument document) {

@@ -345,6 +345,8 @@ class KetThucXuLyUseCaseTest {
         verify(addVbdenResDocumentUseCase).execute(captor.capture());
         String resObjJson = captor.getValue().getFields().get("res_obj");
         assertThat(resObjJson).contains("VBDI-001").contains("VBDI-002");
+        // 05/10/2026: moi phan tu co "action" (mac dinh "ganvbdi") de FE mo dung modal chi tiet van ban di.
+        assertThat(resObjJson).contains("\"action\":\"ganvbdi\"");
     }
 
     @Test

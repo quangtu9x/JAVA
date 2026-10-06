@@ -22,6 +22,10 @@ public class SearchPrivateCategoriesRequest {
     // Dùng cho các danh mục riêng theo đơn vị con trong cùng 1 tenant (vd: ký hiệu văn bản).
     private String identifier;
 
+    // 06/10/2026: true = bỏ thành viên đã bị Khoá/Xoá khỏi receiver_obj (màn CHỌN người, vd chuyển
+    // xử lý). Mặc định không lọc - màn quản trị nhóm người nhận vẫn thấy đủ thành viên đã lưu.
+    private Boolean activeMembersOnly;
+
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
 

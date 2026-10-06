@@ -64,6 +64,7 @@ public class HieuChinhVbdiUseCase {
     private final DocumentCacheService documentCacheService;
     private final DocumentLogService documentLogService;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
 
     public Result<UUID> execute(HieuChinhVbdiRequest request) {
         if (request == null || request.getId() == null) {
@@ -85,11 +86,15 @@ public class HieuChinhVbdiUseCase {
         // lieu (date/number/richtext) cho phan diff FE gui, roi de len map hien co.
         Map<String, Object> existingFields = new LinkedHashMap<>(
             dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
+        // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): documentin_obj /
+        // vanban_lienquan_obj KHONG luu trong dynamic_fields nua - bo khoi payload.
+        Map<String, String> incomingFields = new LinkedHashMap<>(request.getFields());
+        relatedDocumentSnapshots.strip(incomingFields);
         String incomingJson = dynamicDocumentFieldsService.buildDynamicFieldsJson(
-            request.getFields(), request.getDateFields(), request.getNumberFields(), request.getRichtextFields());
+            incomingFields, request.getDateFields(), request.getNumberFields(), request.getRichtextFields());
         existingFields.putAll(dynamicDocumentFieldsService.parseDynamicFields(incomingJson));
         authorAclFieldsService.applyOnUpdate(
-            SoanThaoVbdiUseCase.DOCUMENT_TYPE, existingFields, request.getFields().keySet());
+            SoanThaoVbdiUseCase.DOCUMENT_TYPE, existingFields, incomingFields.keySet());
         document.replaceDynamicFields(toJson(existingFields));
 
         String title = (request.getSubject() == null || request.getSubject().isBlank())

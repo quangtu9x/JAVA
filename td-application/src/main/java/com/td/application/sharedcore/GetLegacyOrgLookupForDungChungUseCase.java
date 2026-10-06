@@ -103,9 +103,60 @@ public class GetLegacyOrgLookupForDungChungUseCase {
             return List.of();
         }
         List<UUID> organizationIds = recursive ? collectDescendantIds(orgId) : List.of(orgId);
+        // 06/10/2026: danh sach chon nguoi - bo nguoi dang bi Khoa.
         return appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(organizationIds).stream()
+            .filter(AppUser::isActive)
             .map(this::toUserRow)
             .toList();
+    }
+
+    // 06/10/2026 (port view Domino vwunitleaders - danh_muc_dung_chung.dxl dong 170, truoc goi
+    // qlvb/danhmuc/GetLanhDao): SELECT Form="user" & caplanhdao!="" & caplanhdao!="khong" & status!="0",
+    // khoa = @Explode(parentids) : level : nhom cap lanh dao (lanhdaocq/lanhdaodv/lanhdaopb -> "lanhdao",
+    // con lai giu nguyen vd "lanhdaovp"). parentids = moi to tien -> key[0] khop ca CAY CON. key[1]/[2]
+    // rong = khong loc (Domino khoa 1 phan). Chi lay nguoi dang hoat dong (status!="0" = isActive).
+    private static final String NOT_A_LEADER = "khong";
+    private static final Set<String> GROUPED_LEADER_LEVELS = Set.of("lanhdaocq", "lanhdaodv", "lanhdaopb");
+    private static final String GROUPED_LEADER_KEY = "lanhdao";
+
+    public List<Map<String, Object>> getUnitLeaders(String orgIdRaw, String levelRaw, String leaderGroupRaw) {
+        UUID orgId = parseUuid(orgIdRaw);
+        if (orgId == null) {
+            return List.of();
+        }
+        String level = levelRaw == null ? "" : levelRaw.trim();
+        String leaderGroup = leaderGroupRaw == null ? "" : leaderGroupRaw.trim();
+        return appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(collectDescendantIds(orgId)).stream()
+            .filter(AppUser::isActive)
+            .filter(user -> {
+                String cap = safe(user.getCapLanhDao()).trim();
+                if (cap.isEmpty() || NOT_A_LEADER.equalsIgnoreCase(cap)) {
+                    return false;
+                }
+                if (!level.isEmpty() && !level.equals(user.getLevel() == null ? "" : String.valueOf(user.getLevel()))) {
+                    return false;
+                }
+                String group = GROUPED_LEADER_LEVELS.contains(cap.toLowerCase()) ? GROUPED_LEADER_KEY : cap;
+                return leaderGroup.isEmpty() || leaderGroup.equalsIgnoreCase(group);
+            })
+            .sorted(java.util.Comparator.comparingInt(AppUser::getSortOrder)
+                .thenComparing(user -> safe(user.getFullName())))
+            .map(this::toLeaderRow)
+            .toList();
+    }
+
+    private Map<String, Object> toLeaderRow(AppUser user) {
+        Map<String, Object> dynamicFields = dynamicDocumentFieldsService.parseDynamicFields(user.getDynamicFieldsJson());
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", user.getId() == null ? null : user.getId().toString());
+        row.put("name", user.getFullName());
+        row.put("username", user.getUsername());
+        row.put("level", user.getLevel() == null ? "" : String.valueOf(user.getLevel()));
+        row.put("position", dynamicFields.getOrDefault("position", ""));
+        row.put("sort_order", user.getSortOrder());
+        row.put("caplanhdao", user.getCapLanhDao());
+        row.put("delegation_obj", dynamicFields.getOrDefault("delegation_obj", ""));
+        return row;
     }
 
     // BFS xuong Organization.parentId, gom CA key goc - tranh vong lap bang visited set (phong du

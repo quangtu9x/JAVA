@@ -25,11 +25,17 @@ class GetPhieuTrinhTdChiTietUseCaseTest {
     @Mock
     private PhieuTrinhTdProcessDocumentRepository phieuTrinhTdProcessDocumentRepository;
 
+    @Mock
+    private com.td.application.documents.ListDocumentFilesUseCase listDocumentFilesUseCase;
+
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
 
     private GetPhieuTrinhTdChiTietUseCase useCase() {
+        org.mockito.Mockito.lenient().when(listDocumentFilesUseCase.execute(org.mockito.ArgumentMatchers.any()))
+            .thenReturn(new com.td.application.common.models.PaginationResponse<>(List.of(), 1, 20, 0L, 0, true, true));
         return new GetPhieuTrinhTdChiTietUseCase(
-            phieuTrinhTdDocumentRepository, phieuTrinhTdProcessDocumentRepository, dynamicDocumentFieldsService);
+            phieuTrinhTdDocumentRepository, phieuTrinhTdProcessDocumentRepository,
+            new PhieuTrinhTdFieldMapper(dynamicDocumentFieldsService, listDocumentFilesUseCase));
     }
 
     @Test

@@ -29,4 +29,16 @@ public class VbdenReplyDocumentRef {
     private String promulgationDate;
 
     private String unitPublish;
+    /**
+     * 05/10/2026 (báo lỗi "bấm văn bản trả lời ở Quá trình xử lý mở modal trống"): FE mở chi tiết theo
+     * {@code action} của từng phần tử ({@code QuatrinhxulyVBden.jsx#componentsMap}, "ganvbdi" = văn bản đi).
+     * Trước đây bị bỏ khi ghi {@code res_obj} — rỗng thì ghi mặc định {@link #DEFAULT_ACTION}.
+     */
+    private String action;
+
+    public static final String DEFAULT_ACTION = "ganvbdi";
+
+    public String resolvedAction() {
+        return action == null || action.isBlank() ? DEFAULT_ACTION : action.trim();
+    }
 }

@@ -3,6 +3,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\events\E
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\DomainEvent.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\IAggregateRoot.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\DefaultAuditableEntity.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\documentlinks\DocumentLinkType.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\UserRoleAssignment.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\UserDataScope.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\AuditableEntity.java
@@ -22,6 +23,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\privatecatalog\
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\duthao\DraftProcessDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\hosoluutru\HoSoLuuTruProcessDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\AppPermission.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\documentlinks\DocumentLink.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\messaging\OutboxEvent.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\Entity.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\ISoftDelete.java

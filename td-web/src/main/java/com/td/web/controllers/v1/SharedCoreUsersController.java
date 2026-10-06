@@ -131,9 +131,12 @@ public class SharedCoreUsersController extends BaseController {
             @RequestParam(required = false) Boolean isActive,
             @Parameter(description = "BL-112: lọc theo người dùng chính — dùng để liệt kê danh sách "
                 + "\"Kiêm nhiệm\" của 1 người dùng (AppUser.parentUserId)")
-            @RequestParam(required = false) UUID parentUserId) {
+            @RequestParam(required = false) UUID parentUserId,
+            @Parameter(description = "06/10/2026: chỉ lấy các tài khoản này (lặp tham số hoặc phân tách dấu phẩy)")
+            @RequestParam(required = false) java.util.List<String> usernames) {
 
         var request = new SearchAppUsersRequest();
+        request.setUsernames(usernames);
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
         request.setSortBy(sortBy);
