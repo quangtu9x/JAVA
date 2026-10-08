@@ -78,6 +78,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\KeycloakJwtConverter.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\messaging\KafkaClientConfig.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresDuThaoDocumentRepository.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\CompleteExternalPdfSignatureUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\RoleGroupRoleJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\RoleGroupJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresHoSoLuuTruDocumentRepository.java
@@ -191,6 +192,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\HoSoLuuTruProcessDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\GetSimPkiCertificateUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\documents\DeleteFileUseCaseImpl.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\PrepareExternalPdfSignatureUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\tenant\TenantDataSourceConfig.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\identityfiles\ListIdentityFilesUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\identityfiles\DeleteIdentityFileUseCaseImpl.java

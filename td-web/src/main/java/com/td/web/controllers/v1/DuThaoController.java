@@ -104,6 +104,8 @@ public class DuThaoController extends BaseController {
     // 03/10/2026: xoa vet / xoa tep cua vet "Qua trinh du thao" (chi nguoi tao dong).
     private final XoaVetDuThaoUseCase xoaVetDuThaoUseCase;
     private final XoaTepVetDuThaoUseCase xoaTepVetDuThaoUseCase;
+    // 08/10/2026: chuyen tep cua vet "Qua trinh du thao" thanh Tep ban hanh/Tep kem theo (thay qlvb/movefile).
+    private final com.td.application.duthao.ChuyenTepVetDuThaoUseCase chuyenTepVetDuThaoUseCase;
     private final ViewQueryService viewQueryService;
     private final AddDuThaoEditHistoryUseCase addDuThaoEditHistoryUseCase;
     private final ListDuThaoEditHistoryUseCase listDuThaoEditHistoryUseCase;
@@ -352,6 +354,16 @@ public class DuThaoController extends BaseController {
         description = "Thay qlvb/add (file_xoa) + qlvb/removefile — xoá mềm (ẩn tệp), ghi thêm 1 dòng file_xoa")
     public ResponseEntity<ApiResponse<UUID>> xoaTepVet(@Valid @RequestBody XoaTepVetDuThaoRequest request) {
         return ok(xoaTepVetDuThaoUseCase.execute(request));
+    }
+
+    @PostMapping("/ChuyenTepVet")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Chuyển 1 tệp của dòng 'Quá trình dự thảo' thành Tệp ban hành/Tệp kèm theo/Tệp phiếu trình",
+        description = "Thay qlvb/movefile?databasetype=duthao — thêm tên tệp vào trường fieldname "
+            + "(tepbanhanh|tepkemtheo|tepphieutrinh) của dự thảo, loại trùng; trả tên tệp")
+    public ResponseEntity<ApiResponse<String>> chuyenTepVet(
+            @Valid @RequestBody com.td.application.duthao.ChuyenTepVetDuThaoRequest request) {
+        return ok(chuyenTepVetDuThaoUseCase.execute(request));
     }
 
     private static UUID parseUuidOrNull(String value) {

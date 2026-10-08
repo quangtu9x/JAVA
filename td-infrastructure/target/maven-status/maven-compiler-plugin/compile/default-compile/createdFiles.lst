@@ -7,6 +7,7 @@ com\td\infrastructure\security\TdTokenAuthenticationFilter.class
 com\td\infrastructure\persistence\repository\VbdenUpdateHistoryDocumentJpaRepository.class
 com\td\infrastructure\errortracking\SensitiveDataSanitizer.class
 com\td\infrastructure\documents\VbdiEditHistorySync.class
+com\td\infrastructure\simpki\CompleteExternalPdfSignatureUseCaseImpl.class
 com\td\infrastructure\persistence\repository\DuThaoDocumentJpaRepository.class
 com\td\infrastructure\tracing\RequestTraceIdFilter.class
 com\td\infrastructure\persistence\repository\DraftProcessDocumentJpaRepository.class
@@ -31,6 +32,7 @@ com\td\infrastructure\persistence\repository\PostgresVbcddhDocumentRepository.cl
 com\td\infrastructure\persistence\identity\PostgresAppUserRoleGroupRepository.class
 com\td\infrastructure\security\ApiResponseAuthenticationEntryPoint.class
 com\td\infrastructure\onlyoffice\OnlyOfficeAccessClaims.class
+com\td\infrastructure\simpki\PrepareExternalPdfSignatureUseCaseImpl$1.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport$1.class
 com\td\infrastructure\persistence\repository\KeywordSql.class
 com\td\infrastructure\messaging\KafkaClientConfig.class
@@ -114,6 +116,7 @@ com\td\infrastructure\persistence\repository\PostgresWorkCalendarRepository.clas
 com\td\infrastructure\search\DocumentSearchMapper.class
 com\td\infrastructure\security\QlvbRoles.class
 com\td\infrastructure\persistence\identity\OrganizationJpaRepository.class
+com\td\infrastructure\simpki\PrepareExternalPdfSignatureUseCaseImpl.class
 com\td\infrastructure\persistence\repository\NumberingConfigJpaRepository.class
 com\td\infrastructure\persistence\repository\PostgresNumberingCounterRepository.class
 com\td\infrastructure\tenant\TenantRoutingDataSource.class

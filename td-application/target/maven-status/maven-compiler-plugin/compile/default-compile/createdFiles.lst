@@ -136,6 +136,7 @@ com\td\application\sharedcore\GetUserRoleGroupConfigUseCase.class
 com\td\application\categories\DeleteCategoryUseCase.class
 com\td\application\phieutrinhtd\RestorePhieuTrinhTdUseCase.class
 com\td\application\vbden\ChoYKienXinYKienUseCase.class
+com\td\application\duthao\ChuyenTepVetDuThaoRequest.class
 com\td\application\sharedcore\UpdateOrganizationUseCase$1.class
 com\td\application\documents\DocumentJsonMapper.class
 com\td\application\vbden\LuuVanBanDenResultDto.class
@@ -179,6 +180,7 @@ com\td\application\categories\CategoryDtoMapper.class
 template\department\application\DepartmentListCacheEntry$DepartmentListCacheEntryBuilder.class
 com\td\application\duthao\TraLaiDuThaoSupport$Receiver.class
 com\td\application\documents\DocumentLogDtoMapper.class
+com\td\application\simpki\CompleteExternalPdfSignatureUseCase.class
 com\td\application\tenant\GetTenantUseCase.class
 com\td\application\common\dynamicfields\DynamicFieldValueConverter$1.class
 com\td\application\vbdi\XoaTraLoiVanBanDenRequest.class
@@ -255,6 +257,7 @@ com\td\application\vbcddh\PhanCongNhiemVuUseCase.class
 com\td\application\duthao\AddDuThaoSeenDocumentRequest.class
 com\td\application\hosocv\GopYPhoiHopRequest.class
 com\td\application\sharedcore\SearchOrganizationsUseCase.class
+com\td\application\duthao\ChuyenTepVetDuThaoUseCase.class
 com\td\application\workflows\CreateWorkflowDefinitionRequest.class
 com\td\application\documents\SearchDocumentsUseCase.class
 com\td\application\common\crypto\CredentialCipher.class
@@ -474,6 +477,7 @@ com\td\application\documentregister\RecordIssuedDocumentRegisterNumberRequest.cl
 template\department\application\DepartmentListCacheEntry.class
 com\td\application\vbdi\HieuChinhVbdiRequest.class
 com\td\application\documents\DocumentFieldLayout.class
+com\td\application\simpki\PrepareExternalPdfSignatureUseCase.class
 com\td\application\vbdi\ListVbdiSendLogUseCase.class
 com\td\application\phieutrinhtd\PhieuTrinhTdListCriteria$PhieuTrinhTdListCriteriaBuilder.class
 com\td\application\hosocv\GetTokenLgspUseCase.class
@@ -749,6 +753,7 @@ com\td\application\common\security\CurrentTenantProvider.class
 com\td\application\vbdi\GanVanBanLienQuanUseCase.class
 com\td\application\tenant\TestTenantConnectionRequest.class
 com\td\application\vbden\KetThucXuLyRequest.class
+com\td\application\simpki\ExternalPdfSignatureResult.class
 com\td\application\documentregister\CopyDocumentRegistersResponse.class
 com\td\application\hosoluutru\HoSoLuuTruDanhMucDocumentRepository.class
 com\td\application\duthao\TraLaiDuThaoRequest.class

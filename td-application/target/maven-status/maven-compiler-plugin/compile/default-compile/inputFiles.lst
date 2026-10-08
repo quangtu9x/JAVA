@@ -127,6 +127,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\template\department\application\SearchDepartmentsUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\GetOrganizationUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\CapNhatYKienVbdenUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\ExternalPdfSignatureResult.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\GetSoLuongCanXuLyUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\AppUserDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\AddDuThaoEditHistoryUseCase.java
@@ -193,6 +194,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\docum
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\TraLaiDuThaoRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\CreateAppPermissionRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\TraTaiLieuUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\PrepareExternalPdfSignatureUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\AddDraftProcessDocumentUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\GetKiemNhiemPendingCountUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\RoleGroupPermissionRepository.java
@@ -242,6 +244,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\docum
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\FileDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\AppRoleDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UserDataScopeDtoMapper.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\ChuyenTepVetDuThaoUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\common\dynamicfields\ItemsFilter.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\SuaYKienVbdenUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\GanVanBanLienQuanDuThaoUseCase.java
@@ -417,6 +420,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoc
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\messaging\OutboundMessage.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\recordsstorage\DeleteRecordsStorageCatalogUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\LuuVanBanDenUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\ChuyenTepVetDuThaoRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\CapNhatKetQuaXuLyUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\UnlockDocumentRegistersUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\PhieuTrinhTdFieldMapper.java
@@ -707,6 +711,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\docum
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\recordsstorage\CreateRecordsStorageCatalogRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\TrinhThamKhaoPhieuTrinhTdUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\numbering\NumberingCounterRepository.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\CompleteExternalPdfSignatureUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbcddh\NhiemVuAssignment.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\recordsstorage\GetRecordsStorageCatalogUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\common\dynamicfields\FieldType.java

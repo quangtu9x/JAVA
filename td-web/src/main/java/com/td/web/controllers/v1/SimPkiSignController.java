@@ -67,6 +67,8 @@ public class SimPkiSignController extends BaseController {
     private final ConvertDocumentToPdfUseCase convertDocumentToPdfUseCase;
     private final GetSimPkiCertificateUseCase getSimPkiCertificateUseCase;
     private final LocateSimPkiSignaturesUseCase locateSimPkiSignaturesUseCase;
+    private final com.td.application.simpki.CompleteExternalPdfSignatureUseCase completeExternalPdfSignatureUseCase;
+    private final com.td.application.simpki.PrepareExternalPdfSignatureUseCase prepareExternalPdfSignatureUseCase;
     private final ObjectMapper objectMapper;
 
     // Bổ sung 23/09/2026: TDPdfViewer (SimPkiCertModal.jsx, "Thông tin chứng thư số") gọi THẲNG
@@ -86,6 +88,30 @@ public class SimPkiSignController extends BaseController {
             @RequestParam("msisdn") String msisdn) {
         var result = getSimPkiCertificateUseCase.execute(msisdn);
         return ok(result);
+    }
+
+    // 07/10/2026: ký USB Token (TDPdfViewer + TDClientAgent) — bước 9 "đóng gói CMS vào PDF" đi qua
+    // td-web thay vì viewer gọi thẳng /api/pdf/external-signature/complete (qlvbv6 không định tuyến
+    // đường đó tới TDSimPki -> HTTP 500). Xem javadoc CompleteExternalPdfSignatureUseCase.
+    @PostMapping(value = "/external-signature/complete", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Hoàn tất chữ ký USB Token: nhúng CMS vào PDF (proxy TDSimPki)",
+        description = "Body giữ nguyên hợp đồng TDSimPki /api/pdf/external-signature/complete; trả {fileBase64, fileName}.")
+    public ResponseEntity<ApiResponse<com.td.application.simpki.ExternalPdfSignatureResult>> completeExternalSignature(
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> request) {
+        return ok(completeExternalPdfSignatureUseCase.execute(request));
+    }
+
+    // 08/10/2026: ký USB Token - thêm 1 chữ ký CÓ HÌNH tại 1 vị trí tem (gọi lặp cho từng tem) - xem
+    // PrepareExternalPdfSignatureUseCase. API riêng, không dùng chung luồng SIM.
+    @PostMapping(value = "/external-signature/prepare", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Chuẩn bị 1 chữ ký USB Token có hình tại 1 vị trí tem (proxy TDSimPki)",
+        description = "Body {requestId, pdfBase64, placement{page,x,y,width,height,imageBase64,type,text,color}, certBase64, fileName}; "
+            + "trả {preparedPdfBase64, byteRange, contentsOffset, contentsLength, hashAlgorithm, hashBase64}.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> prepareExternalSignature(
+            @org.springframework.web.bind.annotation.RequestBody java.util.Map<String, Object> request) {
+        return ok(prepareExternalPdfSignatureUseCase.execute(request));
     }
 
     @PostMapping(value = "/sign", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

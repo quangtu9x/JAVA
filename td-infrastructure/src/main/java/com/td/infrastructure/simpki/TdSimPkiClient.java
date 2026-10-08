@@ -206,6 +206,60 @@ public class TdSimPkiClient {
         return sendForJson(request, "certificates");
     }
 
+    /**
+     * 07/10/2026: hoàn tất chữ ký USB Token (POST /api/pdf/external-signature/complete) — xem javadoc
+     * {@code CompleteExternalPdfSignatureUseCase}. Lỗi 4xx của TDSimPki (ByteRange/chữ ký không khớp,
+     * chứng thư hết hạn...) giữ nguyên thông điệp để người dùng biết lý do, không gộp thành lỗi chung.
+     */
+    public JsonNode completeExternalSignature(java.util.Map<String, Object> payload) {
+        return postExternalSignature("complete", payload);
+    }
+
+    /**
+     * 08/10/2026: chuẩn bị 1 chữ ký USB Token CÓ HÌNH tại 1 vị trí tem (POST
+     * /api/pdf/external-signature/prepare, TDSimPki ExternalPdfSignaturePrepareService) — client gọi lặp
+     * cho từng tem: prepare -> Token ký -> complete.
+     */
+    public JsonNode prepareExternalSignature(java.util.Map<String, Object> payload) {
+        return postExternalSignature("prepare", payload);
+    }
+
+    private JsonNode postExternalSignature(String action, java.util.Map<String, Object> payload) {
+        ensureEnabled();
+        String jsonBody;
+        try {
+            jsonBody = objectMapper.writeValueAsString(payload);
+        } catch (IOException ex) {
+            throw new TdSimPkiException("Khong the dung JSON yeu cau hoan tat chu ky", ex);
+        }
+        HttpRequest request = baseRequestBuilder("/api/pdf/external-signature/" + action)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if (status >= 400 && status < 500) {
+                String message = null;
+                try {
+                    message = objectMapper.readTree(response.body()).path("message").asText(null);
+                } catch (IOException ignored) {
+                    // body không phải JSON
+                }
+                log.warn("TDSimPki external-signature tu choi: HTTP {} - {}", status, message);
+                throw new TdSimPkiException(message != null && !message.isBlank()
+                    ? message : "TDSimPki tu choi hoan tat chu ky: HTTP " + status);
+            }
+            requireOk(status, "external-signature/" + action, () -> "(an noi dung)");
+            return objectMapper.readTree(response.body());
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            throw new TdSimPkiException("Goi TDSimPki (external-signature/" + action + ") that bai: " + ex.getMessage(), ex);
+        }
+    }
+
     /** Tra trạng thái (GET /api/pdf/{id}/status). */
     public JsonNode status(String fileId) {
         ensureEnabled();

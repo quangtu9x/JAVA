@@ -557,7 +557,9 @@ public class SendVbdiDocumentUseCase {
             logRequest.setRecipientGroup(effectiveGroup);
             logRequest.setRecipientIdentifier(identifier);
             logRequest.setRecipientName(recipient.getName());
-            logRequest.setMailin(recipient.getMailin());
+            // 08/10/2026: KHÔNG ghi mailin nữa (không dùng — giao văn bản theo identifier; FE từng gửi giá
+            // trị rác của danh mục tổ chức, hiện lên cột "Địa chỉ nhận" ở Nhật ký gửi nhận).
+            logRequest.setMailin(null);
             logRequest.setStatus(statusLabel);
             logRequest.setContent(content);
             // Chi nhom contact_unit thuc su dung (td-woker chi tao van ban den that cho nhom nay) -
