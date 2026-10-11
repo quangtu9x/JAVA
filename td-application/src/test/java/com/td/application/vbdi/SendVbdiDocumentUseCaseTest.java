@@ -49,13 +49,36 @@ class SendVbdiDocumentUseCaseTest {
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
     private SendVbdiDocumentUseCase useCase;
+    // 09/10/2026: lần gửi đầu phải có tệp - mặc định văn bản có 1 tệp (test riêng đặt rỗng).
+    private List<com.td.application.documents.FileDto> documentFiles = List.of(
+        com.td.application.documents.FileDto.builder().fileId(UUID.randomUUID()).originalFileName("vb.pdf").build());
 
     @BeforeEach
     void setUp() {
         useCase = new SendVbdiDocumentUseCase(vbdiDocumentRepository, vbdiSendLogDocumentRepository,
             addVbdiSendLogUseCase, dynamicDocumentFieldsService, prepareVbdiDeliveryFilesUseCase,
             organizationRepository, organizationAgencyResolver,
-            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
+            documentId -> new com.td.application.common.models.PaginationResponse<>(documentFiles, 1, 20,
+                documentFiles.size(), 1, true, true));
+    }
+
+    // 09/10/2026 (báo lỗi snnmt): văn bản sao chép không có tệp -> lần gửi đầu bị từ chối, không ghi log gửi.
+    @Test
+    void execute_firstSendWithoutAttachment_shouldFail() {
+        documentFiles = List.of();
+        var document = issuedDocument();
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setCoordinator(List.of(recipient("hoangnt.skhcn", "Nong Thanh Hoang")));
+
+        var result = useCase.execute(request);
+
+        org.assertj.core.api.Assertions.assertThat(result.isSuccess()).isFalse();
+        org.assertj.core.api.Assertions.assertThat(result.getError()).isEqualTo(SendVbdiDocumentUseCase.NO_FILE_MESSAGE);
+        org.mockito.Mockito.verifyNoInteractions(addVbdiSendLogUseCase);
     }
 
     private VbdiDocument issuedDocument() {

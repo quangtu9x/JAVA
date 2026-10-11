@@ -43,7 +43,8 @@ class UpdateAppUserUseCaseTest {
 
     private UpdateAppUserUseCase newUseCase() {
         return new UpdateAppUserUseCase(appUserRepository, organizationRepository, roleGroupRepository,
-            appUserRoleGroupRepository, currentUserProvider, dynamicDocumentFieldsService);
+            appUserRoleGroupRepository, currentUserProvider, dynamicDocumentFieldsService,
+            new AppUserDeactivationGuard(appUserRepository, organizationRepository));
     }
 
     @Test

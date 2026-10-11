@@ -16,6 +16,7 @@ com\td\web\controllers\v1\PlatformDbServersController.class
 com\td\web\controllers\v1\VbdenController.class
 com\td\web\controllers\v1\FileController.class
 com\td\web\controllers\v1\QLVBCompatAuthController.class
+com\td\web\controllers\v1\UserDelegationsController.class
 template\department\web\DepartmentsController.class
 com\td\web\config\FormDataToJsonFilter$JsonBodyWrapper$1.class
 com\td\web\controllers\v1\SharedCorePermissionsController.class

@@ -88,4 +88,27 @@ class GetWeekWorkCalendarUseCaseTest {
         assertThat(item.get("t2_s")).isEqualTo("Hop giao ban");
         assertThat(item.get("t2_s_gio")).isEqualTo("08:00");
     }
+
+    @Test
+    void execute_shouldReadLegacySundayKeyInsideRequestedBusinessWeek() {
+        var legacy = new WorkCalendar("coquan", LocalDate.of(2026, 8, 16), "CQ01", "alice", null);
+        legacy.replaceWeekFields("{\"t2_s\":\"Lich cu van hien thi\"}");
+        when(workCalendarRepository.findByScopeAndWeekStartAndIdentifierAndDeletedOnIsNull(
+                "coquan", LocalDate.of(2026, 8, 17), "CQ01"))
+                .thenReturn(Optional.empty());
+        when(workCalendarRepository.findByScopeAndWeekStartBetweenAndIdentifierAndDeletedOnIsNull(
+                "coquan", LocalDate.of(2026, 8, 16), LocalDate.of(2026, 8, 23), "CQ01"))
+                .thenReturn(List.of(legacy));
+
+        var request = new GetWeekWorkCalendarRequest();
+        request.setWeekStart("17/08/2026");
+        request.setScope("coquan");
+        request.setSubject("CQ01");
+
+        var result = newUseCase().execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).hasSize(1);
+        assertThat(result.getData().get(0).get("t2_s")).isEqualTo("Lich cu van hien thi");
+    }
 }

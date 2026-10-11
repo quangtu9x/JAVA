@@ -34,6 +34,7 @@ public class UpdateAppUserUseCase {
     private final AppUserRoleGroupRepository appUserRoleGroupRepository;
     private final CurrentUserProvider currentUserProvider;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    private final AppUserDeactivationGuard deactivationGuard;
 
     public Result<UUID> execute(UUID id, UpdateAppUserRequest request) {
         try {
@@ -58,6 +59,21 @@ public class UpdateAppUserUseCase {
                 }
                 if (!orgOpt.get().isActive()) {
                     return Result.failure("Tổ chức đang bị vô hiệu hóa, không thể gán cho người dùng");
+                }
+            }
+
+            // 09/10/2026: đổi tổ chức qua form sửa — cùng kiểm tra với TransferAppUsersUseCase
+            // (người đại diện nhận văn bản của tổ chức hiện tại).
+            String transferBlocked = deactivationGuard.checkTransfer(current, request.getOrganizationId());
+            if (transferBlocked != null) {
+                return Result.failure(transferBlocked);
+            }
+            // 08/10/2026: đổi trạng thái sang Khoá qua form sửa cũng phải qua cùng kiểm tra với
+            // LockAppUsersUseCase (người đại diện nhận văn bản / tài khoản chính còn kiêm nhiệm).
+            if (Boolean.FALSE.equals(request.getIsActive()) && current.isActive()) {
+                String blocked = deactivationGuard.checkLock(current, List.of(current.getId()));
+                if (blocked != null) {
+                    return Result.failure(blocked);
                 }
             }
 

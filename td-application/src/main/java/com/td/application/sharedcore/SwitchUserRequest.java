@@ -5,12 +5,15 @@ import lombok.Data;
 
 /**
  * Port TDSwitchUser (Domino) — xem docs/analysis/19-checklist-port-tdswitchuser-domino-sang-java.md.
- * CỐ TÌNH KHÔNG có field {@code ma} (mã bảo mật hardcode {@code "123@!@#Aa"} của Domino gốc) — gate
- * bằng {@code @PreAuthorize("hasRole('ADMIN')")} ở controller thay thế, Spring Security đã đủ.
+ * Giữ field {@code ma} tương thích luồng Domino cũ. Controller kiểm tra mã này cùng quyền ADMIN;
+ * giá trị thật được đọc từ cấu hình môi trường và không trả về client.
  */
 @Data
 public class SwitchUserRequest {
 
     @NotBlank(message = "Tên đăng nhập không được để trống")
     private String username;
+
+    @NotBlank(message = "Mã bảo mật không được để trống")
+    private String ma;
 }

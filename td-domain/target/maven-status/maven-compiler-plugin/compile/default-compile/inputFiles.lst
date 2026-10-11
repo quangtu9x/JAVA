@@ -40,6 +40,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contract
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\IAuditableEntity.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\duthao\DuThaoEditHistoryDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\IdentityFileMetadata.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\UserDelegation.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\phieutrinhtd\PhieuTrinhTdProcessDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\RoleGroupPermission.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbdi\VbdiSendLogDocument.java

@@ -32,7 +32,7 @@ class GetLegacyOrgLookupForDungChungUseCaseTest {
 
     private GetLegacyOrgLookupForDungChungUseCase newUseCase() {
         return new GetLegacyOrgLookupForDungChungUseCase(
-            organizationRepository, appUserRepository, dynamicDocumentFieldsService);
+            organizationRepository, appUserRepository, dynamicDocumentFieldsService, UserDelegationTestSupport.emptyResolver());
     }
 
     @Test

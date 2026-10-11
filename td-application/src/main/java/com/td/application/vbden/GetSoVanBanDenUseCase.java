@@ -83,11 +83,16 @@ public class GetSoVanBanDenUseCase {
     private static final String VIEW_TRONGNGAY = "trongngay";
     private static final String VIEW_TRONGTHANG = "trongthang";
     private static final String VIEW_TRONGTUAN = "trongtuan";
+    // 09/10/2026: man "In sổ văn bản đến" (vbden/inso) - truoc day goi Domino qlvb/vbden/InSoVanBanDen.
+    static final String VIEW_INSOVANBAN = "insovanban";
+    private static final java.time.format.DateTimeFormatter DISPLAY_DATE =
+        java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final DocumentRepository documentRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final ListFilesForDocumentsUseCase listFilesForDocumentsUseCase;
+    private final VbdenResDocumentRepository vbdenResDocumentRepository;
 
     public PaginationResponse<Map<String, Object>> execute(GetSoVanBanDenRequest request) {
         String identifier = resolveCurrentIdentifier();
@@ -108,8 +113,16 @@ public class GetSoVanBanDenUseCase {
         Map<UUID, List<Map<String, Object>>> filesByParentId = wantsField(request.getItems(), FILES_FIELD)
             ? collectFilesByParentId(page.getContent())
             : Map.of();
+        boolean inSo = VIEW_INSOVANBAN.equals(viewname);
         List<Map<String, Object>> content = page.getContent().stream()
-            .map(entry -> joinWithParentDocument(entry, request.getItems(), filesByParentId))
+            .map(entry -> {
+                Map<String, Object> row = joinWithParentDocument(entry, request.getItems(), filesByParentId);
+                if (inSo) {
+                    row = new LinkedHashMap<>(row);
+                    row.put("ngaychuyen", resolveNgayChuyen(resolveParentId(entry)));
+                }
+                return row;
+            })
             .toList();
         return toPaginationResponse(content, page);
     }
@@ -200,6 +213,12 @@ public class GetSoVanBanDenUseCase {
                 .maxCreatedOn(today.withDayOfMonth(today.lengthOfMonth()));
             case VIEW_TRONGTUAN -> builder.minCreatedOn(today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)))
                 .maxCreatedOn(today.with(TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)));
+            // 09/10/2026 (port "In sổ văn bản đến" - Domino InSoVanBanDen.java): so tang dan, loc
+            // theo search (khoang ngay den + so van ban) - xem applyInSoSearch.
+            case VIEW_INSOVANBAN -> {
+                builder.primarySortField(DOCUMENT_NUMBER_FIELD).primarySortType("integer").sortDescending(false);
+                applyInSoSearch(builder, request.getSearch());
+            }
             default -> throw new IllegalArgumentException("Khong ho tro viewname: " + request.getViewname());
         }
 
@@ -209,6 +228,51 @@ public class GetSoVanBanDenUseCase {
             builder.includeFieldValues(Map.of(DOCUMENT_REGISTER_ID_FIELD, List.of(request.getIddanhmucso().trim())));
         }
         return builder.build();
+    }
+
+    // Domino InSoVanBanDen.java#createQueryInSoVBden: received_date = ["dd/MM/yyyy","dd/MM/yyyy"] (moi
+    // dau co the rong), document_register_id = 1 so. Cac field khac FE gui (form/author/keyword...)
+    // da duoc Domino bo qua hoac xu ly rieng (keyword o request.keyword).
+    private void applyInSoSearch(VbdenOrgViewFilter.VbdenOrgViewFilterBuilder builder, Map<String, Object> search) {
+        if (search == null) {
+            return;
+        }
+        if (search.get(RECEIVED_DATE_FIELD) instanceof List<?> range) {
+            builder.minReceivedDate(parseDisplayDate(range.size() > 0 ? range.get(0) : null));
+            builder.maxReceivedDate(parseDisplayDate(range.size() > 1 ? range.get(1) : null));
+        }
+        String registerId = asString(search.get(DOCUMENT_REGISTER_ID_FIELD));
+        if (registerId != null && !registerId.isBlank()) {
+            builder.includeFieldValues(Map.of(DOCUMENT_REGISTER_ID_FIELD, List.of(registerId.trim())));
+        }
+    }
+
+    private LocalDate parseDisplayDate(Object value) {
+        String text = asString(value);
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(text.trim(), DISPLAY_DATE);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    // Domino InSoVanBanDen.java#CollectionToArrayNode: "ngaychuyen" = ngay tao ban ghi quá trình xử
+    // lý "chuyenxuly" DAU TIEN cua van ban goc (view QTXL_by_parentid).
+    private String resolveNgayChuyen(UUID parentId) {
+        if (parentId == null) {
+            return "";
+        }
+        return vbdenResDocumentRepository.findByParentId(parentId.toString(), PageRequest.of(0, 200)).getContent().stream()
+            .filter(res -> "chuyenxuly".equalsIgnoreCase(asString(
+                dynamicDocumentFieldsService.parseDynamicFields(res.getDynamicFieldsJson()).get("action"))))
+            .map(res -> res.getCreatedOn())
+            .filter(Objects::nonNull)
+            .findFirst()
+            .map(createdOn -> createdOn.format(DISPLAY_DATE))
+            .orElse("");
     }
 
     // dxl 12-36 (sovanban): sort chinh document_number, dao chieu theo request.sort.

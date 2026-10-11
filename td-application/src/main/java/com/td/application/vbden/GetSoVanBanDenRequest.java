@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * BL-210/211 (VBDen — Sổ văn bản đến) — Slice 9: tương thích {@code qlvb/vbden/GetSoVanBanDen}
@@ -39,4 +40,11 @@ public class GetSoVanBanDenRequest {
 
     /** UUID (dạng chuỗi) của {@code DocumentRegister} cụ thể — rỗng = không lọc theo sổ. */
     private String iddanhmucso;
+
+    /**
+     * 09/10/2026 (port màn "In sổ văn bản đến", Domino {@code InSoVanBanDen.java}, viewname
+     * {@code insovanban}): bộ lọc nâng cao FE {@code vbden/inso/CollapseVBden.jsx} —
+     * {@code received_date} = mảng ["dd/MM/yyyy","dd/MM/yyyy"], {@code document_register_id}.
+     */
+    private Map<String, Object> search;
 }

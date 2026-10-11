@@ -17,6 +17,7 @@ import com.td.application.processdiagram.DiagramNodeRequest;
 import com.td.application.processdiagram.ProcessDiagramService;
 import com.td.application.sharedcore.OrganizationRepository;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
+import com.td.application.sharedcore.UserDelegationResolver;
 import com.td.domain.documents.BusinessDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -172,6 +173,8 @@ public class ChuyenXuLyVbdenUseCase {
     // xem javadoc VbdenForwardUnitMessagePayload#files.
     private final com.td.application.documents.GetDocumentFileRefsUseCase getDocumentFileRefsUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    // 09/10/2026 (port Ủy quyền): kiểm tra người ủy quyền trong userProcessDelegation/... trước khi ghi.
+    private final UserDelegationResolver userDelegationResolver;
 
     public Result<UUID> execute(ChuyenXuLyVbdenRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -629,6 +632,11 @@ public class ChuyenXuLyVbdenUseCase {
         if (request.getUserAssignerObj() != null && !request.getUserAssignerObj().isBlank()) {
             childFields.put(USER_ASSIGNER_OBJ_FIELD_RAW, request.getUserAssignerObj());
         }
+        // 09/10/2026 (port Ủy quyền): Domino docQTXL lưu nguyên *_delegation FE gửi — ở đây chỉ lưu người ủy
+        // quyền đã được server xác nhận (xem validatedDelegators).
+        putIfNotEmpty(childFields, "user_process_delegation", validatedDelegators(request.getUserProcessDelegation(), request.getUserProcess()));
+        putIfNotEmpty(childFields, "user_coordinate_delegation", validatedDelegators(request.getUserCoordinateDelegation(), request.getUserCoordinate()));
+        putIfNotEmpty(childFields, "user_to_read_delegation", validatedDelegators(request.getUserToReadDelegation(), request.getUserToRead()));
         childRequest.setFields(childFields);
 
         return addVbdenResDocumentUseCase.execute(childRequest);
@@ -654,6 +662,7 @@ public class ChuyenXuLyVbdenUseCase {
         updateDebiet(fields, request, actingUsername);
         updateTheodoi(fields, request);
         updatePhutrach(fields, request);
+        applyDelegations(fields, request);
         updateRichObjFields(fields, request);
         authorAclFieldsService.applyOnUpdate(DOCUMENT_TYPE, fields, AUTHOR_TOUCHED_FIELDS);
 
@@ -820,7 +829,12 @@ public class ChuyenXuLyVbdenUseCase {
     // "status" la cot tinh document.status (xem ghi chu o updateParentDocument) - ghi qua
     // parent.update(...), KHONG qua fields map (dynamic_fields).
     private void recomputeStatusOnFirstAssignment(BusinessDocument parent, Map<String, Object> fields, String statusBeforeUpdate) {
-        if (!VbdenStatusService.STATUS_MOI.equals(statusBeforeUpdate)) {
+        // 09/10/2026 (báo lỗi demo11 "chủ trì chưa làm gì mà hiện Đã xử lý"): văn bản ĐÃ xử lý xong (3/4,
+        // vd người trước Kết thúc xử lý) rồi được giao chủ trì MỚI (Phân công bổ sung/chuyển tiếp) thì
+        // cũng phải về "đang xử lý" — Domino chỉ xét status "0" nên giữ nguyên "Đã xử lý" sai.
+        boolean processedBefore = VbdenStatusService.STATUS_QUA_HAN_DA_XU_LY.equals(statusBeforeUpdate)
+            || VbdenStatusService.STATUS_DUNG_HAN_DA_XU_LY.equals(statusBeforeUpdate);
+        if (!VbdenStatusService.STATUS_MOI.equals(statusBeforeUpdate) && !processedBefore) {
             return;
         }
         LocalDate deadlineDate = parseDate(asString(fields.get(DEADLINE_DATE_FIELD)));
@@ -958,6 +972,42 @@ public class ChuyenXuLyVbdenUseCase {
             }
         }
         return result;
+    }
+
+    /**
+     * 09/10/2026 (port Ủy quyền) — Domino ChuyenXuLy.java: user_process_delegation → user_delivered
+     * (updateChutri), user_coordinate_delegation → user_coordinated_movement (updatePhoihop),
+     * user_to_read_delegation → user_to_readed (updateDebiet); theo dõi KHÔNG ghi (Domino comment). Người ủy
+     * quyền coi như đã chuyển cho người nhận ủy quyền — văn bản rời hàng chờ của họ, vào "đã chuyển".
+     */
+    private void applyDelegations(Map<String, Object> fields, ChuyenXuLyVbdenRequest request) {
+        validatedDelegators(request.getUserProcessDelegation(), request.getUserProcess())
+            .forEach(delegator -> addOne(fields, USER_DELIVERED_FIELD, delegator));
+        validatedDelegators(request.getUserCoordinateDelegation(), request.getUserCoordinate())
+            .forEach(delegator -> addOne(fields, USER_COORDINATED_MOVEMENT_FIELD, delegator));
+        validatedDelegators(request.getUserToReadDelegation(), request.getUserToRead())
+            .forEach(delegator -> addOne(fields, "user_to_readed", delegator));
+    }
+
+    // Chỉ giữ người ủy quyền ĐANG ủy quyền phạm vi "vbden" cho 1 người có trong danh sách giao tương ứng và
+    // bản thân không còn trong danh sách đó (Domino tin nguyên giá trị FE gửi — ở đây server tự kiểm tra).
+    private List<String> validatedDelegators(String delegators, String assignees) {
+        List<String> assigneeList = splitSemicolon(assignees);
+        if (assigneeList.isEmpty()) {
+            return List.of();
+        }
+        return splitSemicolon(delegators).stream()
+            .distinct()
+            .filter(delegator -> assigneeList.stream().noneMatch(a -> a.equalsIgnoreCase(delegator)))
+            .filter(delegator -> assigneeList.stream().anyMatch(delegate ->
+                userDelegationResolver.isActiveDelegation(delegator, delegate, UserDelegationResolver.SCOPE_VBDEN)))
+            .toList();
+    }
+
+    private void putIfNotEmpty(Map<String, String> target, String key, List<String> values) {
+        if (!values.isEmpty()) {
+            target.put(key, String.join(";", values));
+        }
     }
 
     private List<String> splitSemicolon(String value) {

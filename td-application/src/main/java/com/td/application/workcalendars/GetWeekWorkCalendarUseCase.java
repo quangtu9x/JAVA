@@ -61,6 +61,22 @@ public class GetWeekWorkCalendarUseCase {
                     : workCalendarRepository.findByScopeAndWeekStartAndIdentifierAndDeletedOnIsNull(
                             scope, weekStart, subject);
 
+            // Compatibility repair for records written by the short-lived FE bug that sent the
+            // selected day instead of Monday. Prefer the canonical Monday record; otherwise accept
+            // one active record inside the same Monday-Sunday business week.
+            if (found.isEmpty()) {
+                LocalDate legacyWeekStart = weekStart.minusDays(1); // FE cũ dùng startOf('week') = Chủ Nhật
+                LocalDate weekEnd = weekStart.plusDays(6);
+                found = ("canhan".equals(scope)
+                        ? workCalendarRepository
+                            .findByScopeAndWeekStartBetweenAndUserCreatorAndDeletedOnIsNull(
+                                scope, legacyWeekStart, weekEnd, subject)
+                        : workCalendarRepository
+                            .findByScopeAndWeekStartBetweenAndIdentifierAndDeletedOnIsNull(
+                                scope, legacyWeekStart, weekEnd, subject))
+                        .stream().findFirst();
+            }
+
             if (found.isEmpty()) {
                 return Result.success(List.of());
             }

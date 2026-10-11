@@ -114,6 +114,9 @@ class VbdenPermissionIntegrationTest {
     private ViewQueryService viewQueryService;
     @MockBean
     private ChuyenXuLyVbdenUseCase chuyenXuLyVbdenUseCase;
+    // 09/10/2026: @PreAuthorize cua ChuyenXuLy goi bean nay qua SpEL (role HOAC nguoi tham gia xu ly).
+    @MockBean(name = "vbdenParticipantChecker")
+    private com.td.application.vbden.VbdenParticipantChecker vbdenParticipantChecker;
     @MockBean
     private GuiSangVbcddhUseCase guiSangVbcddhUseCase;
     // Bo sung 18/09/2026 - xem ghi chu trong VbdenControllerTest (bay "WebMvcTest MockBean drift").
@@ -175,6 +178,8 @@ class VbdenPermissionIntegrationTest {
     private com.td.application.vbden.TheoDoiVanBanDenUseCase theoDoiVanBanDenUseCase;
     @MockBean
     private com.td.application.vbden.GetSoLuongCanXuLyUseCase getSoLuongCanXuLyUseCase;
+    @MockBean
+    private com.td.application.vbden.BaoCaoTheoPhongVbdenUseCase baoCaoTheoPhongVbdenUseCase;
     @MockBean
     private ProcessDiagramService processDiagramService;
     @MockBean
@@ -321,6 +326,21 @@ class VbdenPermissionIntegrationTest {
                 .contentType("application/json")
                 .content("{\"parentid\":\"" + UUID.randomUUID() + "\",\"action\":\"phanxuly\",\"userProcess\":\"nguyenvana\"}"))
             .andExpect(status().isForbidden());
+    }
+
+    // 09/10/2026 (bao loi demo13): khong co quyen phan cong nhung DANG THAM GIA xu ly van ban do
+    // (co ten trong user_*) - chuyen tiep/ghi y kien duoc, dung Domino ChuyenXuLy.java.
+    @Test
+    void chuyenXuLy_withoutQlvbRole_butParticipant_shouldReturn201() throws Exception {
+        UUID parentId = UUID.randomUUID();
+        when(vbdenParticipantChecker.isCurrentUserParticipant(parentId)).thenReturn(true);
+        when(chuyenXuLyVbdenUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        mockMvc.perform(post("/api/v1/vbden/ChuyenXuLy")
+                .header("Tdtoken", buildToken("nhanvien01", "QXemVBDen"))
+                .contentType("application/json")
+                .content("{\"parentid\":\"" + parentId + "\",\"action\":\"chuyenxuly\",\"userProcess\":\"nguyenvana\"}"))
+            .andExpect(status().isCreated());
     }
 
     @Test

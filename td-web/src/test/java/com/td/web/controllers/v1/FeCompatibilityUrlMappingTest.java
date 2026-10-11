@@ -74,6 +74,11 @@ class FeCompatibilityUrlMappingTest {
     @MockBean
     private GetLegacyOrgLookupForDungChungUseCase getLegacyOrgLookupForDungChungUseCase;
     @MockBean
+    private com.td.application.sharedcore.SearchLegacyDanhMucUseCase searchLegacyDanhMucUseCase;
+    // 09/10/2026: LegacyDanhMucController nhom_*_by_identifier (xin y kien thanh vien).
+    @MockBean
+    private com.td.application.privatecatalog.GetGroupPeopleByTypeUseCase getGroupPeopleByTypeUseCase;
+    @MockBean
     private CreateOrganizationUseCase createOrganizationUseCase;
     @MockBean
     private UpdateOrganizationUseCase updateOrganizationUseCase;

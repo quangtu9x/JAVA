@@ -43,6 +43,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\QlvbRoles.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\SecurityResponseWriter.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\errortracking\ErrorTrackingService.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\PostgresUserDelegationRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\tenant\controlplane\MultiPersistenceUnitJpaConfig.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\SubmitSimPkiSignatureUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\identityfiles\GetIdentityFileUseCaseImpl.java
@@ -65,6 +66,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\TdSimPkiProperties.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\VbdiSendLogDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\onlyoffice\OnlyOfficeAccessTokenException.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\LocateTextSlotsUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresVbdenUpdateHistoryDocumentRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\DocumentLinkJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\documents\CopyDocumentFilesUseCaseImpl.java
@@ -133,6 +135,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\onlyoffice\OnlyOfficeProperties.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresFileAccessLogRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\simpki\ConvertDocumentToPdfUseCaseImpl.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\UserDelegationJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\documents\RenameFileUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\PostgresOrganizationRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\AccountProvisioningChecker.java

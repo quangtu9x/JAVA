@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 // BL-108: chuyển đơn vị hàng loạt — 1 transaction rõ ràng (tất cả thành công hoặc rollback), thay
@@ -22,6 +23,7 @@ public class TransferAppUsersUseCase {
 
     private final AppUserRepository appUserRepository;
     private final OrganizationRepository organizationRepository;
+    private final AppUserDeactivationGuard deactivationGuard;
 
     public Result<List<UUID>> execute(List<UUID> userIds, UUID organizationId) {
         try {
@@ -55,6 +57,14 @@ public class TransferAppUsersUseCase {
             }
             if (!notFound.isEmpty()) {
                 return Result.failure("Không tìm thấy người dùng với ID: " + notFound);
+            }
+            // 09/10/2026: người đại diện nhận văn bản của tổ chức hiện tại -> từ chối CẢ lượt.
+            List<String> blocked = users.stream()
+                .map(user -> deactivationGuard.checkTransfer(user, organizationId))
+                .filter(Objects::nonNull)
+                .toList();
+            if (!blocked.isEmpty()) {
+                return Result.failure(String.join(" ", blocked));
             }
 
             List<UUID> updated = new ArrayList<>();

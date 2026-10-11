@@ -38,7 +38,7 @@ class SearchAppUsersUseCaseTest {
 
     private SearchAppUsersUseCase newUseCase() {
         return new SearchAppUsersUseCase(appUserRepository, appUserRoleGroupRepository, dynamicDocumentFieldsService,
-            roleGroupRepository);
+            roleGroupRepository, UserDelegationTestSupport.emptyResolver());
     }
 
     @Test

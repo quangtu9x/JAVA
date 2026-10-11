@@ -71,11 +71,13 @@ public class LegacyDanhMucController extends BaseController {
     private final GetLegacyOrganizationTreeUseCase getLegacyOrganizationTreeUseCase;
     private final GetLegacyOrganizationFlatListUseCase getLegacyOrganizationFlatListUseCase;
     private final GetLegacyOrgLookupForDungChungUseCase getLegacyOrgLookupForDungChungUseCase;
+    private final com.td.application.privatecatalog.GetGroupPeopleByTypeUseCase getGroupPeopleByTypeUseCase;
     private final CreateOrganizationUseCase createOrganizationUseCase;
     private final UpdateOrganizationUseCase updateOrganizationUseCase;
     private final DeleteOrganizationUseCase deleteOrganizationUseCase;
     private final GetCapBanHanhOptionsUseCase getCapBanHanhOptionsUseCase;
     private final GetKyThuaLenhSignersUseCase getKyThuaLenhSignersUseCase;
+    private final com.td.application.sharedcore.SearchLegacyDanhMucUseCase searchLegacyDanhMucUseCase;
 
     // BL-105: LuuDanhMuc/XoaDanhMuc/CapNhatCache dung chung du lieu + cache voi CategoriesController
     private final CreateCategoryUseCase createCategoryUseCase;
@@ -391,6 +393,18 @@ public class LegacyDanhMucController extends BaseController {
     // vwcocautochuc (con truc tiep 1 to chuc), user_by_parentid (thanh vien truc tiep),
     // users_by_parentids (thanh vien CA CAY CON). Dinh tuyen theo request.getViewname() TRUOC KHI
     // roi vao nhanh Category mac dinh - KHONG doi shape/route cua nhanh Category (van la default).
+    // 11/10/2026: thay qlvb/search?databasetype=qlvb|tudien (FE baseAPI tu chuyen huong) - xem javadoc
+    // SearchLegacyDanhMucUseCase. Tra {supported, items, total}; supported=false -> FE goi lai Domino.
+    @PostMapping("/TimKiemDanhMucCu")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Dịch công thức Domino qlvb/search (danh mục/người dùng/đơn vị/sổ) sang dữ liệu Java")
+    public ResponseEntity<com.td.application.common.models.ApiResponse<Map<String, Object>>> timKiemDanhMucCu(@RequestBody Map<String, Object> body) {
+        Object query = body == null ? null : body.get("query");
+        Object keyword = body == null ? null : body.get("keyword");
+        return ok(searchLegacyDanhMucUseCase.execute(
+            query == null ? null : String.valueOf(query), keyword == null ? null : String.valueOf(keyword)));
+    }
+
     @PostMapping("/LayDanhSachDungChung")
     @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
     @Operation(summary = "Lay danh sach dung chung theo form (tuong thich qlvb/danhmuc/LayDanhSachDungChung)",
@@ -414,6 +428,11 @@ public class LegacyDanhMucController extends BaseController {
         }
         if ("users_by_parentids".equalsIgnoreCase(viewname)) {
             return ok(getLegacyOrgLookupForDungChungUseCase.getOrganizationMembers(firstKey, true));
+        }
+        // 09/10/2026: nhom_{tvub,tvnb,btv,bch,ttdu}_by_identifier (truoc la Domino qlvb/danhmuc/GetView
+        // tudien) - nhom thanh vien xin y kien, keys[0] = identifier. Xem GetGroupPeopleByTypeUseCase.
+        if (com.td.application.privatecatalog.GetGroupPeopleByTypeUseCase.supportsView(viewname)) {
+            return ok(getGroupPeopleByTypeUseCase.execute(viewname, firstKey));
         }
         // 06/10/2026: vwunitleaders (truoc la Domino qlvb/danhmuc/GetLanhDao) - keys [orgId, level, nhom cap lanh dao].
         if ("vwunitleaders".equalsIgnoreCase(viewname)) {
@@ -615,15 +634,14 @@ public class LegacyDanhMucController extends BaseController {
     }
 
     @DeleteMapping("/XoaDanhMuc")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER', 'CVQuanTri', 'CVQuanTriDV')")
     @Operation(summary = "Xoa danh muc hoac lam moi cache (tuong thich qlvb/danhmuc/XoaDanhMuc)",
         description = "{id, deleteoption} -> xoa mem danh muc (dung chung du lieu voi CategoriesController). "
             + "{deletetype:\"cache\"} -> lam moi cache danh muc. KHONG ho tro xoa truc tiep 1 Redis key tuy y "
             + "(key_cache) nhu ban goc vi ly do bao mat. Rieng databasetype=lichct (port lichct 08/09/2026) - "
             + "route sang DeleteWorkCalendarUseCase. LUU Y: endpoint nay van yeu cau vai tro ADMIN/"
-            + "PRODUCT_MANAGER/BRAND_MANAGER (ke thua @PreAuthorize dung chung) - CHUA ap dung logic "
-            + "'chu lich tu xoa duoc' cua Domino goc cho lichct (ghi nhan la han che, xem muc 11 tai lieu 09) "
-            + "- an toan hon la noi long nham bao mat cua nhanh Category.")
+            + "PRODUCT_MANAGER/BRAND_MANAGER/CVQuanTri/CVQuanTriDV; nhanh lichct con kiem tra quyen "
+            + "chu so huu va menu_lichct tai application use case.")
     public ResponseEntity<com.td.application.common.models.ApiResponse<UUID>> xoaDanhMuc(
             @RequestParam(name = "databasetype", required = false) String databasetype,
             @RequestBody XoaDanhMucRequest request) {

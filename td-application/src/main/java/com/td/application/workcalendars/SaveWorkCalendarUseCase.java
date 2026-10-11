@@ -64,12 +64,13 @@ public class SaveWorkCalendarUseCase {
 
     // Xem javadoc lop ve sai lech so voi chuoi regex goc trong tai lieu 09.
     static final Pattern WEEK_FIELD_KEY_PATTERN =
-            Pattern.compile("^(t[2-7]|cn)_(s|c)(_[0-9]+)?(_gio|_dd|_tp)?$");
+            Pattern.compile("^((t[2-7]|cn)_(s|c)(_[0-9]+)?(_gio|_dd|_tp)?|(t[2-7]|cn)_(gio|dd|tp)_(s|c))$");
 
     private final WorkCalendarRepository workCalendarRepository;
     private final WorkCalendarCacheService workCalendarCacheService;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final CurrentUserProvider currentUserProvider;
+    private final WorkCalendarPermissionService permissionService;
 
     public Result<UUID> execute(SaveWorkCalendarRequest request) {
         try {
@@ -103,7 +104,7 @@ public class SaveWorkCalendarUseCase {
         }
         var calendar = opt.get();
 
-        if (!canEdit(calendar.getUserCreator(), currentUsername)) {
+        if (!permissionService.canEdit(request.getScope(), calendar.getIdentifier(), calendar.getUserCreator())) {
             return Result.failure("Ban khong co quyen sua lich cong tac nay");
         }
 
@@ -122,14 +123,24 @@ public class SaveWorkCalendarUseCase {
         // dung tien le TaoDuThaoUseCase (userCreator do server tu gan theo tai khoan dang dang nhap).
         String userCreator = currentUsername;
 
+        if (!permissionService.canCreate(request.getScope(), identifier)) {
+            return Result.failure("Ban khong co quyen tao lich cong tac nay");
+        }
+
         if ("canhan".equals(scope)) {
             if (userCreator == null) {
                 return Result.failure("Khong xac dinh duoc nguoi dung hien tai");
             }
             var existing = workCalendarRepository
                     .findByScopeAndWeekStartAndUserCreatorAndDeletedOnIsNull(scope, weekStart, userCreator);
+            if (existing.isEmpty()) {
+                existing = workCalendarRepository
+                        .findByScopeAndWeekStartBetweenAndUserCreatorAndDeletedOnIsNull(
+                                scope, weekStart.minusDays(1), weekStart.plusDays(6), userCreator)
+                        .stream().findFirst();
+            }
             if (existing.isPresent()) {
-                return Result.failure("Da ton tai lich ca nhan cho tuan nay");
+                return updateExisting(existing.get(), request, weekFieldsJson);
             }
         } else {
             if (identifier == null) {
@@ -137,8 +148,14 @@ public class SaveWorkCalendarUseCase {
             }
             var existing = workCalendarRepository
                     .findByScopeAndWeekStartAndIdentifierAndDeletedOnIsNull(scope, weekStart, identifier);
+            if (existing.isEmpty()) {
+                existing = workCalendarRepository
+                        .findByScopeAndWeekStartBetweenAndIdentifierAndDeletedOnIsNull(
+                                scope, weekStart.minusDays(1), weekStart.plusDays(6), identifier)
+                        .stream().findFirst();
+            }
             if (existing.isPresent()) {
-                return Result.failure("Da ton tai lich " + scope + " cho tuan nay");
+                return updateExisting(existing.get(), request, weekFieldsJson);
             }
         }
 
@@ -149,12 +166,18 @@ public class SaveWorkCalendarUseCase {
         return Result.success(saved.getId());
     }
 
-    // Xem javadoc lop ve pham vi CHUA du 4 dieu kien canEditSchedule.
-    private boolean canEdit(String existingUserCreator, String currentUsername) {
-        if (existingUserCreator == null || existingUserCreator.isBlank()) {
-            return true; // khong xac dinh duoc chu - fail-open, tranh chan nham du lieu cu
-        }
-        return existingUserCreator.equals(currentUsername);
+    /**
+     * Idempotent create by the calendar natural key. The FE normally supplies an id after loading
+     * the week, but a refresh/race must not turn the same week into a duplicate-create error.
+     * Authorization has already been checked by {@link WorkCalendarPermissionService#canCreate}.
+     */
+    private Result<UUID> updateExisting(
+            WorkCalendar calendar, SaveWorkCalendarRequest request, String weekFieldsJson) {
+        calendar.updateNote(request.getNote());
+        calendar.replaceWeekFields(weekFieldsJson);
+        var saved = workCalendarRepository.save(calendar);
+        evictCache(saved);
+        return Result.success(saved.getId());
     }
 
     private void evictCache(WorkCalendar calendar) {

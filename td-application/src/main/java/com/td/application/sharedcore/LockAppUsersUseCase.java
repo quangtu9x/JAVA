@@ -1,6 +1,7 @@
 package com.td.application.sharedcore;
 
 import com.td.application.common.models.Result;
+import com.td.domain.sharedcore.AppUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 // BL-108: khoá tài khoản hàng loạt (tương đương field `status`="0" của Domino — field `locked` cũ
@@ -19,6 +21,7 @@ import java.util.UUID;
 public class LockAppUsersUseCase {
 
     private final AppUserRepository appUserRepository;
+    private final AppUserDeactivationGuard deactivationGuard;
 
     public Result<List<UUID>> execute(List<UUID> userIds) {
         try {
@@ -26,13 +29,25 @@ public class LockAppUsersUseCase {
                 return Result.failure("Danh sách người dùng không được để trống");
             }
 
-            List<UUID> updated = new ArrayList<>();
+            List<AppUser> users = new ArrayList<>();
             for (UUID id : userIds) {
-                appUserRepository.findByIdAndDeletedOnIsNull(id).ifPresent(user -> {
-                    user.update(null, null, null, null, null, false);
-                    appUserRepository.save(user);
-                    updated.add(user.getId());
-                });
+                appUserRepository.findByIdAndDeletedOnIsNull(id).ifPresent(users::add);
+            }
+            // 08/10/2026: người đại diện nhận văn bản / tài khoản chính còn kiêm nhiệm -> từ chối
+            // CẢ lượt (kiểm tra hết trước khi ghi), không khoá 1 phần.
+            List<String> blocked = users.stream()
+                .map(user -> deactivationGuard.checkLock(user, userIds))
+                .filter(Objects::nonNull)
+                .toList();
+            if (!blocked.isEmpty()) {
+                return Result.failure(String.join(" ", blocked));
+            }
+
+            List<UUID> updated = new ArrayList<>();
+            for (AppUser user : users) {
+                user.update(null, null, null, null, null, false);
+                appUserRepository.save(user);
+                updated.add(user.getId());
             }
             // Trước đây trả success ngay cả khi không id nào khớp (vd id sai/đã bị xoá/lệch schema
             // tenant) — FE nhận "Thao tác thành công!" dù KHÔNG có gì thay đổi thật, gây cảm giác

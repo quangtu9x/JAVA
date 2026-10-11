@@ -85,7 +85,65 @@ class ChuyenXuLyVbdenUseCaseTest {
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
             processDiagramService, resolveIdentifierByLevelUseCase, publishVbdiReplyStatusUseCase,
             organizationRepository, currentTenantProvider, outboxPublisherService, getDocumentFileRefsUseCase,
-            authorAclFieldsService);
+            authorAclFieldsService, com.td.application.sharedcore.UserDelegationTestSupport.resolverWith(delegations));
+    }
+
+    // 09/10/2026 (port Ủy quyền): ủy quyền dùng chung cho test, mặc định rỗng.
+    private final java.util.List<com.td.domain.sharedcore.UserDelegation> delegations = new java.util.ArrayList<>();
+
+    private void delegate(String delegator, String delegate, String scopes) {
+        java.time.LocalDate today = com.td.application.sharedcore.UserDelegationResolver.today();
+        delegations.add(new com.td.domain.sharedcore.UserDelegation(UUID.randomUUID(), delegator,
+            UUID.randomUUID(), delegate, "Nguoi nhan", "Pho phong", today.minusDays(1), today.plusDays(1), scopes, null));
+    }
+
+    // Ủy quyền hợp lệ: FE đã thay truongphong bằng phophong trong userProcess, gửi truongphong ở
+    // userProcessDelegation -> truongphong vào user_delivered ("đã chuyển"), vết lưu user_process_delegation.
+    @Test
+    void execute_withActiveDelegation_shouldMarkDelegatorAsDelivered() {
+        delegate("truongphong", "phophong", "vbden;duthao");
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"vanthu01\"]}", "2");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));
+        org.mockito.ArgumentCaptor<com.td.application.documents.AddDynamicDocumentRequest> captor =
+            org.mockito.ArgumentCaptor.forClass(com.td.application.documents.AddDynamicDocumentRequest.class);
+        when(addVbdenResDocumentUseCase.execute(captor.capture())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenxuly");
+        request.setUserProcess("phophong");
+        request.setUserProcessDelegation("truongphong");
+
+        useCase.execute(request);
+
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        org.assertj.core.api.Assertions.assertThat((java.util.List<?>) fields.get("user_delivered")).asList().contains("truongphong");
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getFields()).containsEntry("user_process_delegation", "truongphong");
+    }
+
+    // Không có ủy quyền thật (hoặc sai phạm vi) -> server bỏ qua giá trị FE gửi.
+    @Test
+    void execute_withoutActiveDelegation_shouldIgnoreDelegatorField() {
+        delegate("truongphong", "phophong", "duthao");
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"vanthu01\"]}", "2");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));
+        when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenxuly");
+        request.setUserProcess("phophong");
+        request.setUserProcessDelegation("truongphong;nguoila");
+
+        useCase.execute(request);
+
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        org.assertj.core.api.Assertions.assertThat((java.util.List<?>) fields.get("user_delivered")).asList()
+            .doesNotContain("truongphong", "nguoila");
     }
 
     @Test
@@ -1162,6 +1220,25 @@ class ChuyenXuLyVbdenUseCaseTest {
         request.setParentid(parent.getId());
         request.setAction("chuyenxuly");
         request.setUserProcess("nguyenvana");
+
+        useCase.execute(request);
+
+        assertThat(parent.getStatus()).isEqualTo(VbdenStatusService.STATUS_CON_HAN_DANG_XU_LY);
+    }
+
+    // 09/10/2026 (bao loi demo11): van ban da "Da xu ly" (4) duoc giao chu tri MOI -> ve "dang xu ly".
+    @Test
+    void execute_withProcessedStatusAndNewAssignee_shouldRecomputeStatusToDangXuLy() {
+        BusinessDocument parent = newDocument("vbden", "{\"deadline_date\":\"01/01/2099\"}", "4");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("lanhdao01"));
+        when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenxuly");
+        request.setUserProcess("demo11");
 
         useCase.execute(request);
 

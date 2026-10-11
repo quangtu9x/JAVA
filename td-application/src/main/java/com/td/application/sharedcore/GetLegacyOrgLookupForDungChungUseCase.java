@@ -53,6 +53,8 @@ public class GetLegacyOrgLookupForDungChungUseCase {
     private final OrganizationRepository organizationRepository;
     private final AppUserRepository appUserRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    // 09/10/2026: delegation_obj lãnh đạo lấy từ bảng user_delegations (ủy quyền đang hiệu lực).
+    private final UserDelegationResolver userDelegationResolver;
 
     // viewname=vwcocautochuc: cac node CON TRUC TIEP cua key (org id).
     public List<Map<String, Object>> getOrganizationChildren(String parentIdRaw) {
@@ -110,6 +112,51 @@ public class GetLegacyOrgLookupForDungChungUseCase {
             .toList();
     }
 
+    // 11/10/2026 (SearchLegacyDanhMucUseCase - thay qlvb/search "Select Form='user' & ..."): nhu
+    // getOrganizationMembers nhung kem position/email (picker nguoi ky/nguoi soan doc "position"), sap
+    // theo thu tu hien thi roi ten.
+    public List<Map<String, Object>> getOrganizationMembersDetailed(String orgIdRaw, boolean recursive) {
+        UUID orgId = parseUuid(orgIdRaw);
+        if (orgId == null) {
+            return List.of();
+        }
+        List<UUID> organizationIds = recursive ? collectDescendantIds(orgId) : List.of(orgId);
+        return appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(organizationIds).stream()
+            .filter(AppUser::isActive)
+            .sorted(java.util.Comparator.comparingInt(AppUser::getSortOrder)
+                .thenComparing(user -> safe(user.getFullName())))
+            .map(user -> {
+                Map<String, Object> dynamicFields = dynamicDocumentFieldsService.parseDynamicFields(user.getDynamicFieldsJson());
+                Map<String, Object> row = toUserRow(user);
+                row.put("fullname", safe(user.getFullName()));
+                row.put("position", asString(dynamicFields.get("position")));
+                row.put("email", safe(user.getEmail()));
+                row.put("organization_id", user.getOrganizationId() == null ? "" : user.getOrganizationId().toString());
+                return row;
+            })
+            .toList();
+    }
+
+    // 11/10/2026 (SearchLegacyDanhMucUseCase): node to chuc co form (agency/unit/department...) =
+    // nodeType - directChildrenOnly: chi con truc tiep cua rootId (Domino "&parentid=..."), nguoc lai
+    // ca cay con (KHONG gom chinh rootId).
+    public List<Map<String, Object>> getOrganizationsByForm(String rootIdRaw, String nodeType, boolean directChildrenOnly) {
+        List<Map<String, Object>> rows = directChildrenOnly
+            ? getOrganizationChildren(rootIdRaw)
+            : getOrganizationSubtree(rootIdRaw).stream().filter(row -> !Integer.valueOf(0).equals(row.get("depth"))).toList();
+        return rows.stream()
+            .filter(row -> nodeType == null || nodeType.equalsIgnoreCase(String.valueOf(row.get("form"))))
+            .toList();
+    }
+
+    public String getOrganizationIdentifier(String orgIdRaw) {
+        UUID orgId = parseUuid(orgIdRaw);
+        if (orgId == null) {
+            return null;
+        }
+        return organizationRepository.findByIdAndDeletedOnIsNull(orgId).map(Organization::getIdentifier).orElse(null);
+    }
+
     // 06/10/2026 (port view Domino vwunitleaders - danh_muc_dung_chung.dxl dong 170, truoc goi
     // qlvb/danhmuc/GetLanhDao): SELECT Form="user" & caplanhdao!="" & caplanhdao!="khong" & status!="0",
     // khoa = @Explode(parentids) : level : nhom cap lanh dao (lanhdaocq/lanhdaodv/lanhdaopb -> "lanhdao",
@@ -155,7 +202,7 @@ public class GetLegacyOrgLookupForDungChungUseCase {
         row.put("position", dynamicFields.getOrDefault("position", ""));
         row.put("sort_order", user.getSortOrder());
         row.put("caplanhdao", user.getCapLanhDao());
-        row.put("delegation_obj", dynamicFields.getOrDefault("delegation_obj", ""));
+        row.put("delegation_obj", userDelegationResolver.activeFor(user.getUsername()).<Object>map(obj -> obj).orElse("")); // 09/10/2026: bảng user_delegations
         return row;
     }
 

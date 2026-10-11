@@ -45,6 +45,7 @@ com\td\domain\sharedcore\IdentityFileMetadata$IdentityFileMetadataBuilder.class
 com\td\domain\sharedcore\RolePermission.class
 com\td\domain\common\events\EntityDeletedEvent.class
 com\td\domain\common\contracts\AbstractEntity.class
+com\td\domain\sharedcore\UserDelegation.class
 com\td\domain\vbdi\VbdiEditHistoryDocument.class
 com\td\domain\categories\CategoryFileMetadata.class
 com\td\domain\common\contracts\AuditableEntityListener.class

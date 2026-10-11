@@ -55,6 +55,11 @@ public class PostgresPrivateCategoryRepository implements PrivateCategoryReposit
     }
 
     @Override
+    public List<PrivateCategory> findByFormAndTypeAndIdentifier(String form, String type, String identifier) {
+        return jpa.findByFormAndTypeAndIdentifier(form, type, identifier);
+    }
+
+    @Override
     public Page<PrivateCategory> search(SearchPrivateCategoriesRequest request, Pageable pageable) {
         Specification<PrivateCategory> spec = Specification
             .where(notDeleted())

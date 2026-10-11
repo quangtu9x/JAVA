@@ -36,6 +36,8 @@ import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -134,8 +136,29 @@ class SharedCoreUsersControllerTest {
 
         mockMvc.perform(post("/api/v1/shared-core/users/switch")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"ghost\"}"))
+                .content("{\"username\":\"ghost\",\"ma\":\"123@!@#Aa\"}"))
             .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void switchUser_withoutSecurityCode_shouldReturn400BeforeUseCase() throws Exception {
+        mockMvc.perform(post("/api/v1/shared-core/users/switch")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"nhanvien02\"}"))
+            .andExpect(status().isBadRequest());
+
+        verify(switchUserUseCase, never()).execute(any());
+    }
+
+    @Test
+    void switchUser_withInvalidSecurityCode_shouldReturn400BeforeUseCase() throws Exception {
+        mockMvc.perform(post("/api/v1/shared-core/users/switch")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\":\"nhanvien02\",\"ma\":\"sai-ma\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Mã bảo mật không đúng"));
+
+        verify(switchUserUseCase, never()).execute(any());
     }
 
     @Test
@@ -155,7 +178,7 @@ class SharedCoreUsersControllerTest {
 
         mockMvc.perform(post("/api/v1/shared-core/users/switch")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"username\":\"nhanvien02\"}"))
+                .content("{\"username\":\"nhanvien02\",\"ma\":\"123@!@#Aa\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.tdtoken").value("fake-tdtoken"))
             .andExpect(jsonPath("$.data.username").value("nhanvien02"));

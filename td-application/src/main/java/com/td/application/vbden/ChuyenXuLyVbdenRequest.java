@@ -104,4 +104,16 @@ public class ChuyenXuLyVbdenRequest {
 
     /** Chức vụ hiển thị của người thực hiện (đi kèm {@code creatorName}) — cùng lý do, tuỳ chọn. */
     private String position;
+
+    /**
+     * 09/10/2026 (port Ủy quyền — Domino ChuyenXuLy.java updateChutri/updatePhoihop/updateDebiet): người ỦY
+     * QUYỀN (nối ";") mà FE đã thay bằng người nhận ủy quyền trong userProcess/userCoordinate/userToRead.
+     * Server chỉ nhận người đang ủy quyền phạm vi "vbden" cho đúng 1 người có trong danh sách giao
+     * (UserDelegationResolver) rồi ghi vào user_delivered / user_coordinated_movement / user_to_readed.
+     */
+    private String userProcessDelegation;
+
+    private String userCoordinateDelegation;
+
+    private String userToReadDelegation;
 }

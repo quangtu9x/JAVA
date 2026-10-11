@@ -47,6 +47,8 @@ class GetSoVanBanDenUseCaseTest {
     private ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     @Mock
     private ListFilesForDocumentsUseCase listFilesForDocumentsUseCase;
+    @Mock
+    private VbdenResDocumentRepository vbdenResDocumentRepository;
 
     private GetSoVanBanDenUseCase useCase;
 
@@ -59,7 +61,7 @@ class GetSoVanBanDenUseCaseTest {
         lenient().when(listFilesForDocumentsUseCase.execute(any())).thenReturn(Map.of());
         useCase = new GetSoVanBanDenUseCase(
             documentRepository, new DynamicDocumentFieldsService(), resolveIdentifierByLevelUseCase,
-            listFilesForDocumentsUseCase);
+            listFilesForDocumentsUseCase, vbdenResDocumentRepository);
     }
 
     @Test
@@ -198,6 +200,33 @@ class GetSoVanBanDenUseCaseTest {
 
         assertThat(filterCaptor.getValue().getIncludeFieldValues())
             .containsEntry("document_register_id", List.of("11111111-1111-1111-1111-111111111111"));
+    }
+
+    // 09/10/2026: port man "In sổ văn bản đến" (Domino InSoVanBanDen.java) - so TANG dan, loc khoang
+    // ngay den + so van ban tu "search".
+    @Test
+    void execute_insovanban_shouldSortAscendingAndApplyReceivedDateAndRegisterFilters() {
+        stubCurrentIdentifier("PHONG_TH");
+        ArgumentCaptor<VbdenOrgViewFilter> filterCaptor = ArgumentCaptor.forClass(VbdenOrgViewFilter.class);
+        when(documentRepository.findByVbdenOrgView(eq("vbden_so"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        var request = new GetSoVanBanDenRequest();
+        request.setViewname("insovanban");
+        request.setSearch(Map.of(
+            "received_date", List.of("01/10/2026", "09/10/2026"),
+            "document_register_id", "22222222-2222-2222-2222-222222222222"));
+
+        useCase.execute(request);
+
+        var filter = filterCaptor.getValue();
+        assertThat(filter.getPrimarySortField()).isEqualTo("document_number");
+        assertThat(filter.isSortDescending()).isFalse();
+        assertThat(filter.getMinReceivedDate()).isEqualTo(java.time.LocalDate.of(2026, 10, 1));
+        assertThat(filter.getMaxReceivedDate()).isEqualTo(java.time.LocalDate.of(2026, 10, 9));
+        assertThat(filter.getIncludeFieldValues())
+            .containsEntry("document_register_id", List.of("22222222-2222-2222-2222-222222222222"));
+        assertThat(filter.getOrgValue()).isEqualTo("PHONG_TH");
     }
 
     @Test

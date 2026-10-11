@@ -29,6 +29,7 @@ public class SearchAppUsersUseCase {
     private final AppUserRoleGroupRepository appUserRoleGroupRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final RoleGroupRepository roleGroupRepository;
+    private final UserDelegationResolver userDelegationResolver;
 
     public PaginationResponse<AppUserDto> execute(SearchAppUsersRequest request) {
         try {
@@ -63,11 +64,20 @@ public class SearchAppUsersUseCase {
                 .stream()
                 .collect(Collectors.toMap(RoleGroup::getId, RoleGroup::getName, (a, b) -> a));
 
+            // 09/10/2026: ủy quyền đang hiệu lực (bảng user_delegations) cho CẢ TRANG 1 lần — gắn vào
+            // dynamicFields.delegation_obj (FE userApi#fetchUsers trải phẳng dynamicFields, cây Chuyển xử lý /
+            // "Lãnh đạo phân công" đọc current.delegation_obj).
+            Map<String, Map<String, Object>> activeDelegations = userDelegationResolver.activeByDelegator(
+                page.getContent().stream().map(AppUser::getUsername).toList());
+
             List<AppUserDto> items = page.getContent().stream()
                 .map(entity -> {
                     List<UUID> groupIds = roleGroupIdsByUser.getOrDefault(entity.getId(), List.of());
+                    Map<String, Object> dynamicFields = new java.util.LinkedHashMap<>(
+                        dynamicDocumentFieldsService.parseDynamicFields(entity.getDynamicFieldsJson()));
+                    dynamicFields.put("delegation_obj", userDelegationResolver.activeObjOrEmpty(activeDelegations, entity.getUsername()));
                     AppUserDto dto = AppUserDtoMapper.map(
-                        entity, dynamicDocumentFieldsService.parseDynamicFields(entity.getDynamicFieldsJson()),
+                        entity, dynamicFields,
                         groupIds, idsWithKiemNhiem.contains(entity.getId()));
                     dto.setRoleGroupNames(groupIds.stream()
                         .map(roleGroupNameById::get)

@@ -60,6 +60,8 @@ public class GetKyThuaLenhSignersUseCase {
     private final AppUserRepository appUserRepository;
     private final OrganizationRepository organizationRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
+    // 09/10/2026: delegation_obj lãnh đạo lấy từ bảng user_delegations (ủy quyền đang hiệu lực).
+    private final UserDelegationResolver userDelegationResolver;
 
     public Result<List<Map<String, Object>>> execute(String capBanHanhIdRaw) {
         UUID capBanHanhId = parseUuid(capBanHanhIdRaw);
@@ -264,7 +266,7 @@ public class GetKyThuaLenhSignersUseCase {
         node.put("position", dynamicFields.getOrDefault("position", ""));
         node.put("caplanhdao", user.getCapLanhDao());
         node.put("level", user.getLevel() == null ? "" : String.valueOf(user.getLevel()));
-        node.put("delegation_obj", dynamicFields.getOrDefault("delegation_obj", ""));
+        node.put("delegation_obj", userDelegationResolver.activeFor(user.getUsername()).<Object>map(obj -> obj).orElse("")); // 09/10/2026: bảng user_delegations
         return node;
     }
 

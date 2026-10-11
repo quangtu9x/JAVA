@@ -69,6 +69,7 @@ public class SimPkiSignController extends BaseController {
     private final LocateSimPkiSignaturesUseCase locateSimPkiSignaturesUseCase;
     private final com.td.application.simpki.CompleteExternalPdfSignatureUseCase completeExternalPdfSignatureUseCase;
     private final com.td.application.simpki.PrepareExternalPdfSignatureUseCase prepareExternalPdfSignatureUseCase;
+    private final com.td.application.simpki.LocateTextSlotsUseCase locateTextSlotsUseCase;
     private final ObjectMapper objectMapper;
 
     // Bổ sung 23/09/2026: TDPdfViewer (SimPkiCertModal.jsx, "Thông tin chứng thư số") gọi THẲNG
@@ -175,6 +176,26 @@ public class SimPkiSignController extends BaseController {
             .build();
         var result = locateSimPkiSignaturesUseCase.execute(request);
         return ok(result);
+    }
+
+    // 08/10/2026 - ký USB Token mới ở Văn bản đi, các lựa chọn "chèn số ký hiệu / ngày tháng ban hành..."
+    // như luồng ký USB cũ: FE gửi bytes PDF + regex ô trống, nhận hộp ô trống (pt, gốc dưới-trái) + cỡ chữ
+    // + kích thước trang để đặt tem chữ qua 'place-signatures' của TDPdfViewer. Stateless ở TDSimPki.
+    @PostMapping(value = "/locate-text-slots", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @Operation(summary = "Định vị ô trống để chèn chữ trong PDF (proxy TDSimPki, không lưu tệp)",
+        description = "Multipart: 'file' (PDF), 'slots' (chuỗi JSON mảng {id, regex, occurrence?}; group 1 = ô trống). "
+            + "Trả {pages:[{page,width,height}], slots:[{id, found, page, x, y, width, height, baseline, fontSizePt, matchedText}]}.")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> locateTextSlots(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam("slots") String slotsJson) {
+        byte[] pdfBytes;
+        try {
+            pdfBytes = file.getBytes();
+        } catch (IOException ex) {
+            return badRequest(Result.failure("Khong doc duoc tep da tai len"));
+        }
+        return ok(locateTextSlotsUseCase.execute(pdfBytes, file.getOriginalFilename(), slotsJson));
     }
 
     @GetMapping("/{simPkiFileId}/status")

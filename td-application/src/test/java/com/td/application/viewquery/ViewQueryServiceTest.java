@@ -117,7 +117,7 @@ class ViewQueryServiceTest {
             draftProcessDocumentRepository, listDocumentFilesByProcessUseCase, listDocumentFilesUseCase,
             com.td.application.documentlinks.InMemoryDocumentLinkRepository.newService(linkRepository),
             com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
-            phieuTrinhTdViewQuery);
+            phieuTrinhTdViewQuery, com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver());
         // DT-007 (27/08/2026): moi vet draft_process ghep them "files" trong response, loc theo
         // cap (parentDraftId, processId) - stub mac dinh trang rong de cac test khong lien quan
         // file khong bi NPE (da co guard parentid khong hop le nen phan lon test se khong goi toi
@@ -3357,6 +3357,41 @@ class ViewQueryServiceTest {
     }
 
     /** Rut gon stub isOwnIdentifier dung lai o nhieu test tren (user1 thuoc identifiers cho truoc). */
+    // 10/10/2026 "In sổ văn bản đi" (Domino TDQueryVBDI#reportDocumentRegister): identifier server-side,
+    // ISSUED, ngaybanhanh MM/dd/yyyy, sổ theo id, danh mục theo tên, document_internet 1 gồm cả "3".
+    @Test
+    void execute_vbdiReportDocumentRegister_shouldMapInSoFilter() {
+        stubOwnIdentifier("user1", "H05.01;H05;G10;");
+        when(resolveIdentifierByLevelUseCase.resolveForCurrentUser()).thenReturn(Optional.of("H05"));
+        ArgumentCaptor<VbdiDocumentOutFilter> filterCaptor = ArgumentCaptor.forClass(VbdiDocumentOutFilter.class);
+        when(vbdiDocumentRepository.findByAnyFieldEqualsIdentifier(
+                eq("vbdi"), eq(VbdiStatus.ISSUED), any(), eq("H05"), filterCaptor.capture(), any()))
+            .thenReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("reportdocumentregister");
+        request.setSearch(new java.util.LinkedHashMap<>(Map.of(
+            "ngaybanhanh", Map.of("fromDate", "10/01/2026", "toDate", "10/31/2026"),
+            "document_register_id", "REG-1",
+            "sovanban", "Sổ VB đi",
+            "linhvuc", "Giáo dục",
+            "document_internet", "1",
+            "trichyeu", "kế hoạch")));
+
+        service.execute("vbdi", request);
+
+        VbdiDocumentOutFilter filter = filterCaptor.getValue();
+        assertThat(filter.getPromulgationDateFrom()).isEqualTo(java.time.LocalDate.of(2026, 10, 1));
+        assertThat(filter.getPromulgationDateTo()).isEqualTo(java.time.LocalDate.of(2026, 10, 31));
+        assertThat(filter.getDocumentRegisterId()).isEqualTo("REG-1");
+        assertThat(filter.getIncludeFieldValues())
+            .containsEntry("sector", List.of("Giáo dục"))
+            .containsEntry("document_internet", List.of("1", "3"))
+            .doesNotContainKey("document_register");
+        assertThat(filter.getKeyword()).isEqualTo("kế hoạch");
+        assertThat(filter.getKeywordColumns()).containsExactly("subject");
+    }
+
     private void stubOwnIdentifier(String username, String identifiers) {
         AppUser user = newUser(username, "Test User", username + "@test.vn");
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of(username));

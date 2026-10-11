@@ -15,6 +15,7 @@ C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\Shared
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\SharedCorePermissionsController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\NumberingConfigController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\ErrorTrackingController.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\UserDelegationsController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\FileController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\StringNormalizationConfig.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\GlobalExceptionHandler.java

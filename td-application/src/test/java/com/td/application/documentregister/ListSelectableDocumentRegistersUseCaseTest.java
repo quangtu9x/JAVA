@@ -26,7 +26,7 @@ class ListSelectableDocumentRegistersUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new ListSelectableDocumentRegistersUseCase(documentRegisterRepository);
+        useCase = new ListSelectableDocumentRegistersUseCase(documentRegisterRepository, com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver());
     }
 
     @Test

@@ -170,7 +170,8 @@ class GetDuThaoDetailUseCaseTest {
     private GetDuThaoDetailUseCase newUseCase() {
         return new GetDuThaoDetailUseCase(
             duThaoDocumentRepository, listDocumentFilesUseCase, dynamicDocumentFieldsService,
-            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
+            DuThaoSignSubmissionInspectorTest.emptyInspector());
     }
 
     private void stubEmptyFiles(UUID documentId) {

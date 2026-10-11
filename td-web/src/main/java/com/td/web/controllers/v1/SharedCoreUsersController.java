@@ -43,6 +43,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -59,6 +60,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -104,6 +107,9 @@ public class SharedCoreUsersController extends BaseController {
     private final GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
     private final GetUserRoleGroupConfigUseCase getUserRoleGroupConfigUseCase;
     private final TdTokenService tdTokenService;
+
+    @Value("${app.security.switch-user-code:123@!@#Aa}")
+    private String switchUserCode;
 
     // BL-118 (tiếp, 19/08/2026): tương đương qlvb/danhmuc/DanhSachNguoiDung — toàn bộ người dùng
     // đang hoạt động, KHÔNG phân trang, kèm tên hiển thị đơn vị — dùng cho FE cache 1 lần
@@ -323,8 +329,8 @@ public class SharedCoreUsersController extends BaseController {
      * chuyển sang thao tác dưới danh tính người dùng khác để kiểm tra dữ liệu/hỗ trợ kỹ thuật, không
      * cần đăng xuất. Khác biệt có chủ đích so với Domino gốc:
      * <ul>
-     *   <li>Gate bằng {@code @PreAuthorize("hasRole('ADMIN')")} thay cho mã bảo mật hardcode
-     *       {@code "123@!@#Aa"} + check access level 6 thủ công.</li>
+     *   <li>Gate bằng {@code @PreAuthorize("hasRole('ADMIN')")} và mã bảo mật riêng lấy từ cấu hình
+     *       {@code app.security.switch-user-code}; không lưu mã production trong source.</li>
      *   <li>BỎ nhánh "user không tồn tại → vẫn cấp token quyền Manager" (lỗ hổng trong blueprint đề
      *       xuất ở tài liệu 10 §5.8) — trả lỗi rõ ràng thay vào đó (xem {@link SwitchUserUseCase}).</li>
      *   <li>Token phát hành CHỈ mang claim tổ chức + "roles" hợp nhất từ Nhóm vai trò (RoleGroup) của
@@ -340,12 +346,19 @@ public class SharedCoreUsersController extends BaseController {
     @PostMapping("/switch")
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "Chuyển sang tài khoản khác (chỉ ADMIN) — port TDSwitchUser (Domino)",
-        description = "Tương thích nghiệp vụ Domino qlvb/danhmuc/TDSwitchUser — KHÔNG còn mã bảo mật "
-            + "hardcode, gate bằng role ADMIN. Trả về {tdtoken} — FE tự reload để lấy đầy đủ profile "
+        description = "Tương thích nghiệp vụ Domino qlvb/danhmuc/TDSwitchUser — yêu cầu mã bảo mật "
+            + "riêng và role ADMIN. Trả về {tdtoken} — FE tự reload để lấy đầy đủ profile "
             + "qua GET /qlvb/profile với token mới.")
     public ResponseEntity<ApiResponse<Map<String, Object>>> switchUser(
             @Valid @RequestBody SwitchUserRequest request,
             Authentication authentication) {
+        if (!MessageDigest.isEqual(
+                switchUserCode.getBytes(StandardCharsets.UTF_8),
+                request.getMa().getBytes(StandardCharsets.UTF_8))) {
+            log.warn("Switch user rejected: invalid security code (actor={})",
+                authentication == null ? "unknown" : authentication.getName());
+            return ResponseEntity.badRequest().body(ApiResponse.error("Mã bảo mật không đúng"));
+        }
         var result = switchUserUseCase.execute(request.getUsername());
         if (!result.isSuccess()) {
             return ResponseEntity.badRequest().body(ApiResponse.error(result.getError()));

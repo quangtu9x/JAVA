@@ -47,4 +47,26 @@ public interface PrivateCategoryJpaRepository extends BaseRepository<PrivateCate
         """, nativeQuery = true)
     List<PrivateCategory> findByFormAndDonViSuDungIdentifier(
         @Param("form") String form, @Param("identifier") String identifier);
+
+    // 09/10/2026 (port "Sử dụng xin ý kiến" — DXL tudien nhom_{TVUB,TVNB,BTV,BCH,TTDU}_by_identifier):
+    // SELECT Form="group_people" & type="<loại nhóm>", khoá @Explode(identifier + ";" +
+    // donvi_sudung_identifier) — khớp cột identifier (đơn vị tạo nhóm) HOẶC 1 token của
+    // donvi_sudung_identifier (cùng cách so khớp token như truy vấn trên).
+    @Query(value = """
+        SELECT * FROM private_categories
+        WHERE form = :form
+          AND deleted_on IS NULL
+          AND is_active = true
+          AND dynamic_fields->>'type' = :type
+          AND (
+            identifier = :identifier
+            OR dynamic_fields->>'donvi_sudung_identifier' = :identifier
+            OR dynamic_fields->>'donvi_sudung_identifier' LIKE CONCAT(CAST(:identifier AS text), ';%')
+            OR dynamic_fields->>'donvi_sudung_identifier' LIKE CONCAT('%;', CAST(:identifier AS text))
+            OR dynamic_fields->>'donvi_sudung_identifier' LIKE CONCAT('%;', CAST(:identifier AS text), ';%')
+          )
+        ORDER BY sort_order ASC
+        """, nativeQuery = true)
+    List<PrivateCategory> findByFormAndTypeAndIdentifier(
+        @Param("form") String form, @Param("type") String type, @Param("identifier") String identifier);
 }

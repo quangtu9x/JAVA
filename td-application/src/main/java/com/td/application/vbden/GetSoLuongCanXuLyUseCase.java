@@ -158,8 +158,15 @@ public class GetSoLuongCanXuLyUseCase {
 
     // Gia tri Y HET QlvbRoles (td-infrastructure) - lap lai vi td-application khong duoc phu thuoc
     // nguoc vao td-infrastructure (xem javadoc CurrentUserProvider#currentRoles).
+    // 09/10/2026 (báo lỗi demo10 "chưa có con số Chờ gửi ở Trang chủ/menu"): thêm các biến thể phạm vi
+    // đơn vị/phòng ban (đã có trong catalog app_permissions V1.0.18, cùng họ lỗi 403 ChuyenXuLy
+    // 24/09) — văn thư đơn vị/phòng chỉ có quyền *DV/*PB nên trước đây không bao giờ được tính số cấp
+    // cơ quan (WaitingToSend, send_waiting_for_signature...). identifier vẫn theo level của user.
     private static final Set<String> ORG_LEVEL_ELIGIBLE_ROLES = Set.of(
-        "QCAPNHATVBDEN", "QCAPNHATVBDI", "QPHANCONG", "QPHANPHOI", "QKTTTTH");
+        "QCAPNHATVBDEN", "QCAPNHATVBDENDV", "QCAPNHATVBDENPB",
+        "QCAPNHATVBDI", "QCAPNHATVBDIDV", "QCAPNHATVBDIPB",
+        "QPHANCONG", "QPHANCONGDV", "QPHANCONGPHONG",
+        "QPHANPHOI", "QPHANPHOIDV", "QKTTTTH");
 
     private final ViewQueryService viewQueryService;
     private final CurrentUserProvider currentUserProvider;

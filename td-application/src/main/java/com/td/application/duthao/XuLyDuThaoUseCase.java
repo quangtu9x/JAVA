@@ -199,6 +199,11 @@ public class XuLyDuThaoUseCase {
     private final AuthorAclFieldsService authorAclFieldsService;
     // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
     private final DraftProcessActorFields draftProcessActorFields;
+    private final DuThaoSignSubmissionInspector signSubmissionInspector;
+
+    private static String text(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
 
     public Result<UUID> execute(XuLyDuThaoRequest request) {
         if (request == null || request.getId() == null) {
@@ -219,6 +224,13 @@ public class XuLyDuThaoUseCase {
 
         if (ACTION_DANH_GIA.equals(action)) {
             return applyRating(document, fields, request);
+        }
+
+        // 09/10/2026: dự thảo đang chờ ký — người ký đã thao tác (ký số/ý kiến/gắn tệp) thì không thu
+        // hồi được nữa (FE cũng ẩn nút, xem DuThaoSignSubmissionInspector).
+        if (ACTION_THU_HOI.equals(action) && DuThaoStatus.PENDING_SIGNATURE.equals(document.getStatus())
+                && signSubmissionInspector.inspect(document.getId(), text(fields.get(USER_SIGNER_FIELD))).signerActed()) {
+            return Result.failure("Người ký đã xử lý dự thảo, không thể thu hồi.");
         }
 
         String targetStatus = resolveTargetStatus(action, fields);

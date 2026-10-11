@@ -154,6 +154,51 @@ public class TdSimPkiClient {
         }
     }
 
+    /**
+     * 08/10/2026 — POST /api/pdf/locate-text-slots (stateless): định vị ô trống để chèn chữ (xem
+     * {@link com.td.application.simpki.LocateTextSlotsUseCase}). {@code slots} gửi dạng JSON escape
+     * {@code \\uXXXX} ký tự ngoài ASCII (cùng lý do {@link #locateSignatures}).
+     */
+    public JsonNode locateTextSlots(byte[] pdfBytes, String fileName, JsonNode slots) {
+        ensureEnabled();
+        String slotsJson;
+        try {
+            slotsJson = objectMapper.writer()
+                .with(com.fasterxml.jackson.core.json.JsonWriteFeature.ESCAPE_NON_ASCII)
+                .writeValueAsString(slots);
+        } catch (IOException ex) {
+            throw new TdSimPkiException("Khong the dung JSON slots", ex);
+        }
+        MultipartRequestBuilder body = new MultipartRequestBuilder()
+            .addFile("file", safeFileName(fileName), "application/pdf", pdfBytes)
+            .addField("slots", slotsJson);
+        HttpRequest request = baseRequestBuilder("/api/pdf/locate-text-slots")
+            .header("Content-Type", body.contentType())
+            .header("Accept", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body.build()))
+            .build();
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() >= 400 && response.statusCode() < 500) {
+                String message = null;
+                try {
+                    message = objectMapper.readTree(response.body()).path("message").asText(null);
+                } catch (IOException ignored) {
+                    // body không phải JSON
+                }
+                throw new TdSimPkiException(message != null && !message.isBlank()
+                    ? message : "TDSimPki tu choi dinh vi o trong: HTTP " + response.statusCode());
+            }
+            requireOk(response.statusCode(), "locate-text-slots", response::body);
+            return objectMapper.readTree(response.body());
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            throw new TdSimPkiException("Goi TDSimPki (locate-text-slots) that bai: " + ex.getMessage(), ex);
+        }
+    }
+
     private boolean isErrorCode(String body, String code) {
         try {
             return code.equals(objectMapper.readTree(body).path("code").asText());

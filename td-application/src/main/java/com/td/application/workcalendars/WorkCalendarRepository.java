@@ -5,6 +5,7 @@ import com.td.domain.workcalendars.WorkCalendar;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -24,4 +25,10 @@ public interface WorkCalendarRepository extends IRepository<WorkCalendar> {
     /** Chủ thể = user_creator (scope canhan). */
     Optional<WorkCalendar> findByScopeAndWeekStartAndUserCreatorAndDeletedOnIsNull(
             String scope, LocalDate weekStart, String userCreator);
+
+    List<WorkCalendar> findByScopeAndWeekStartBetweenAndIdentifierAndDeletedOnIsNull(
+            String scope, LocalDate from, LocalDate to, String identifier);
+
+    List<WorkCalendar> findByScopeAndWeekStartBetweenAndUserCreatorAndDeletedOnIsNull(
+            String scope, LocalDate from, LocalDate to, String userCreator);
 }

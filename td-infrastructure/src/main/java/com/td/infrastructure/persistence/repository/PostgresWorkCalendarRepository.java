@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -56,5 +57,17 @@ public class PostgresWorkCalendarRepository implements WorkCalendarRepository {
     public Optional<WorkCalendar> findByScopeAndWeekStartAndUserCreatorAndDeletedOnIsNull(
             String scope, LocalDate weekStart, String userCreator) {
         return jpa.findByScopeAndWeekStartAndUserCreatorAndDeletedOnIsNull(scope, weekStart, userCreator);
+    }
+
+    @Override
+    public List<WorkCalendar> findByScopeAndWeekStartBetweenAndIdentifierAndDeletedOnIsNull(
+            String scope, LocalDate from, LocalDate to, String identifier) {
+        return jpa.findByScopeAndWeekStartBetweenAndIdentifierAndDeletedOnIsNull(scope, from, to, identifier);
+    }
+
+    @Override
+    public List<WorkCalendar> findByScopeAndWeekStartBetweenAndUserCreatorAndDeletedOnIsNull(
+            String scope, LocalDate from, LocalDate to, String userCreator) {
+        return jpa.findByScopeAndWeekStartBetweenAndUserCreatorAndDeletedOnIsNull(scope, from, to, userCreator);
     }
 }

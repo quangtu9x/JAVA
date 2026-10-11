@@ -32,9 +32,10 @@ class ActiveGroupMembersFilterTest {
             "",
             null));
 
-        List<Object> result = new ActiveGroupMembersFilter(appUserRepository).filter(input);
+        List<Object> result = new ActiveGroupMembersFilter(appUserRepository, com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver()).filter(input);
 
-        assertThat(result.get(0)).isEqualTo(List.of(Map.of("username", "active01", "name", "A")));
+        // 09/10/2026: thành viên còn hoạt động được gắn delegation_obj ("" = không ủy quyền).
+        assertThat(result.get(0)).isEqualTo(List.of(Map.of("username", "active01", "name", "A", "delegation_obj", "")));
         assertThat(result.get(1)).isEqualTo("[{\"id\":\"x\"}]");
         assertThat(result.get(2)).isEqualTo("");
         assertThat(result.get(3)).isNull();

@@ -247,6 +247,30 @@ public class LuuVanBanDenUseCase {
         return String.join(";", userProcess);
     }
 
+    private static final String USER_DELIVERED_MERGE_FIELD = "user_delivered";
+
+    // Hợp 2 giá trị dạng List hoặc chuỗi nối ";"/"," — giữ thứ tự, bỏ trùng/rỗng.
+    private static java.util.List<String> unionList(Object existing, Object incoming) {
+        java.util.LinkedHashSet<String> values = new java.util.LinkedHashSet<>();
+        for (Object raw : new Object[]{existing, incoming}) {
+            if (raw instanceof java.util.Collection<?> collection) {
+                collection.forEach(v -> addToken(values, v));
+            } else if (raw != null) {
+                for (String token : raw.toString().split("[;,]")) {
+                    addToken(values, token);
+                }
+            }
+        }
+        return new java.util.ArrayList<>(values);
+    }
+
+    private static void addToken(java.util.Set<String> target, Object value) {
+        String token = value == null ? "" : value.toString().trim();
+        if (!token.isEmpty()) {
+            target.add(token);
+        }
+    }
+
     private String scalarValue(Object raw) {
         return raw == null ? "" : raw.toString().trim();
     }
@@ -261,6 +285,12 @@ public class LuuVanBanDenUseCase {
                 fields, request.getDateFields(), request.getNumberFields(), request.getRichtextFields()));
         Map<String, Object> merged = new LinkedHashMap<>(existing);
         merged.putAll(incoming);
+        // 09/10/2026 (port Ủy quyền): vào sổ khi Lãnh đạo phân công đang ủy quyền, FE gửi user_delivered =
+        // người ủy quyền (VaoSoNhieu/ChiTietSoVanBanDen*) — Domino THÊM vào danh sách
+        // (addToFieldListStringHideVBden), trước đây Java ghi đè mất những người đã chuyển trước đó.
+        if (incoming.containsKey(USER_DELIVERED_MERGE_FIELD)) {
+            merged.put(USER_DELIVERED_MERGE_FIELD, unionList(existing.get(USER_DELIVERED_MERGE_FIELD), incoming.get(USER_DELIVERED_MERGE_FIELD)));
+        }
         // Xem AuthorAclFieldsService javadoc muc "CHUA PORT"/"applyOnUpdate" (16/09/2026 (2)) - R12
         // that ra van can port PHAN nghiep vu (khong phai ACL) - fields.keySet() = dung field client
         // GUI trong request nay (khop dung "user_fields dong" cua Domino, khong phai TOAN BO field

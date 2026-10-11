@@ -54,7 +54,8 @@ class XuLyDuThaoUseCaseTest {
         useCase = new XuLyDuThaoUseCase(
             duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider,
             documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
-            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
+            DuThaoSignSubmissionInspectorTest.emptyInspector());
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
         lenient().when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         // DT-007: mac dinh tao draft_process thanh cong - cac test khong quan tam ket qua nay chi

@@ -43,7 +43,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_shouldIncludeMailinAndClericalFromDynamicFields() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization agency = newAgencyLevel("Bo Nong nghiep");
         Organization externalUnit = newAgency("Don vi ngoai", agency.getId());
@@ -68,7 +68,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // identifier_other_org — KHÔNG đổi "identifier_other" cũ của node agency (vẫn "").
     @Test
     void execute_shouldExposeConfiguredIdentifierOtherAsSeparateKey() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization root = newAgencyLevel("UBND thanh pho");
         Organization vanPhong = newAgency("Van phong UBND thanh pho", root.getId());
@@ -85,7 +85,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withoutDynamicFields_shouldDefaultToEmptyString() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization agency = newAgencyLevel("Bo Nong nghiep");
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(agency)));
@@ -100,7 +100,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // nhận" không đưa được vào user_process — xem javadoc buildNodeData/resolveReceiverUsername).
     @Test
     void execute_withReceiverConfigured_shouldResolveUsernameFromReceiverId() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization unit = newAgencyLevel("Phong Ke hoach");
         UUID receiverAppUserId = UUID.randomUUID();
@@ -122,7 +122,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withoutReceiverConfigured_shouldReturnEmptyUserReceiver() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization agency = newAgencyLevel("Bo Nong nghiep");
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(agency)));
@@ -137,7 +137,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withReceiverIdPointingToDeletedAppUser_shouldReturnEmptyUserReceiver() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization unit = newAgencyLevel("Phong Ke hoach");
         UUID receiverAppUserId = UUID.randomUUID();
@@ -156,7 +156,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // GetLegacyOrganizationTreeUseCase mục scopeAgencyId/resolveCurrentUserAgencyId.
     @Test
     void execute_withNonAdminUser_shouldOnlyIncludeOwnAgencyBranch() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization root = newAgencyLevel("Tinh Thanh Hoa");
         Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
@@ -178,7 +178,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withAdmin_shouldIncludeFullTreeRegardlessOfCurrentUser() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization root = newAgencyLevel("Tinh Thanh Hoa");
         Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
@@ -196,7 +196,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withUnresolvableCurrentUser_shouldFailOpenToFullTree() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization root = newAgencyLevel("Tinh Thanh Hoa");
         Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
@@ -214,7 +214,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // CU THE, khong chi chon theo don vi - xem javadoc execute(jedisKey, includeFullTree, includeUsers)).
     @Test
     void execute_withIncludeUsersTrue_shouldAttachUserLeafNodesUnderTheirOrganization() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization agency = newAgencyLevel("So Khoa hoc va Cong nghe");
         Organization department = newUnit("Phong Quan ly", agency.getId());
@@ -240,7 +240,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withIncludeUsersFalse_shouldNotQueryOrAttachUsers() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
 
         Organization agency = newAgencyLevel("So Khoa hoc va Cong nghe");
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(agency)));

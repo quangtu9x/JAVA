@@ -32,6 +32,7 @@ public class DeleteWorkCalendarUseCase {
     private final WorkCalendarCacheService workCalendarCacheService;
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
+    private final WorkCalendarPermissionService permissionService;
 
     public Result<UUID> execute(UUID id) {
         try {
@@ -41,9 +42,7 @@ public class DeleteWorkCalendarUseCase {
             }
             var calendar = opt.get();
 
-            String currentUsername = currentUserProvider.currentUsername().orElse(null);
-            String owner = calendar.getUserCreator();
-            if (owner != null && !owner.isBlank() && !owner.equals(currentUsername)) {
+            if (!permissionService.canEdit(calendar.getScope(), calendar.getIdentifier(), calendar.getUserCreator())) {
                 return Result.failure("Ban khong co quyen xoa lich cong tac nay");
             }
 

@@ -25,4 +25,11 @@ public interface PrivateCategoryRepository extends IRepository<PrivateCategory> 
      * — xem javadoc {@code PrivateCategoryJpaRepository#findByFormAndDonViSuDungIdentifier}).
      */
     List<PrivateCategory> findByFormAndDonViSuDungIdentifier(String form, String identifier);
+
+    /**
+     * 09/10/2026 — DXL Domino {@code nhom_{TVUB,TVNB,BTV,BCH,TTDU}_by_identifier}: nhóm {@code form}
+     * có field động {@code type} = {@code type}, khớp {@code identifier} ở cột thật HOẶC 1 token của
+     * {@code donvi_sudung_identifier} (xem {@code GetGroupPeopleByTypeUseCase}).
+     */
+    List<PrivateCategory> findByFormAndTypeAndIdentifier(String form, String type, String identifier);
 }

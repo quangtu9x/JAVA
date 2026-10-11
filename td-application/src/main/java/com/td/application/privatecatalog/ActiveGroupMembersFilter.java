@@ -28,6 +28,9 @@ public class ActiveGroupMembersFilter {
     private static final String USERNAME_KEY = "username";
 
     private final AppUserRepository appUserRepository;
+    // 09/10/2026 (port Ủy quyền): thay Domino UyQuyen#capnhat_nhom_nhan_vanban (chép delegation_obj vào
+    // từng thành viên receiver_obj) — gắn LÚC ĐỌC ủy quyền đang hiệu lực của mỗi thành viên còn hoạt động.
+    private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
 
     /** Lọc 1 lô {@code receiver_obj} (List đã parse hoặc chuỗi JSON) bằng 1 query duy nhất; giữ nguyên dạng đầu vào. */
     public List<Object> filter(List<Object> receiverObjs) {
@@ -47,6 +50,8 @@ public class ActiveGroupMembersFilter {
             }
         }
         Set<String> active = usernames.isEmpty() ? Set.of() : appUserRepository.findActiveUsernamesIn(usernames);
+        Map<String, Map<String, Object>> delegations = usernames.isEmpty() ? Map.of()
+            : userDelegationResolver.activeByDelegator(usernames);
 
         List<Object> result = new ArrayList<>();
         for (int i = 0; i < receiverObjs.size(); i++) {
@@ -59,13 +64,24 @@ public class ActiveGroupMembersFilter {
             List<Object> kept = new ArrayList<>();
             for (Object member : members) {
                 String username = usernameOf(member);
-                if (username == null || active.contains(username)) {
+                if (username == null) {
                     kept.add(member);
+                } else if (active.contains(username)) {
+                    kept.add(withDelegation(member, userDelegationResolver.activeObjOrEmpty(delegations, username)));
                 }
             }
             result.add(original instanceof String ? toJson(kept) : kept);
         }
         return result;
+    }
+
+    private Object withDelegation(Object member, Object delegationObj) {
+        if (!(member instanceof Map<?, ?> map)) {
+            return member;
+        }
+        Map<Object, Object> copy = new java.util.LinkedHashMap<>(map);
+        copy.put("delegation_obj", delegationObj);
+        return copy;
     }
 
     private List<?> asList(Object value) {

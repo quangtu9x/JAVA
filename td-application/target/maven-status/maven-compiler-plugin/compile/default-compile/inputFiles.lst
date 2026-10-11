@@ -52,6 +52,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workf
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\SyncDocumentSearchByIdUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\DeleteAppPermissionUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UpdateAppPermissionUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\SaveMyDelegationRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\recordsstorage\RecordsStorageCatalogDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\common\email\EmailSender.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\DocumentLogDto.java
@@ -60,6 +61,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\share
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\SearchDocumentsUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\HoSoLuuTruVanBanDocumentRepository.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\TiepNhanHoSoLuuTruUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\ManageMyDelegationUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\SimPkiSignaturePlacement.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosocv\HoSoCVDocumentRepository.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\DuThaoDocumentRepository.java
@@ -67,6 +69,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\priva
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\PublishCatalogRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\DocumentSearchPageResult.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\TraLoiVanBanDenDuThaoUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\BaoCaoTheoPhongVbdenRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dbserver\ListDbServersUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\DangKyMuonTaiLieuRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\PublishVbdiReplyStatusUseCase.java
@@ -176,6 +179,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workf
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\CapNhatDaXemDeBietRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\messaging\MessageUnitSpec.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workflows\WorkflowRuntimeFacade.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\LocateTextSlotsUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\VbdenUserActionLogRepository.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\GetDocumentSearchStatusUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\common\cqrs\Command.java
@@ -300,6 +304,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dbserver\TestDbServerConnectionRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\ChoYKienPhieuTrinhTdUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\privatecatalog\SearchPrivateCategoriesRequest.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UserDelegationRepository.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UserDirectoryEntryDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\SearchOrganizationsRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tenant\TestTenantConnectionRequest.java
@@ -334,6 +339,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dutha
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\categories\SearchCategoriesRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\PrepareVbdiDeliveryFilesRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workcalendars\GetWeekWorkCalendarUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\BaoCaoTheoPhongVbdenUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\DangKyMuonTaiLieuUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\DocumentRegisterDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\ResolveIdentifierByLevelUseCase.java
@@ -447,6 +453,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workf
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\TrinhKyVbdiUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\RenameFileRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\privatecatalog\PrivateCategoryDtoMapper.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UserDelegationResolver.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosocv\XuLyLaiHoSoRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\GuiXinYKienTuVBdenRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\GetVbdiDetailRequest.java
@@ -504,6 +511,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\docum
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\LegacyOrganizationTreeResponse.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\ThemVanBanLuuTruUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\CapNhatYKienVbdenRequest.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\AppUserDeactivationGuard.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\GetSystemConfigurationUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UpdateOrganizationUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\common\interfaces\IRepository.java
@@ -526,6 +534,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\share
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\ChoYKienXinYKienRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\PhieuTrinhTdViewQuery.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\AddHoSoLuuTruProcessDocumentUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\DuThaoSignSubmissionInspector.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\processdiagram\DiagramNodeRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\TheoDoiVanBanDenRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\DuThaoVanThuKhongBanHanhUseCase.java
@@ -561,6 +570,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\docum
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\TaoHoSoLuuTruTuHoSoCVUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\GetPhieuTrinhTdChiTietUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\UserRoleGroupConfigDto.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\VbdenParticipantChecker.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\VbdenOrgViewFilter.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\VBdenChuyenVanBanPhapQuyUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosoluutru\HoSoLuuTruProcessDocumentRepository.java
@@ -621,6 +631,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dutha
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\categories\XoaDanhMucRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosocv\XoaVanBanKhacUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\TheoDoiNhiemVuUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\privatecatalog\GetGroupPeopleByTypeUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\AddVbdenUserActionLogUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\GetVbdenDetailUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\TraLaiDuThaoChoNguoiSoanThaoUseCase.java
@@ -637,6 +648,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tenant\CreateTenantUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\SearchRoleGroupsUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\CapNhatVanBanDiUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workcalendars\WorkCalendarPermissionService.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\recordsstorage\SearchRecordsStorageCatalogsUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\OrganizationDtoMapper.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\categories\CategoryFileDto.java
@@ -690,6 +702,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dbser
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\RecordIssuedDocumentRegisterNumberRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\GetDynamicDocumentRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\privatecatalog\GetGroupPeopleForIdentifierUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\SearchLegacyDanhMucUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\SimpleFileDto.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\ListDuThaoEditHistoryUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\GetVbdenDetailRequest.java

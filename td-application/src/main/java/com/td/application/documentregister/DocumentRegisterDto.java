@@ -38,4 +38,10 @@ public class DocumentRegisterDto {
     private boolean isLocked;
     private LocalDateTime createdOn;
     private LocalDateTime lastModifiedOn;
+    /**
+     * 09/10/2026 (port Ủy quyền): ủy quyền đang hiệu lực của "Lãnh đạo phân công" mặc định của sổ
+     * ({@code userAssignerUsername}) — dạng delegation_obj Domino, "" nếu không có. Thay Domino
+     * UyQuyen#capnhat_so_vanban (chép delegation_obj vào bản ghi sổ). Chỉ điền ở API sổ mặc định/sổ để chọn.
+     */
+    private Object delegationObj = "";
 }

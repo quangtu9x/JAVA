@@ -83,6 +83,7 @@ public class SendVbdiDocumentUseCase {
     private static final String NOT_FOUND_MESSAGE = "Không tìm thấy văn bản đi";
     private static final String NOT_ISSUED_MESSAGE = "Văn bản chưa ban hành, không thể gửi";
     private static final String NO_RECIPIENT_MESSAGE = "Chưa chọn nơi nhận";
+    static final String NO_FILE_MESSAGE = "Văn bản chưa có tệp đính kèm, vui lòng đính kèm tệp trước khi gửi";
 
     private static final Map<String, String> STATUS_LABELS = Map.of(
         VbdiSendType.SEND_DOCUMENT, "Gửi văn bản",
@@ -188,6 +189,7 @@ public class SendVbdiDocumentUseCase {
     private final OrganizationRepository organizationRepository;
     private final OrganizationAgencyResolver organizationAgencyResolver;
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
+    private final com.td.application.documents.ListDocumentFilesUseCase listDocumentFilesUseCase;
 
     public Result<Integer> execute(SendVbdiDocumentRequest request) {
         if (request == null || request.getDocumentId() == null) {
@@ -204,6 +206,13 @@ public class SendVbdiDocumentUseCase {
 
         String sendType = request.getSendType() == null || request.getSendType().isBlank()
             ? VbdiSendType.SEND_DOCUMENT : request.getSendType().trim();
+        // 09/10/2026 (báo lỗi snnmt: "Nhập mới giống VB trước" không chép tệp nhưng vẫn bấm Gửi được): lần
+        // GỬI ĐẦU phải có tệp đính kèm (cùng quy tắc "Lưu và gửi" FE 06/10). Gửi lại/bổ sung/thu hồi không xét
+        // (văn bản đã phát hành trước đó).
+        if (VbdiSendType.SEND_DOCUMENT.equals(sendType)
+                && listDocumentFilesUseCase.execute(document.getId()).getItems().isEmpty()) {
+            return Result.failure(NO_FILE_MESSAGE);
+        }
         String statusLabel = STATUS_LABELS.getOrDefault(sendType, sendType);
         String content = request.getOpinion() == null || request.getOpinion().isBlank()
             ? null : request.getOpinion().trim();

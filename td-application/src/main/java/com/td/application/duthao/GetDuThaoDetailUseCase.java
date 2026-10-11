@@ -56,6 +56,11 @@ public class GetDuThaoDetailUseCase {
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
+    private final DuThaoSignSubmissionInspector signSubmissionInspector;
+
+    private static String asText(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
 
     public Result<Map<String, Object>> execute(GetDuThaoDetailRequest request) {
         UUID id = parseUuid(request == null ? null : request.getId());
@@ -92,7 +97,15 @@ public class GetDuThaoDetailUseCase {
         // docs/architecture/document-links.md), ghi de gia tri cu con sot trong dynamic_fields.
         relatedDocumentSnapshots.decorate(allFields, document.getId(), com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_DUTHAO);
 
-        Map<String, Object> filtered = dynamicDocumentFieldsService.filterItems(allFields, request.getItems());
+        Map<String, Object> filtered = new LinkedHashMap<>(
+            dynamicDocumentFieldsService.filterItems(allFields, request.getItems()));
+        // 09/10/2026: dự thảo chờ ký duyệt — FE chỉ hiện "Thu hồi" cho người trình khi người ký chưa
+        // thao tác (DuThaoButtonAction.jsx). Gắn SAU filterItems để không bị lọc mất theo items.
+        if (DuThaoStatus.PENDING_SIGNATURE.equals(document.getStatus())) {
+            var inspection = signSubmissionInspector.inspect(document.getId(), asText(allFields.get("user_signer")));
+            filtered.put("sign_submitter", inspection.submitterUsername());
+            filtered.put("signer_acted", inspection.signerActed() ? "1" : "0");
+        }
         return Result.success(filtered);
     }
 

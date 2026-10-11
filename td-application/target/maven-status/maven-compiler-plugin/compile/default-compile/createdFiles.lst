@@ -6,10 +6,12 @@ com\td\application\documents\DeleteFileRequest.class
 com\td\application\vbdi\TraLoiVanBanDenUseCase.class
 com\td\application\hosoluutru\GetHoSoLuuTruChiTietRequest.class
 com\td\application\sharedcore\LegacyOrganizationTreeResponse.class
+com\td\application\sharedcore\AppUserDeactivationGuard.class
 com\td\application\recordsstorage\UpdateRecordsStorageCatalogRequest.class
 com\td\application\documents\DocumentSearchService.class
 com\td\application\documents\DocumentSearchPageResult.class
 com\td\application\vbden\AddVbdenResDocumentUseCase.class
+com\td\application\sharedcore\UserDelegationResolver.class
 com\td\application\duthao\DuThaoStatus.class
 com\td\application\privatecatalog\ActiveGroupMembersFilter.class
 com\td\application\duthao\ChuyenThanhVanBanDiRequest.class
@@ -30,6 +32,7 @@ com\td\application\workflows\WorkflowActionRequest.class
 com\td\application\hosoluutru\DangKyMuonTaiLieuUseCase.class
 com\td\application\vbdi\VbdiDeliveryMessagePayload$DocumentSnapshot.class
 com\td\application\vbdi\SendVbdiDocumentUseCase.class
+com\td\application\simpki\LocateTextSlotsUseCase.class
 com\td\application\documentregister\RecordIssuedDocumentRegisterNumberUseCase.class
 com\td\application\documents\DocumentDetailWithFilesDto.class
 com\td\application\sharedcore\OrganizationConfigKeys.class
@@ -110,6 +113,7 @@ com\td\application\documents\VbdiDeliveryFileRef.class
 com\td\application\hosoluutru\RestoreHoSoLuuTruUseCase.class
 com\td\application\hosocv\LuuHoSoRequest.class
 com\td\application\tenant\TenantDto.class
+com\td\application\sharedcore\UserDelegationRepository.class
 com\td\application\phieutrinhtd\TrinhThamKhaoPhieuTrinhTdRequest.class
 com\td\application\categories\CreateCategoryUseCase.class
 com\td\application\vbden\PhucHoiVanBanDenUseCase.class
@@ -196,6 +200,7 @@ com\td\application\identityfiles\GetIdentityFileUseCase.class
 com\td\application\duthao\TaoDuThaoUseCase.class
 com\td\application\documents\DocumentCacheStatsDto$DocumentCacheStatsDtoBuilder.class
 com\td\application\documents\SupersedeDocumentFilesUseCase.class
+com\td\application\vbden\VbdenParticipantChecker.class
 com\td\application\categories\SearchCategoriesUseCase.class
 com\td\application\tenant\CreateTenantRequest.class
 com\td\application\sharedcore\TransferAppUsersUseCase.class
@@ -411,7 +416,10 @@ com\td\application\vbdi\AddVbdiSeenDocumentUseCase.class
 com\td\application\categories\CreateCategoryRequest.class
 com\td\application\vbden\GanKemTepVbdenRequest.class
 com\td\application\vbden\ListVbdenUpdateHistoryRequest.class
+com\td\application\duthao\DuThaoSignSubmissionInspector.class
+com\td\application\vbden\BaoCaoTheoPhongVbdenUseCase.class
 com\td\application\vbdi\SoanThaoVbdiUseCase.class
+com\td\application\privatecatalog\GetGroupPeopleByTypeUseCase.class
 com\td\application\sharedcore\UserSignatureImageDocumentIdResolver.class
 com\td\application\tenant\UpdateTenantRequest.class
 com\td\application\hosocv\HoSoCVProcessDocumentRepository.class
@@ -430,6 +438,7 @@ com\td\application\simpki\LocateSimPkiSignaturesRequest$LocateSimPkiSignaturesRe
 com\td\application\documents\DocumentJsonMapper$2.class
 com\td\application\dbserver\DbServerDto.class
 com\td\application\documents\DocumentXemChiTietDto.class
+com\td\application\workcalendars\WorkCalendarPermissionService.class
 com\td\application\workflows\WorkflowDefinitionDetailDto.class
 com\td\application\recordsstorage\RecordsStorageCatalogRepository.class
 com\td\application\workflows\CreateWorkflowInstanceRequest.class
@@ -494,6 +503,7 @@ com\td\application\privatecatalog\GroupUnitType.class
 com\td\application\common\cqrs\Query.class
 com\td\application\documents\UpdateDocumentWithFileUseCase.class
 com\td\application\numbering\UpdateNumberingConfigUseCase.class
+com\td\application\sharedcore\SearchLegacyDanhMucUseCase.class
 com\td\application\vbdi\DeleteVbdiDocumentUseCase.class
 com\td\application\sharedcore\LegacyOrganizationTreeNode.class
 com\td\application\documents\VerifyFileSignatureUseCase.class
@@ -518,6 +528,7 @@ com\td\application\identityfiles\ListIdentityFilesUseCase.class
 com\td\application\hosoluutru\DangKyMuonTaiLieuRequest.class
 com\td\application\documents\FileDto$FileDtoBuilder.class
 com\td\application\categories\SearchCategoriesRequest.class
+com\td\application\duthao\DuThaoSignSubmissionInspector$Inspection.class
 com\td\application\vbdi\BanHanhVbdiRequest.class
 com\td\application\vbcddh\NhacViecItemDto.class
 com\td\application\dbserver\UpdateDbServerUseCase.class
@@ -535,6 +546,7 @@ com\td\application\vbden\VbdenObjSnapshotFields.class
 com\td\application\documentregister\UpdateDocumentRegisterRequest.class
 com\td\application\workflows\DelegateWorkflowTaskRequest.class
 com\td\application\hosocv\DeleteHoSoUseCase.class
+com\td\application\sharedcore\SaveMyDelegationRequest.class
 com\td\application\documents\AddDynamicDocumentRequest.class
 com\td\application\duthao\ThuHoiVanBanDiRequest.class
 com\td\application\sharedcore\GetUserOrganizationProfileUseCase.class
@@ -619,6 +631,7 @@ com\td\application\privatecatalog\CreatePrivateCategoryUseCase.class
 com\td\application\hosoluutru\ChuyenLuuTruNoiBoUseCase.class
 com\td\application\documents\UpdateDocumentRequest.class
 template\department\application\CreateDepartmentRequest.class
+com\td\application\sharedcore\ManageMyDelegationUseCase.class
 com\td\application\privatecatalog\SearchPrivateCategoriesRequest.class
 com\td\application\vbden\TraLaiVanBanUseCase.class
 com\td\application\vbden\KhongVaoSoVbdenRequest.class
@@ -715,6 +728,7 @@ com\td\application\documents\UpdateDocumentWithFileRequest.class
 com\td\application\vbden\GetNguoiTraLaiRequest.class
 com\td\application\vbden\VbdenForwardUnitMessagePayload$VbdenForwardUnitMessagePayloadBuilder.class
 com\td\application\simpki\LocateSimPkiSignaturesUseCase.class
+com\td\application\vbden\BaoCaoTheoPhongVbdenRequest.class
 com\td\application\workflows\WorkflowDefinitionSummaryDto.class
 com\td\application\hosoluutru\GetHoSoLuuTruChiTietUseCase.class
 com\td\application\workcalendars\WorkCalendarRepository.class

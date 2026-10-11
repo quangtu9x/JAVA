@@ -187,6 +187,22 @@ class GetSoLuongCanXuLyUseCaseTest {
         assertThat(orgLevelKeys).isEqualTo(24);
     }
 
+    // 09/10/2026 (bao loi demo10): van thu don vi chi co quyen pham vi don vi (QCapNhatVBDiDV) van phai
+    // thay so "Cho gui" (WaitingToSend) o Trang chu/menu.
+    @Test
+    void execute_withUnitScopedVanThuRole_shouldComputeWaitingToSend() {
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of(USERNAME));
+        when(currentUserProvider.currentRoles()).thenReturn(Set.of("QCAPNHATVBDIDV"));
+        when(resolveIdentifierByLevelUseCase.resolveForCurrentUser()).thenReturn(Optional.of(IDENTIFIER));
+        when(viewQueryService.execute(any(), any())).thenReturn(pageOfSize(0));
+        when(viewQueryService.execute(eq("vbdi"), argThatViewname("vwcreator_documentout_waitingtosend")))
+            .thenReturn(pageOfSize(3));
+
+        var counts = newUseCase().execute();
+
+        assertThat(counts.get("WaitingToSend")).isEqualTo(3L);
+    }
+
     private ViewQueryRequest argThatViewname(String viewname) {
         return ArgumentMatchers.argThat(req -> req != null && viewname.equals(req.getViewname()));
     }

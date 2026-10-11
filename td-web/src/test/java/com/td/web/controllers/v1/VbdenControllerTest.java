@@ -131,6 +131,8 @@ class VbdenControllerTest {
     @MockBean
     private com.td.application.vbden.GetSoLuongCanXuLyUseCase getSoLuongCanXuLyUseCase;
     @MockBean
+    private com.td.application.vbden.BaoCaoTheoPhongVbdenUseCase baoCaoTheoPhongVbdenUseCase;
+    @MockBean
     private ProcessDiagramService processDiagramService;
     @MockBean
     private com.td.application.vbden.XoaVanBanDenUseCase xoaVanBanDenUseCase;

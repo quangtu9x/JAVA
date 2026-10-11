@@ -69,6 +69,7 @@ public class GetLegacyOrganizationTreeUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final AppUserRepository appUserRepository;
     private final OrganizationAgencyResolver organizationAgencyResolver;
+    private final UserDelegationResolver userDelegationResolver;
 
     public LegacyOrganizationTreeResponse execute(String jedisKey, boolean includeFullTree) {
         return execute(jedisKey, includeFullTree, false);
@@ -201,7 +202,7 @@ public class GetLegacyOrganizationTreeUseCase {
         List<LegacyOrganizationTreeNode> result = new ArrayList<>();
         for (Organization root : roots) {
             LegacyOrganizationTreeNode node = buildNode(
-                root, childrenByParent, new NodeContext(null, null, null), scopeAgencyId, usersByOrganizationId);
+                root, childrenByParent, new NodeContext(null, null, null, userDelegationResolver.allActiveToday()), scopeAgencyId, usersByOrganizationId);
             if (node != null) {
                 result.add(node);
             }
@@ -258,6 +259,7 @@ public class GetLegacyOrganizationTreeUseCase {
         data.put("username", safe(user.getUsername()));
         data.put("position", asString(dynamicFields.get("position")));
         data.put("cap_lanh_dao", safe(user.getCapLanhDao()));
+        data.put("delegation_obj", userDelegationResolver.activeJsonOrEmpty(context.delegations(), user.getUsername()));
         data.put("agency_id", safe(context.agencyId()));
         data.put("unit_id", safe(context.unitId()));
 
@@ -325,6 +327,9 @@ public class GetLegacyOrganizationTreeUseCase {
         // quan/Phòng ban) - áp dụng CHUNG cho mọi form, cùng cách mailin/clerical đã làm bên dưới.
         data.put("receiver", safe(organization.getReceiver()));
         data.put("receiver_position", safe(organization.getReceiverPosition()));
+        // 09/10/2026 (port Ủy quyền): thay Domino UyQuyen#capnhat_daidien_nhan_vanban (chép delegation_obj
+        // sang bản ghi tổ chức) — gắn LÚC ĐỌC ủy quyền đang hiệu lực của người đại diện nhận (chuỗi JSON).
+        data.put("delegation_obj", userDelegationResolver.activeJsonOrEmpty(context.delegations(), receiverUsername));
 
         // Bugfix 21/08/2026 (D.22 tài liệu phân tích vbden — tiếp): "clerical"/"mailin" - đơn vị
         // NGOÀI hệ thống, nhận văn bản qua email thay vì tài khoản (dùng ở
@@ -384,7 +389,7 @@ public class GetLegacyOrganizationTreeUseCase {
             unitId = organization.getId().toString();
         }
 
-        return new NodeContext(agencyId, agencyIdentifier, unitId);
+        return new NodeContext(agencyId, agencyIdentifier, unitId, current.delegations());
     }
 
     private String normalizeJedisKey(String jedisKey) {
@@ -402,6 +407,9 @@ public class GetLegacyOrganizationTreeUseCase {
         return value == null ? "" : String.valueOf(value);
     }
 
-    private record NodeContext(String agencyId, String agencyIdentifier, String unitId) {
+    // 09/10/2026: "delegations" = ủy quyền đang hiệu lực hôm nay (UserDelegationResolver#allActiveToday, 1
+    // truy vấn cho CẢ cây) — gắn delegation_obj vào node tổ chức (người đại diện nhận) và node người dùng.
+    private record NodeContext(String agencyId, String agencyIdentifier, String unitId,
+                               Map<String, Map<String, Object>> delegations) {
     }
 }

@@ -23,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GetDefaultDocumentRegisterUseCase {
 
     private final DocumentRegisterRepository documentRegisterRepository;
+    private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
 
     public Result<DocumentRegisterDto> execute(String identifier, String documentRegisterType) {
         try {
@@ -41,7 +42,9 @@ public class GetDefaultDocumentRegisterUseCase {
             if (register.isLocked()) {
                 return Result.failure("Sổ văn bản '" + register.getName() + "' đã bị khoá");
             }
-            return Result.success(DocumentRegisterDtoMapper.mapWithComputedNextNumber(register));
+            DocumentRegisterDto dto = DocumentRegisterDtoMapper.mapWithComputedNextNumber(register);
+            dto.setDelegationObj(userDelegationResolver.activeFor(register.getUserAssignerUsername()).<Object>map(o -> o).orElse(""));
+            return Result.success(dto);
         } catch (Exception ex) {
             log.error("Lấy sổ văn bản mặc định thất bại", ex);
             return Result.failure("Lấy sổ văn bản mặc định thất bại: " + ex.getMessage());

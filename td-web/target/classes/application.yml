@@ -161,6 +161,9 @@ app:
     credential-encryption-salt: ${TENANT_CREDENTIAL_ENCRYPTION_SALT:}
   # Security Configuration with Keycloak
   security:
+    # Ma rieng bat buoc khi ADMIN dung chuc nang "Chuyen tai khoan". Gia tri mac dinh giu tuong
+    # thich Domino cu; production nen dat SWITCH_USER_SECURITY_CODE rieng.
+    switch-user-code: "${SWITCH_USER_SECURITY_CODE:123@!@#Aa}"
     keycloak:
       server-url: ${KEYCLOAK_SERVER_URL:http://localhost:8180}
       realm: ${KEYCLOAK_REALM:td-webapi-realm}

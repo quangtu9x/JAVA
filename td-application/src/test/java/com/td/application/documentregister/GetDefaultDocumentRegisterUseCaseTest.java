@@ -26,7 +26,7 @@ class GetDefaultDocumentRegisterUseCaseTest {
 
     @BeforeEach
     void setUp() {
-        useCase = new GetDefaultDocumentRegisterUseCase(documentRegisterRepository);
+        useCase = new GetDefaultDocumentRegisterUseCase(documentRegisterRepository, com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver());
     }
 
     @Test

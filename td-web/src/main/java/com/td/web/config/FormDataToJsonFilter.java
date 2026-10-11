@@ -80,9 +80,11 @@ public class FormDataToJsonFilter extends OncePerRequestFilter {
     // tren, path khong chua "/files" hay "/upload".
     // "/simpki/locate-signatures" (29/09/2026): SimPkiSignController#locateSignatures (multipart PDF +
     // signerName) - tu dat chu ky theo ten nguoi ky o modal Ky SIM, cung bay voi /simpki/sign.
+    // "/simpki/locate-text-slots" (08/10/2026): SimPkiSignController#locateTextSlots (multipart PDF + slots) -
+    // dinh vi o trong chen so/ngay cho ky USB Token moi o Van ban di, cung bay.
     private static final Set<String> FILE_UPLOAD_SEGMENTS =
         Set.of("/files", "/upload", "/simpki/convert", "/simpki/sign", "/simpki/locate-signatures",
-            "/signature-images");
+            "/simpki/locate-text-slots", "/signature-images");
 
     private final ObjectMapper objectMapper;
 

@@ -31,7 +31,7 @@ class GetGroupPeopleForIdentifierUseCaseTest {
 
     private GetGroupPeopleForIdentifierUseCase newUseCase() {
         return new GetGroupPeopleForIdentifierUseCase(privateCategoryRepository, dynamicDocumentFieldsService,
-            new ActiveGroupMembersFilter(appUserRepository));
+            new ActiveGroupMembersFilter(appUserRepository, com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver()));
     }
 
     @Test

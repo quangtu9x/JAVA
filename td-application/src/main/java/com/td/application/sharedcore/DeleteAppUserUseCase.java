@@ -21,6 +21,7 @@ public class DeleteAppUserUseCase {
 
     private final AppUserRepository appUserRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final AppUserDeactivationGuard deactivationGuard;
 
     public Result<UUID> execute(UUID id) {
         try {
@@ -30,6 +31,10 @@ public class DeleteAppUserUseCase {
             }
 
             var user = opt.get();
+            String blocked = deactivationGuard.checkDelete(user);
+            if (blocked != null) {
+                return Result.failure(blocked);
+            }
             user.markAsDeleted(resolveCurrentUserId());
             var saved = appUserRepository.save(user);
 

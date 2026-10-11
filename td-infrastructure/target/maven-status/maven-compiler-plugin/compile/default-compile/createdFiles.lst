@@ -68,6 +68,7 @@ com\td\infrastructure\persistence\repository\PostgresVbdenUpdateHistoryDocumentR
 com\td\infrastructure\tenant\TenantActiveRegistry.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport$AttributeFilterRule.class
 com\td\infrastructure\persistence\repository\PostgresHoSoLuuTruDocumentRepository.class
+com\td\infrastructure\simpki\LocateTextSlotsUseCaseImpl$1.class
 com\td\infrastructure\messaging\KafkaMessagePublisher.class
 com\td\infrastructure\tenant\TenantProperties.class
 com\td\infrastructure\simpki\GetSimPkiSignStatusUseCaseImpl.class
@@ -88,6 +89,7 @@ com\td\infrastructure\categories\DeleteCategoryFileUseCaseImpl.class
 com\td\infrastructure\persistence\repository\DocumentJpaRepository.class
 com\td\infrastructure\identityfiles\UploadIdentityFileUseCaseImpl.class
 com\td\infrastructure\categories\GetCategoryFileUseCaseImpl.class
+com\td\infrastructure\persistence\identity\PostgresUserDelegationRepository.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport.class
 com\td\infrastructure\persistence\repository\PostgresNumberingConfigRepository.class
 com\td\infrastructure\tenant\TenantDataSourceConfig$TenantDataSourcePool.class
@@ -148,6 +150,7 @@ com\td\infrastructure\security\CurrentUserContext.class
 com\td\infrastructure\persistence\identity\PostgresAppPermissionRepository.class
 com\td\infrastructure\persistence\identity\AppPermissionJpaRepository.class
 com\td\infrastructure\errortracking\ErrorLogDto$ErrorLogDtoBuilder.class
+com\td\infrastructure\persistence\identity\UserDelegationJpaRepository.class
 com\td\infrastructure\persistence\repository\PostgresDuThaoDocumentRepository.class
 com\td\infrastructure\persistence\repository\VbcddhDocumentJpaRepository.class
 com\td\infrastructure\simpki\SubmitSimPkiSignatureUseCaseImpl.class
@@ -229,6 +232,7 @@ com\td\infrastructure\persistence\repository\PhieuTrinhTdDocumentJpaRepository.c
 com\td\infrastructure\persistence\repository\PostgresDocumentRepository.class
 com\td\infrastructure\errortracking\ErrorLogEntity$ErrorLogEntityBuilder.class
 com\td\infrastructure\errortracking\Severity.class
+com\td\infrastructure\simpki\LocateTextSlotsUseCaseImpl.class
 com\td\infrastructure\persistence\identity\PostgresAppRoleRepository.class
 com\td\infrastructure\config\MinioService.class
 com\td\infrastructure\persistence\repository\HoSoCVDocumentJpaRepository.class

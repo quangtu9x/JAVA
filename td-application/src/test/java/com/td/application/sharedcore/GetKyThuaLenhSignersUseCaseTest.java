@@ -49,7 +49,7 @@ class GetKyThuaLenhSignersUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new GetKyThuaLenhSignersUseCase(currentUserProvider, appUserRepository, organizationRepository,
-            new DynamicDocumentFieldsService());
+            new DynamicDocumentFieldsService(), UserDelegationTestSupport.emptyResolver());
         tinh = org("H05", "Tỉnh", "agency_level", null);
         khoi = org("H05.K", "Khối sở", "agency", tinh.getId());
         so = org("H05.01", "Sở KHCN", "agency", khoi.getId());

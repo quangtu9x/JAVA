@@ -419,8 +419,53 @@ class ThuHoiVanBanUseCaseTest {
         // request, du van dang "chua xu ly") - khac han nhanh "all" (derive tu lich su).
         assertThat(userProcess).containsExactlyInAnyOrder("tranthic", "vanthu01");
         verify(processDiagramService).removeNode(parent.getId(), "vbden", "nguyenvana");
-        // Nhanh "select" KHONG can quet lich su vbden_res.
-        verify(vbdenResDocumentRepository, never()).findByParentId(any(), any());
+        // Nhanh "select" khong dung lich su de chon nguoi bi thu hoi; tu 09/10/2026 chi doc 1 lan de xet
+        // go nguoi thu hoi khoi user_delivered/user_track (clearDeliveredMarkersIfNothingLeft).
+        verify(vbdenResDocumentRepository).findByParentId(any(), any());
+    }
+
+    // 09/10/2026 (bao loi demo9): thu hoi het nguoi minh da chuyen -> go khoi user_delivered + user_track
+    // (an cac nut "Phan cong bo sung / Bo sung y kien / Thu hoi / Huy theo doi").
+    @Test
+    void execute_revokingEveryRecipient_shouldClearDeliveredAndSelfTrack() {
+        BusinessDocument parent = newDocument("vbden",
+            "{\"user_process\":[\"demo15\"],\"user_delivered\":[\"lpha\",\"demo9\"],\"user_track\":[\"demo9\",\"lpha\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        stubHistory(parent, historyRecord("demo9", "chuyenxuly", "[{\"username\":\"demo15\"}]"));
+
+        var request = new ThuHoiVanBanRequest();
+        request.setParentid(parent.getId());
+        request.setOpinion("Thu hoi");
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat((List<?>) updated.get("user_process")).asList().containsExactly("demo9");
+        assertThat((List<?>) updated.get("user_delivered")).asList().containsExactly("lpha");
+        assertThat((List<?>) updated.get("user_track")).asList().containsExactly("lpha");
+    }
+
+    @Test
+    void execute_selectRevokeWithRecipientLeft_shouldKeepDeliveredAndTrack() {
+        BusinessDocument parent = newDocument("vbden",
+            "{\"user_process\":[\"demo15\",\"demo16\"],\"user_delivered\":[\"demo9\"],\"user_track\":[\"demo9\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        stubHistory(parent, historyRecord("demo9", "chuyenxuly",
+            "[{\"username\":\"demo15\"},{\"username\":\"demo16\"}]"));
+
+        var request = new ThuHoiVanBanRequest();
+        request.setParentid(parent.getId());
+        request.setOpinion("Thu hoi 1 nguoi");
+        request.setType("select");
+        request.setUserProcessObj("[{\"username\":\"demo15\"}]");
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> updated = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat((List<?>) updated.get("user_delivered")).asList().containsExactly("demo9");
+        assertThat((List<?>) updated.get("user_track")).asList().containsExactly("demo9");
     }
 
     // "Theo doi" (user_track) CHI duoc thu hoi o nhanh "select" (doc SONG, khac nhanh "all" - xem
@@ -469,6 +514,16 @@ class ThuHoiVanBanUseCaseTest {
         // thu hoi du co trong userProcessObj, vi field do bi bo qua hoan toan o nhanh mac dinh.
         assertThat((List<?>) updatedFields.get("user_process")).asList().contains("nguyenvana");
         verify(vbdenResDocumentRepository).findByParentId(any(), any());
+    }
+
+    private VbdenResDocument historyRecord(String actor, String action, String userProcessObjJson) {
+        return newResRecord("{\"nguoi_thuc_hien\":\"" + actor + "\",\"action\":\"" + action + "\","
+            + "\"user_process_obj\":" + com.fasterxml.jackson.databind.node.TextNode.valueOf(userProcessObjJson) + "}");
+    }
+
+    private void stubHistory(BusinessDocument parent, VbdenResDocument... records) {
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(records), PageRequest.of(0, 1000), records.length));
     }
 
     private BusinessDocument newDocument(String documentType, String dynamicFieldsJson) {

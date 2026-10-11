@@ -19,6 +19,7 @@ import java.util.List;
 public class ListSelectableDocumentRegistersUseCase {
 
     private final DocumentRegisterRepository documentRegisterRepository;
+    private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
 
     public Result<List<DocumentRegisterDto>> execute(String identifier, String documentRegisterType) {
         try {
@@ -31,8 +32,15 @@ public class ListSelectableDocumentRegistersUseCase {
             var registers = documentRegisterRepository
                 .findByIdentifierAndDocumentRegisterTypeAndIsLockedFalseAndDeletedOnIsNull(
                     identifier.trim(), documentRegisterType.trim());
+            // 09/10/2026: ủy quyền đang hiệu lực của Lãnh đạo phân công mặc định từng sổ (1 truy vấn).
+            var delegations = userDelegationResolver.activeByDelegator(registers.stream()
+                .map(r -> r.getUserAssignerUsername()).filter(java.util.Objects::nonNull).toList());
             var dtos = registers.stream()
-                .map(DocumentRegisterDtoMapper::mapWithComputedNextNumber)
+                .map(register -> {
+                    DocumentRegisterDto dto = DocumentRegisterDtoMapper.mapWithComputedNextNumber(register);
+                    dto.setDelegationObj(userDelegationResolver.activeObjOrEmpty(delegations, register.getUserAssignerUsername()));
+                    return dto;
+                })
                 .toList();
             return Result.success(dtos);
         } catch (Exception ex) {

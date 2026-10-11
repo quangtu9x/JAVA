@@ -143,6 +143,9 @@ public class ViewQueryService {
     // findByAnyFieldEqualsIdentifier/findByAnyFieldContainsMember trong VbdiDocumentRepository).
     static final String VIEW_VBDI_TOANBO_ALL_BO = "vwcreator_documentout_all_bo"; // route "toanbo_all"
     static final String VIEW_VBDI_DOCUMENTOUT_ALL = "vwcreator_documentout_all"; // "cq_toanbo"/"dv_toanbo"/"pb_toanbo"
+    // 10/10/2026 ("In sổ văn bản đi" vbdi/baocaoinso/insovanban): thay Domino qlvb/search
+    // templateQuery=reportDocumentRegister (TDQueryVBDI#reportDocumentRegister) - xem buildVbdiInSoFilter.
+    static final String VIEW_VBDI_REPORT_DOCUMENT_REGISTER = "reportdocumentregister";
     static final String VIEW_VBDI_USER_ALL = "vwdocumentout_userall"; // "cn_toanbo"
     static final String VIEW_VBDI_WAITING_TO_SEND = "vwcreator_documentout_waitingtosend"; // "chuagui"
     static final String VIEW_VBDI_SENT = "vwcreator_documentout_sent"; // "dagui"
@@ -1217,6 +1220,8 @@ public class ViewQueryService {
     private final DocumentLinkService documentLinkService;
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
     private final com.td.application.phieutrinhtd.PhieuTrinhTdViewQuery phieuTrinhTdViewQuery;
+    // 09/10/2026: delegation_obj lãnh đạo (vwuserleaderbyparentid) lấy từ bảng user_delegations.
+    private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
 
     public PaginationResponse<Map<String, Object>> execute(String dbType, ViewQueryRequest request) {
         // 06/10/2026 (cutover FE phieu trinh): moi view phieu trinh (ten view Domino that, nhieu ten TRUNG
@@ -1234,6 +1239,14 @@ public class ViewQueryService {
         // (CollapseHoSoCV, object "search") trước đây CHỈ áp cho VIEW_HOSOCV_TOAN_BO — mọi hàng đợi
         // hồ sơ cá nhân khác bỏ qua. Tính 1 lần, truyền vào queryHoSoCVPersonalQueue*.
         VbdenOrgViewFilter hoSoCVSearch = buildHoSoCVAdvancedSearchFilter(request.getSearch());
+
+        // 09/10/2026 (port "Sử dụng xin ý kiến" - Văn bản đi -> Tra cứu "VB xin ý kiến TVUB/BTV..."):
+        // truoc day FE vbdi/xinykien goi Domino qlvb/view/query. Xem queryVbdiXinYKienView.
+        String vbdiOpinionFlag = vbdiXinYKienFlag(viewname);
+        if (vbdiOpinionFlag != null) {
+            return queryVbdiXinYKienView(dbType, viewname, key, vbdiOpinionFlag, request.getSearch(),
+                request.getItems(), keyword, keywordColumns, pageable);
+        }
 
         return switch (viewname) {
             case VIEW_DOCUMENT_CHO_XU_LY, VIEW_VBDEN_CHUTRI ->
@@ -1289,6 +1302,18 @@ public class ViewQueryService {
                         "unit_creator_identifier"),
                     VbdiStatus.ISSUED, null, buildVbdiAdvancedSearchFilter(request.getSearch()),
                     request.getItems(), keyword, keywordColumns, pageable);
+            // Pham vi = "toan bo van ban di cua to chuc" da ban hanh (cung 4 field identifier tren,
+            // identifier LUON resolve server-side); "Trich yeu" (trichyeu) di qua keyword tren subject.
+            case VIEW_VBDI_REPORT_DOCUMENT_REGISTER -> {
+                String trichYeu = asString(request.getSearch() == null ? null : request.getSearch().get("trichyeu"));
+                boolean hasTrichYeu = trichYeu != null && !trichYeu.isBlank();
+                yield queryVbdiByFieldsEquals(dbType, resolveCurrentIdentifier(),
+                    List.of("unit_publish_identifier", "unit_identifier", "unit_in_charge_identifier",
+                        "unit_creator_identifier"),
+                    VbdiStatus.ISSUED, null, buildVbdiInSoFilter(request.getSearch()),
+                    request.getItems(), hasTrichYeu ? trichYeu.trim() : null,
+                    hasTrichYeu ? List.of("subject") : null, pageable);
+            }
             case VIEW_VBDI_USER_ALL ->
                 queryVbdiByFieldsContainsMember(dbType,
                     resolveUsernameToken(key),
@@ -2665,6 +2690,69 @@ public class ViewQueryService {
             .build();
     }
 
+    private static final DateTimeFormatter VBDI_IN_SO_MM_DD_YYYY = DateTimeFormatter.ofPattern("MM/dd/yyyy");
+
+    /**
+     * 10/10/2026 — "In sổ văn bản đi" (FE {@code vbdi/insovanban/components/ItemsList.jsx}, object
+     * {@code dataFilter}), đúng các khoá Domino {@code TDQueryVBDI#reportDocumentRegister}:
+     * {@code ngaybanhanh} = {fromDate,toDate} dạng MM/dd/yyyy; {@code document_register_id} (sổ Java) hoặc
+     * {@code sovanban} (tên sổ); {@code dokhan/loaivanban/linhvuc/nguoiky/nguoisoanthao/domat/phuongthuc}
+     * = tên danh mục; đơn vị soạn = {@code madonvisoanthao} (unit_in_charge_identifier, form Java lưu
+     * unit_in_charge — Domino cũ so unit_creator) hoặc tên; {@code document_internet} 1/2 gồm cả "3"
+     * (cả hai), "3" = không lọc như Domino. {@code trichyeu} xử lý ở call site (keyword trên subject).
+     */
+    private VbdiDocumentOutFilter buildVbdiInSoFilter(Map<String, Object> search) {
+        VbdiDocumentOutFilter.VbdiDocumentOutFilterBuilder builder = VbdiDocumentOutFilter.builder();
+        if (search == null || search.isEmpty()) {
+            return builder.build();
+        }
+        if (search.get("ngaybanhanh") instanceof Map<?, ?> range) {
+            builder.promulgationDateFrom(parseMmDdYyyy(asString(range.get("fromDate"))));
+            builder.promulgationDateTo(parseMmDdYyyy(asString(range.get("toDate"))));
+        }
+
+        Map<String, List<String>> includeFieldValues = new LinkedHashMap<>();
+        String registerId = asString(search.get("document_register_id"));
+        if (registerId != null && !registerId.isBlank()) {
+            builder.documentRegisterId(registerId.trim());
+        } else {
+            putIfNonBlank(includeFieldValues, "document_register", asString(search.get("sovanban")));
+        }
+        putIfNonBlank(includeFieldValues, "priority", asString(search.get("dokhan")));
+        putIfNonBlank(includeFieldValues, "document_type", asString(search.get("loaivanban")));
+        putIfNonBlank(includeFieldValues, "sector", asString(search.get("linhvuc")));
+        putIfNonBlank(includeFieldValues, "signer", asString(search.get("nguoiky")));
+        putIfNonBlank(includeFieldValues, "draftor", asString(search.get("nguoisoanthao")));
+        putIfNonBlank(includeFieldValues, "confidentiality", asString(search.get("domat")));
+        putIfNonBlank(includeFieldValues, "delivery_method", asString(search.get("phuongthuc")));
+        putIfNonBlank(includeFieldValues, "unit_publish_identifier", asString(search.get("unit_publish_identifier")));
+        putIfNonBlank(includeFieldValues, "send_agent", asString(search.get("send_agent")));
+        putIfNonBlank(includeFieldValues, "lien_thong", asString(search.get("lien_thong")));
+        putIfNonBlank(includeFieldValues, "mc_thutuc", asString(search.get("mc_thutuc")));
+        String unitInChargeIdentifier = asString(search.get("madonvisoanthao"));
+        if (unitInChargeIdentifier != null && !unitInChargeIdentifier.isBlank()) {
+            putIfNonBlank(includeFieldValues, "unit_in_charge_identifier", unitInChargeIdentifier);
+        } else {
+            putIfNonBlank(includeFieldValues, "unit_in_charge", asString(search.get("donvisoanthao")));
+        }
+        String documentInternet = asString(search.get("document_internet"));
+        if ("1".equals(documentInternet) || "2".equals(documentInternet)) {
+            includeFieldValues.put("document_internet", List.of(documentInternet, "3"));
+        }
+        return builder.includeFieldValues(includeFieldValues.isEmpty() ? null : includeFieldValues).build();
+    }
+
+    private LocalDate parseMmDdYyyy(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value.trim(), VBDI_IN_SO_MM_DD_YYYY);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     /**
      * 29/08/2026 (đợt 1 "port toàn bộ vbdi/xuly/*"): dùng chung cho các view "hàng đợi cá nhân" khoá
      * theo field động DẠNG DANH SÁCH username nối {@code ";"} (xem
@@ -2987,6 +3075,48 @@ public class ViewQueryService {
      * {@link #queryVbdiDocumentOutTextBook} về lý do cần validate thay vì tự resolve 1 giá trị cố
      * định như {@link #resolveCurrentIdentifier()}.
      */
+    /**
+     * 09/10/2026 — DXL {@code view_vanbandi.dxl} {@code toanbo_vb_xin_ykien_tvub}/{@code _tvnb} và
+     * {@code vb_xin_ykien_tvub_by_draftor}/{@code _tvnb_by_draftor} ({@code SELECT Form="DocumentOut" &
+     * status="2" & is_<loại>_opinion="true"}); "toàn bộ" khoá {@code unit_publish_identifier} (+
+     * {@code unit_publish_identifier_other}), "_by_draftor" khoá {@code user_draft}. FE còn dùng
+     * {@code toanbo_vb_xin_ykien_btv}/{@code vb_xin_ykien_btv_by_draftor} (không có trong DXL đã xuất) —
+     * cùng khuôn với cờ {@code is_btv_opinion}; mở rộng đồng nhất cho bch/ttdu. Cờ nhận "true"|"1" như
+     * 14 view xin ý kiến vbden (OPINION_FLAG_TRUE_VALUES).
+     */
+    private static final java.util.regex.Pattern VBDI_XIN_Y_KIEN_VIEW =
+        java.util.regex.Pattern.compile("^(?:toanbo_vb_xin_ykien_|vb_xin_ykien_)(tvub|tvnb|btv|bch|ttdu)(?:_by_draftor)?$");
+
+    private String vbdiXinYKienFlag(String viewname) {
+        if (viewname == null) {
+            return null;
+        }
+        var matcher = VBDI_XIN_Y_KIEN_VIEW.matcher(viewname);
+        if (!matcher.matches()) {
+            return null;
+        }
+        boolean toanBo = viewname.startsWith("toanbo_");
+        boolean byDraftor = viewname.endsWith("_by_draftor");
+        // "vb_xin_ykien_<loai>" khong hau to = ten route FE, khong phai view Domino -> bo qua.
+        if (toanBo == byDraftor) {
+            return null;
+        }
+        return "is_" + matcher.group(1) + "_opinion";
+    }
+
+    private PaginationResponse<Map<String, Object>> queryVbdiXinYKienView(
+            String dbType, String viewname, String key, String flagField, Map<String, Object> search,
+            String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+        String flagSql = "COALESCE(d.dynamic_fields->>'" + flagField + "', '') IN ('true', '1')";
+        if (viewname.endsWith("_by_draftor")) {
+            return queryVbdiByFieldsEqualsUnvalidated(dbType, key, List.of("user_draft"), VbdiStatus.ISSUED,
+                flagSql, items, keyword, keywordColumns, pageable);
+        }
+        // "search" (vd promulgation_date khoảng ngày - InBaoCaoLayKienThanhVien.jsx) dùng chung bộ lọc nâng cao vbdi.
+        return queryVbdiByFieldsEquals(dbType, key, List.of("unit_publish_identifier", "unit_publish_identifier_other"),
+            VbdiStatus.ISSUED, flagSql, buildVbdiAdvancedSearchFilter(search), items, keyword, keywordColumns, pageable);
+    }
+
     private boolean isOwnIdentifier(String identifier) {
         String username = currentUserProvider.currentUsername().orElse(null);
         if (username == null) {
@@ -4552,7 +4682,7 @@ public class ViewQueryService {
         fields.put("sort_order", user.getSortOrder());
         fields.put("position", dynamicFields.getOrDefault("position", ""));
         fields.put("caplanhdao", user.getCapLanhDao());
-        fields.put("delegation_obj", dynamicFields.getOrDefault("delegation_obj", ""));
+        fields.put("delegation_obj", userDelegationResolver.activeFor(user.getUsername()).<Object>map(obj -> obj).orElse("")); // 09/10/2026: bảng user_delegations
         return fields;
     }
 

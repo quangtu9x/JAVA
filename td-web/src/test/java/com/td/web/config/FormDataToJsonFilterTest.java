@@ -72,6 +72,22 @@ class FormDataToJsonFilterTest {
     }
 
     @Test
+    void doFilter_shouldPassThroughUnchanged_forSimPkiLocateTextSlotsMultipartUpload() throws Exception {
+        // 08/10/2026: dinh vi o trong chen so/ngay (ky USB Token moi o Van ban di) - cung bay.
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/simpki/locate-text-slots");
+        request.setContentType("multipart/form-data; boundary=abc");
+        request.addPart(new MockPart("file", "van-ban.pdf", "noi dung gia".getBytes(StandardCharsets.UTF_8)));
+        request.addPart(new MockPart("slots", "[{\"id\":\"so\",\"regex\":\"Số\\\\s*:( ?)/\"}]".getBytes(StandardCharsets.UTF_8)));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        AtomicReference<Object> requestSeenByChain = new AtomicReference<>();
+        filter.doFilter(request, response, (req, res) -> requestSeenByChain.set(req));
+
+        assertThat(requestSeenByChain.get()).isSameAs(request);
+        assertThat(request.getContentType()).contains("multipart/form-data");
+    }
+
+    @Test
     void doFilter_shouldPassThroughUnchanged_forUserSignatureImageMultipartUpload() throws Exception {
         // Cung bay y het SimPki o tren: SharedCoreUsersController#uploadSignatureImage
         // (/api/v1/shared-core/users/{id}/signature-images) khong co "/files"/"/upload" trong path.

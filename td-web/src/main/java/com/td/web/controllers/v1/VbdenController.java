@@ -53,6 +53,8 @@ import com.td.application.vbden.CapNhatYKienVbdenUseCase;
 import com.td.application.vbden.ChuyenXuLyVbcddhNhiemVuRequest;
 import com.td.application.vbden.ChuyenXuLyVbcddhNhiemVuUseCase;
 import com.td.application.vbden.GetSoLuongCanXuLyUseCase;
+import com.td.application.vbden.BaoCaoTheoPhongVbdenRequest;
+import com.td.application.vbden.BaoCaoTheoPhongVbdenUseCase;
 import com.td.application.vbden.GetSoVanBanDenRequest;
 import com.td.application.vbden.GetSoVanBanDenUseCase;
 import com.td.application.vbden.GuiSangVbcddhRequest;
@@ -156,6 +158,12 @@ public class VbdenController extends BaseController {
             + QlvbRoles.CAP_NHAT_VBDEN + "', '" + QlvbRoles.CAP_NHAT_VBDEN_DV + "', '"
             + QlvbRoles.CAP_NHAT_VBDEN_PB + "', '" + QlvbRoles.QUAN_TRI + "')";
 
+    // 09/10/2026 (bugfix 403 lần 2 — demo13): role ở trên HOẶC đang tham gia xử lý chính văn bản đó
+    // (có tên trong field user_*/author) — chuyên viên nhận văn bản chuyển tiếp/ghi ý kiến không cần
+    // quyền phân công, đúng Domino ChuyenXuLy.java (xem javadoc VbdenParticipantChecker).
+    private static final String CHUYEN_XU_LY_ACCESS = PHAN_CONG_CHUYEN_TIEP_ROLES
+        + " or @vbdenParticipantChecker.isCurrentUserParticipant(#request.parentid)";
+
     private final TiepNhanVbdenUseCase tiepNhanVbdenUseCase;
     private final GetVbdenDetailUseCase getVbdenDetailUseCase;
     private final ViewQueryService viewQueryService;
@@ -185,6 +193,7 @@ public class VbdenController extends BaseController {
     private final TheoDoiNhiemVuUseCase theoDoiNhiemVuUseCase;
     private final TheoDoiVanBanDenUseCase theoDoiVanBanDenUseCase;
     private final GetSoLuongCanXuLyUseCase getSoLuongCanXuLyUseCase;
+    private final BaoCaoTheoPhongVbdenUseCase baoCaoTheoPhongVbdenUseCase;
     private final AddVbdenEditHistoryUseCase addVbdenEditHistoryUseCase;
     private final ListVbdenEditHistoryUseCase listVbdenEditHistoryUseCase;
     private final com.td.application.vbden.ListVbdenUpdateHistoryUseCase listVbdenUpdateHistoryUseCase;
@@ -377,7 +386,7 @@ public class VbdenController extends BaseController {
     }
 
     @PostMapping("/ChuyenXuLy")
-    @PreAuthorize(PHAN_CONG_CHUYEN_TIEP_ROLES)
+    @PreAuthorize(CHUYEN_XU_LY_ACCESS)
     @Operation(summary = "Phân công / Chuyển tiếp / Ghi ý kiến xử lý văn bản đến (BL-211, tương thích qlvb/vbden/ChuyenXuLy)",
         description = "Một action dùng chung cho phân công xử lý (DoD 1), ghi ý kiến xử lý (DoD 2), "
             + "và chuyển tiếp (DoD 3) — đúng thiết kế Domino thật (ChuyenXuLy.java dùng 1 action, "
@@ -875,5 +884,16 @@ public class VbdenController extends BaseController {
             + "GetSoLuongCanXuLyUseCase")
     public ResponseEntity<ApiResponse<Map<String, Object>>> soLuongCanXuLy() {
         return ok(getSoLuongCanXuLyUseCase.execute());
+    }
+
+    @PostMapping("/BaoCaoTheoPhong")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Báo cáo tổng hợp theo đơn vị - cá nhân (thay qlvb/vbcddh/danhsachdonvithuchien "
+        + "+ qlvb/vbden/TimKiemVanBanDen)",
+        description = "Trả {unit: cây tổ chức shape Domino (nhân sự gom vào node form=nhansu), data: văn bản "
+            + "đến trong phạm vi tổ chức (view toanbovanban, lọc search.received_date), total, truncated}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> baoCaoTheoPhong(
+            @RequestBody BaoCaoTheoPhongVbdenRequest request) {
+        return ok(baoCaoTheoPhongVbdenUseCase.execute(request));
     }
 }

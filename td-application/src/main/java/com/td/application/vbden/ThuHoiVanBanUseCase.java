@@ -120,6 +120,7 @@ public class ThuHoiVanBanUseCase {
     // ThuHoiVanBanUseCase dung toi (chi GetNguoiThuHoiUseCase doc SONG qua TheoDoiVanBanDenUseCase),
     // gio nhanh chon loc THAT SU ghi field nay nen can khai bao rieng.
     static final String USER_TRACK_FIELD = "user_track";
+    private static final String USER_DELIVERED_FIELD = "user_delivered";
     private static final String TYPE_SELECT = "select";
 
     private static final String NOT_FOUND_MESSAGE = "Khong tim thay van ban den";
@@ -178,14 +179,15 @@ public class ThuHoiVanBanUseCase {
             return Result.failure("Khong xac dinh duoc nguoi dung hien tai");
         }
 
+        List<VbdenResDocument> history = vbdenResDocumentRepository.findByParentId(
+            request.getParentid().toString(), PageRequest.of(0, MAX_HISTORY_RECORDS)).getContent();
         RevokeResult revoked;
         if (TYPE_SELECT.equalsIgnoreCase(request.getType())) {
             revoked = computeSelectiveRevocation(parent, request);
         } else {
-            var historyPage = vbdenResDocumentRepository.findByParentId(
-                request.getParentid().toString(), PageRequest.of(0, MAX_HISTORY_RECORDS));
-            revoked = computeRevocation(parent, historyPage.getContent(), actingUsername);
+            revoked = computeRevocation(parent, history, actingUsername);
         }
+        clearDeliveredMarkersIfNothingLeft(revoked.fields(), history, actingUsername);
 
         updateParentDocument(parent, actingUsername, revoked, request.getOpinion());
         var childResult = createProcessingRecord(request, actingUsername, revoked);
@@ -301,6 +303,64 @@ public class ThuHoiVanBanUseCase {
     // la chuoi JSON. Truoc ban fix nay, asString(...).toString() tren cau truc do KHONG phai JSON hop
     // le, readTree luon nem loi, bi bat/bo qua AM THAM - "thu hoi toan bo" KHONG BAO GIO thu hoi duoc
     // ai qua nhanh nay trong thuc te (tests cu dung fixture chuoi JSON tho, khong khop du lieu that).
+    /**
+     * 09/10/2026 (báo lỗi demo9, VB 1/QĐ-SNNMT: chuyển cho demo15 rồi thu hồi 3 lần, mở lại VB vẫn hiện
+     * "Phân công bổ sung / Bổ sung ý kiến / Thu hồi / Hủy theo dõi"): FE hiện các nút đó theo
+     * {@code user_delivered}/{@code user_track} chứa người dùng, nhưng thu hồi (cả Domino — dòng gỡ
+     * user_delivered trong ThuHoiVanBan.java bị comment) chưa bao giờ gỡ người thu hồi ra. Sau thu hồi,
+     * nếu KHÔNG còn người/đơn vị nào do chính người này chuyển (chủ trì/phối hợp/xem để biết) đang xử lý
+     * hoặc đã xử lý, thì gỡ người này khỏi user_delivered và user_track ("Trực tiếp theo dõi xử lý" tự
+     * tích lúc chuyển). Còn ai thì giữ nguyên như cũ.
+     */
+    private void clearDeliveredMarkersIfNothingLeft(
+            Map<String, Object> fields, List<VbdenResDocument> history, String actingUsername) {
+        Set<String> recipientUsers = new LinkedHashSet<>();
+        Set<String> recipientUnits = new LinkedHashSet<>();
+        for (VbdenResDocument historyRecord : history) {
+            Map<String, Object> historyFields = dynamicDocumentFieldsService.parseDynamicFields(
+                historyRecord.getDynamicFieldsJson());
+            if (!actingUsername.equals(asString(historyFields.get(NGUOI_THUC_HIEN_FIELD)))
+                    || !REVOCABLE_ACTIONS.contains(asString(historyFields.get(ACTION_FIELD)))) {
+                continue;
+            }
+            for (String key : List.of(ChuyenXuLyVbdenUseCase.USER_PROCESS_OBJ_FIELD_RAW,
+                    ChuyenXuLyVbdenUseCase.USER_COORDINATE_OBJ_FIELD_RAW, ChuyenXuLyVbdenUseCase.USER_TO_READ_OBJ_FIELD_RAW)) {
+                for (JsonNode node : VbdenObjSnapshotFields.readJsonArray(historyFields.get(key))) {
+                    String username = node.hasNonNull("username") ? node.path("username").asText()
+                        : node.path("user_receiver").asText("");
+                    if (!username.isBlank()) {
+                        recipientUsers.add(username);
+                    }
+                    String identifier = node.path("identifier").asText("");
+                    if (!identifier.isBlank()) {
+                        recipientUnits.add(identifier);
+                    }
+                }
+            }
+            recipientUsers.addAll(toStringList(historyFields.get(USER_PROCESS_FIELD)));
+        }
+        recipientUsers.remove(actingUsername);
+
+        Set<String> involvedUsers = new LinkedHashSet<>();
+        for (String field : List.of(USER_PROCESS_FIELD, USER_COORDINATE_FIELD, USER_TO_READ_FIELD, USER_PROCESSED_FIELD)) {
+            involvedUsers.addAll(toStringList(fields.get(field)));
+        }
+        Set<String> involvedUnits = new LinkedHashSet<>();
+        for (String field : List.of(UNIT_PROCESS_FIELD, UNIT_COORDINATE_FIELD, UNIT_TO_READ_FIELD)) {
+            involvedUnits.addAll(toStringList(fields.get(field)));
+        }
+        if (recipientUsers.stream().anyMatch(involvedUsers::contains)
+                || recipientUnits.stream().anyMatch(involvedUnits::contains)) {
+            return;
+        }
+        for (String field : List.of(USER_DELIVERED_FIELD, USER_TRACK_FIELD)) {
+            List<String> values = toStringList(fields.get(field));
+            if (values.remove(actingUsername)) {
+                fields.put(field, values);
+            }
+        }
+    }
+
     private void revokeFromSnapshot(
             Object rawValue, List<String> pendingUsers, List<String> pendingUnits,
             Set<String> revokedUsernamesOut, ArrayNode revokedOut) {
