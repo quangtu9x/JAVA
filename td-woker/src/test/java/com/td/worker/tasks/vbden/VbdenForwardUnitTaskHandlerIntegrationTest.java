@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.td.worker.config.WorkerProperties;
 import com.td.worker.core.task.TaskContext;
 import com.td.worker.core.task.UnitResult;
+import com.td.worker.infrastructure.fileregistry.SharedFileRegistry;
 import com.td.worker.infrastructure.tenant.TenantDataSourceManager;
 import com.td.worker.transport.rabbit.RabbitPublisher;
 import com.zaxxer.hikari.HikariConfig;
@@ -29,6 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -51,6 +53,7 @@ class VbdenForwardUnitTaskHandlerIntegrationTest {
     private final ObjectProvider<RabbitPublisher> rabbitPublisher = mock(ObjectProvider.class);
     private WorkerProperties props;
     private VbdenForwardUnitTaskHandler handler;
+    private SharedFileRegistry sharedFileRegistry;
 
     @BeforeAll
     static void startContainer() {
@@ -153,7 +156,9 @@ class VbdenForwardUnitTaskHandlerIntegrationTest {
         when(tenantDataSources.getDataSource(any())).thenReturn(Optional.of(dataSource));
         props = new WorkerProperties();
         props.getTasks().getVbden().setEnabled(true);
-        handler = new VbdenForwardUnitTaskHandler(props, tenantDataSources, objectMapper, rabbitPublisher);
+        sharedFileRegistry = mock(SharedFileRegistry.class);
+        handler = new VbdenForwardUnitTaskHandler(props, tenantDataSources, objectMapper, rabbitPublisher,
+            sharedFileRegistry);
     }
 
     private ObjectNode basePayload() {
@@ -275,6 +280,10 @@ class VbdenForwardUnitTaskHandlerIntegrationTest {
         // Yeu cau nguoi dung 08/09/2026 ("khong cho xoa dinh kem goc"): dong file_metadata cua ban
         // sao PHAI danh dau is_shared=TRUE de DeleteFileUseCaseImpl chan xoa (xem migration V1.0.50).
         assertThat(fileRows.get(0).get("is_shared")).isEqualTo(true);
+        // 22/10/2026: tham chieu vao so dang ky tep dung chung - object goc chi bi xoa khi het don vi tham chieu.
+        verify(sharedFileRegistry).registerQuietly("h05_02", SharedFileRegistry.SOURCE_FORWARD_UNIT, List.of(
+            new SharedFileRegistry.SharedFileRef((UUID) fileRows.get(0).get("id"), documentId, "td-webapi-files",
+                "documents/2026/09/08/origin-doc/aaa.pdf")));
 
         Map<String, Object> dynamicFields = objectMapper.readValue(doc.get("dynamic_fields").toString(), Map.class);
         List<Map<String, Object>> filesJson = (List<Map<String, Object>>) dynamicFields.get("files");

@@ -43,6 +43,8 @@ import static org.mockito.Mockito.when;
 class ThuHoiVanBanUseCaseTest {
 
     @Mock
+    private com.td.application.sharedcore.GetLegacyOrgLookupForDungChungUseCase orgLookup;
+    @Mock
     private DocumentRepository documentRepository;
     @Mock
     private VbdenResDocumentRepository vbdenResDocumentRepository;
@@ -78,7 +80,7 @@ class ThuHoiVanBanUseCaseTest {
             documentRepository, vbdenResDocumentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
             processDiagramService, resolveIdentifierByLevelUseCase, publishForwardUnitRevokeUseCase,
-            authorAclFieldsService);
+            authorAclFieldsService, new VbdenRevokeRecipientMatcher(orgLookup));
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         lenient().when(vbdenResDocumentRepository.findByParentId(any(), any()))
@@ -231,7 +233,7 @@ class ThuHoiVanBanUseCaseTest {
 
         VbdenResDocument historyRecord = newResRecord("{"
             + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"vanthu01\","
-            + "\"action\":\"phanxuly\","
+            + "\"action\":\"ketthucxuly\","
             + "\"user_process_obj\":\"[{\\\"username\\\":\\\"nguyenvana\\\"}]\"}");
         when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
             .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
@@ -243,6 +245,78 @@ class ThuHoiVanBanUseCaseTest {
 
         Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
         assertThat((List<?>) updatedFields.get("user_process")).asList().contains("nguyenvana");
+    }
+
+    // 11/10/2026 VB 10/BC-SKHCN: thu hoi DON VI phai go ca thanh vien dang giu (demo17) - truoc day sot.
+    @Test
+    void execute_revokeUnit_shouldAlsoRevokeMembersHoldingDocument() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"demo17\"],\"unit_process\":[\"H05.01.05.02\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        when(orgLookup.getOrganizationMembers("ORG-QTHT", true)).thenReturn(List.of(
+            Map.of("username", "demo15"), Map.of("username", "demo17")));
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo9\",\"action\":\"chuyenxuly\","
+            + "\"user_process_obj\":[{\"id\":\"ORG-QTHT\",\"identifier\":\"H05.01.05.02\",\"user_receiver\":\"demo15\"}]}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+        var request = new ThuHoiVanBanRequest();
+        request.setParentid(parent.getId());
+
+        useCase.execute(request);
+
+        Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat((List<?>) updatedFields.get("user_process")).asList().containsExactly("demo9");
+        assertThat((List<?>) updatedFields.get("unit_process")).asList().isEmpty();
+    }
+
+    // 11/10/2026 VB 1/QĐ-SNNMT: da thu hoi het tu truoc ban sua 09/10 -> cleanupOnly go dau "da chuyen",
+    // KHONG ghi vet, KHONG dua nguoi thao tac vao user_process.
+    @Test
+    void execute_cleanupOnly_shouldClearDeliveredMarkerWithoutRevoking() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"lpha\"],\"user_delivered\":[\"demo9\"],"
+            + "\"user_track\":[\"demo9\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo9\",\"action\":\"chuyenxuly\","
+            + "\"user_process_obj\":[{\"username\":\"demo15\"}]}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+        var request = new ThuHoiVanBanRequest();
+        request.setParentid(parent.getId());
+        request.setCleanupOnly(true);
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat((List<?>) updatedFields.get("user_delivered")).asList().isEmpty();
+        assertThat((List<?>) updatedFields.get("user_track")).asList().isEmpty();
+        assertThat((List<?>) updatedFields.get("user_process")).asList().containsExactly("lpha");
+        verify(addVbdenResDocumentUseCase, never()).execute(any());
+    }
+
+    // 11/10/2026 (demo9): "Phan xu ly" (phanxuly) danh dau user_delivered nhu chuyenxuly -> phai thu hoi duoc.
+    @Test
+    void execute_phanXuLyTransfer_shouldBeRevoked() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"nguyenvana\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));
+
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"vanthu01\","
+            + "\"action\":\"phanxuly\","
+            + "\"user_process_obj\":\"[{\\\"username\\\":\\\"nguyenvana\\\"}]\"}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+
+        var request = new ThuHoiVanBanRequest();
+        request.setParentid(parent.getId());
+
+        useCase.execute(request);
+
+        Map<String, Object> updatedFields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        assertThat((List<?>) updatedFields.get("user_process")).asList().doesNotContain("nguyenvana");
     }
 
     @Test

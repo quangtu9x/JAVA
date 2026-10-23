@@ -53,6 +53,23 @@ class DuThaoSignSubmissionInspectorTest {
     }
 
     /** Dùng chung cho test use case khác cần inspector không có vết nào. */
+    // 19/10/2026: người kết thúc = vết ketthuc MỚI NHẤT (dự thảo kết thúc trước khi có user_ended).
+    @Test
+    void endedBy_shouldReturnActorOfLatestKetThucRecord() {
+        newestFirst.add(record("ketthuc", "truongphong"));
+        newestFirst.add(record("thuhoi", "truongphong"));
+        newestFirst.add(record("ketthuc", "chuyenvien1"));
+
+        assertThat(inspector.endedBy(UUID.randomUUID())).isEqualTo("truongphong");
+    }
+
+    @Test
+    void endedBy_withoutKetThucRecord_shouldBeEmpty() {
+        newestFirst.add(record("chuyenduyet", "chuyenvien1"));
+
+        assertThat(inspector.endedBy(UUID.randomUUID())).isEmpty();
+    }
+
     static DuThaoSignSubmissionInspector emptyInspector() {
         return new DuThaoSignSubmissionInspector(stubRepository(List.of()), new DynamicDocumentFieldsService());
     }

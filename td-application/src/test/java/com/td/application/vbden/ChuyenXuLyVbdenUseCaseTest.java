@@ -97,6 +97,61 @@ class ChuyenXuLyVbdenUseCaseTest {
             UUID.randomUUID(), delegate, "Nguoi nhan", "Pho phong", today.minusDays(1), today.plusDays(1), scopes, null));
     }
 
+    // 20/10/2026: Phân công bổ sung chọn người ĐANG PHỐI HỢP làm chủ trì -> bỏ khỏi phối hợp, vết ghi ở quá trình.
+    @Test
+    void execute_promoteCoordinatorToChutri_shouldRemoveFromCoordinateAndRecordInProcess() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"truongphong\"],"
+            + "\"user_coordinate\":[\"chuyenvien1\",\"chuyenvien2\"],"
+            + "\"coordinate_obj\":[{\"username\":\"chuyenvien1\",\"name\":\"Chuyen vien 1\"},{\"username\":\"chuyenvien2\",\"name\":\"Chuyen vien 2\"}]}", "2");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("truongphong"));
+        org.mockito.ArgumentCaptor<com.td.application.documents.AddDynamicDocumentRequest> captor =
+            org.mockito.ArgumentCaptor.forClass(com.td.application.documents.AddDynamicDocumentRequest.class);
+        when(addVbdenResDocumentUseCase.execute(captor.capture())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenxuly");
+        request.setUserProcess("chuyenvien1");
+        request.setOpinion("Giao chu tri");
+
+        useCase.execute(request);
+
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        org.assertj.core.api.Assertions.assertThat((java.util.List<?>) fields.get("user_process")).asList().contains("chuyenvien1");
+        org.assertj.core.api.Assertions.assertThat((java.util.List<?>) fields.get("user_coordinate")).asList().containsExactly("chuyenvien2");
+        org.assertj.core.api.Assertions.assertThat(String.valueOf(fields.get("coordinate_obj"))).doesNotContain("chuyenvien1").contains("chuyenvien2");
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getFields())
+            .containsEntry("coordinate_to_chutri", "Chuyen vien 1")
+            .containsEntry("opinion", "Giao chu tri\n(Chuyển từ phối hợp sang chủ trì: Chuyen vien 1)");
+    }
+
+    @Test
+    void execute_promoteCoordinatorUnitToChutri_shouldRemoveUnitFromCoordinate() {
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"truongphong\"],"
+            + "\"unit_coordinate\":[\"H56.09\",\"H56.10\"],"
+            + "\"coordinate_obj\":[{\"identifier\":\"H56.09\",\"name\":\"Phong Cong nghe\"}]}", "2");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("truongphong"));
+        org.mockito.ArgumentCaptor<com.td.application.documents.AddDynamicDocumentRequest> captor =
+            org.mockito.ArgumentCaptor.forClass(com.td.application.documents.AddDynamicDocumentRequest.class);
+        when(addVbdenResDocumentUseCase.execute(captor.capture())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("chuyenxuly");
+        request.setUnitProcess("H56.09");
+
+        useCase.execute(request);
+
+        var fields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        org.assertj.core.api.Assertions.assertThat((java.util.List<?>) fields.get("unit_coordinate")).asList().containsExactly("H56.10");
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getFields())
+            .containsEntry("opinion", "Chuyển từ phối hợp sang chủ trì: Phong Cong nghe");
+    }
+
     // Ủy quyền hợp lệ: FE đã thay truongphong bằng phophong trong userProcess, gửi truongphong ở
     // userProcessDelegation -> truongphong vào user_delivered ("đã chuyển"), vết lưu user_process_delegation.
     @Test
@@ -410,8 +465,10 @@ class ChuyenXuLyVbdenUseCaseTest {
      * publish THÊM STATUS_05 "Đang xử lý" TRƯỚC STATUS_04, kèm {@code statusDetails} = danh sách
      * người mới được giao (";"-nối) trên chính STATUS_04.
      */
+    // 20/10/2026: người dùng yêu cầu BỎ STATUS_05 ở lần phân công đầu (thừa vết "Văn thư - Đang xử lý" ở Nhật
+    // ký gửi nhận văn bản đi) — chỉ còn STATUS_04.
     @Test
-    void execute_firstAssignmentFromStatusMoi_shouldAlsoPublishReplyStatusDangXuLy() {
+    void execute_firstAssignmentFromStatusMoi_shouldPublishOnlyPhanCongStatus() {
         BusinessDocument parent = newDocument("vbden", "{\"send_log_id\":\"sl-1\"}", VbdenStatusService.STATUS_MOI);
         when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
         when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -428,13 +485,10 @@ class ChuyenXuLyVbdenUseCaseTest {
         assertThat(result.isSuccess()).isTrue();
         ArgumentCaptor<com.td.application.vbdi.PublishVbdiReplyStatusRequest> captor =
             ArgumentCaptor.forClass(com.td.application.vbdi.PublishVbdiReplyStatusRequest.class);
-        verify(publishVbdiReplyStatusUseCase, org.mockito.Mockito.times(2)).execute(captor.capture());
-        var requests = captor.getAllValues();
-        assertThat(requests.get(0).getStatusCode()).isEqualTo("05");
-        assertThat(requests.get(0).getStatusLabel()).isEqualTo("Đang xử lý");
-        assertThat(requests.get(1).getStatusCode()).isEqualTo("04");
-        assertThat(requests.get(1).getStatusLabel()).isEqualTo("Phân công xử lý");
-        assertThat(requests.get(1).getStatusDetails()).isEqualTo("nguyenvana; tranvanb");
+        verify(publishVbdiReplyStatusUseCase, org.mockito.Mockito.times(1)).execute(captor.capture());
+        assertThat(captor.getValue().getStatusCode()).isEqualTo("04");
+        assertThat(captor.getValue().getStatusLabel()).isEqualTo("Phân công xử lý");
+        assertThat(captor.getValue().getStatusDetails()).isEqualTo("nguyenvana; tranvanb");
     }
 
     /** Đang phân công lại (status KHÁC "0") — KHÔNG phát lại STATUS_05, chỉ có STATUS_04 như cũ. */

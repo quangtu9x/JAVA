@@ -18,20 +18,15 @@ import com.td.application.documents.DeleteDocumentUseCase;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentCacheStatsDto;
 import com.td.application.documents.DocumentDetailWithFilesDto;
-import com.td.application.documents.DocumentSearchStatusDto;
 import com.td.application.documents.DocumentDto;
 import com.td.application.documents.DocumentXemChiTietDto;
 import com.td.application.documents.GetDeletedDocumentsUseCase;
-import com.td.application.documents.GetDocumentSearchStatusUseCase;
 import com.td.application.documents.SimpleFileDto;
 import com.td.application.documents.GetDocumentRequest;
 import com.td.application.documents.GetDocumentUseCase;
 import com.td.application.documents.HardDeleteDocumentUseCase;
-import com.td.application.documents.ReindexDocumentSearchUseCase;
-import com.td.application.documents.SearchDocumentsElasticUseCase;
 import com.td.application.documents.SearchDocumentsRequest;
 import com.td.application.documents.SearchDocumentsUseCase;
-import com.td.application.documents.SyncDocumentSearchByIdUseCase;
 import com.td.application.documents.UpdateDocumentRequest;
 import com.td.application.documents.UpdateDocumentUseCase;
 import com.td.application.documents.UploadFileUseCase;
@@ -99,10 +94,6 @@ public class DocumentsController extends BaseController {
     private final HardDeleteDocumentUseCase hardDeleteDocumentUseCase;
     private final GetDocumentUseCase getDocumentUseCase;
     private final SearchDocumentsUseCase searchDocumentsUseCase;
-    private final SearchDocumentsElasticUseCase searchDocumentsElasticUseCase;
-    private final GetDocumentSearchStatusUseCase getDocumentSearchStatusUseCase;
-    private final ReindexDocumentSearchUseCase reindexDocumentSearchUseCase;
-    private final SyncDocumentSearchByIdUseCase syncDocumentSearchByIdUseCase;
     private final GetDeletedDocumentsUseCase getDeletedDocumentsUseCase;
     private final GetDocumentLogsUseCase getDocumentLogsUseCase;
     private final UploadFileUseCase uploadFileUseCase;
@@ -276,44 +267,6 @@ public class DocumentsController extends BaseController {
         return ResponseEntity.ok()
             .header("X-Cache", "MISS")
             .body(toApiResponse(response));
-    }
-
-    @PostMapping("/search/elastic")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Tìm kiếm tài liệu bằng Elasticsearch",
-        description = "Ưu tiên Elasticsearch cho full-text search. Nếu request có attributeFilters hoặc Elasticsearch chưa sẵn sàng, API sẽ fallback về database search")
-    public ResponseEntity<ApiResponse<List<DocumentDto>>> searchDocumentsElastic(
-            @Valid @RequestBody SearchDocumentsRequest request) {
-        var searchResult = searchDocumentsElasticUseCase.execute(request);
-        var response = enrichDocumentsWithFiles(searchResult.getPage());
-        return ResponseEntity.ok()
-            .header("X-Search-Backend", searchResult.getBackend())
-            .body(toApiResponse(response));
-    }
-
-    @GetMapping("/search/admin/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
-    @Operation(summary = "Trạng thái Elasticsearch cho documents",
-        description = "Kiểm tra Elasticsearch đã bật, đã tạo index và có bao nhiêu bản ghi được index")
-    public ResponseEntity<ApiResponse<DocumentSearchStatusDto>> getDocumentSearchStatus() {
-        return ok(getDocumentSearchStatusUseCase.execute());
-    }
-
-    @PostMapping("/search/admin/reindex")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Reindex documents lên Elasticsearch",
-        description = "Xóa và tạo lại index documents-search, sau đó đồng bộ toàn bộ documents chưa bị xóa từ PostgreSQL sang Elasticsearch")
-    public ResponseEntity<ApiResponse<Long>> reindexDocumentSearch() {
-        return ok(reindexDocumentSearchUseCase.execute());
-    }
-
-    @PostMapping("/search/admin/sync/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Đồng bộ một document lên Elasticsearch theo ID",
-        description = "Dùng để debug index data cho một document cụ thể. Nếu document đã deleted hoặc không tồn tại, API sẽ xóa bản ghi tương ứng khỏi index")
-    public ResponseEntity<ApiResponse<String>> syncDocumentSearchById(
-            @Parameter(description = "Document ID", required = true) @PathVariable("id") UUID id) {
-        return ok(syncDocumentSearchByIdUseCase.execute(id));
     }
 
     private PaginationResponse<DocumentDto> enrichDocumentsWithFiles(PaginationResponse<DocumentDto> response) {

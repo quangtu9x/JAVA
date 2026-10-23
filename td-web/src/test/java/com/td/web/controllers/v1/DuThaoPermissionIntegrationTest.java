@@ -25,6 +25,7 @@ import com.td.application.duthao.TaoDuThaoUseCase;
 import com.td.application.duthao.ThuHoiVanBanDiUseCase;
 import com.td.application.duthao.TraLoiVanBanDenDuThaoUseCase;
 import com.td.application.duthao.XinYKienPhoiHopUseCase;
+import com.td.application.duthao.ChuyenPhoiHopDuThaoUseCase;
 import com.td.application.duthao.XuLyDuThaoUseCase;
 import com.td.application.sharedcore.GetUserRoleGroupConfigUseCase;
 import com.td.application.tenant.ResolveUserTenantUseCase;
@@ -123,6 +124,9 @@ class DuThaoPermissionIntegrationTest {
     private LuuDuThaoUseCase luuDuThaoUseCase;
     @MockBean
     private XinYKienPhoiHopUseCase xinYKienPhoiHopUseCase;
+
+    @MockBean
+    private ChuyenPhoiHopDuThaoUseCase chuyenPhoiHopDuThaoUseCase;
     @MockBean
     private ChuyenThanhVanBanDiUseCase chuyenThanhVanBanDiUseCase;
     @MockBean
@@ -162,6 +166,12 @@ class DuThaoPermissionIntegrationTest {
     private com.td.application.duthao.XoaTepVetDuThaoUseCase xoaTepVetDuThaoUseCase;
     @MockBean
     private com.td.application.duthao.ChuyenTepVetDuThaoUseCase chuyenTepVetDuThaoUseCase;
+
+    @MockBean
+    private com.td.application.duthao.XoaDuThaoUseCase xoaDuThaoUseCase;
+
+    @MockBean
+    private com.td.application.duthao.DuThaoGroupViewQuery duThaoGroupViewQuery;
     @MockBean
     private ViewQueryService viewQueryService;
 

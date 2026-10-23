@@ -83,10 +83,7 @@ worker:
     url: ${WORKER_DB_URL:jdbc:postgresql://localhost:5432/tdworker}
     username: ${WORKER_DB_USERNAME:postgres}
     password: ${WORKER_DB_PASSWORD:postgres}
-    # Bổ sung placeholder (docs/18-trien-khai-test-simpki.md mục "H2 file cục bộ") — mặc định KHÔNG
-    # đổi (vẫn "org.postgresql.Driver") — cho phép đổi sang "org.h2.Driver" qua WORKER_DB_DRIVER_CLASS_NAME
-    # khi máy chủ test chưa có Postgres. Trước đây là literal cứng (không placeholder) nên biến môi
-    # trường KHÔNG ghi đè được — đã tự phát hiện bằng thực nghiệm (smoke test thật, không suy đoán).
+    # Cho phép test cục bộ đổi driver qua biến môi trường; production mặc định vẫn dùng PostgreSQL.
     driver-class-name: ${WORKER_DB_DRIVER_CLASS_NAME:org.postgresql.Driver}
     schema-management: ${WORKER_DB_SCHEMA_MANAGEMENT:flyway}
     # batch gửi ngay các unit của MỘT message; không chờ gom message khác. single = từng INSERT.
@@ -142,6 +139,21 @@ worker:
     secret-key: ${MINIO_SECRET_KEY:}
     bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
 
+  # So dang ky tep dinh kem DUNG CHUNG (van ban den noi tinh/truc quoc gia, chuyen xu ly) - DB RIENG, PHAI la CUNG
+  # database voi app.file-registry cua td-web (td-web so huu migration). Job don dep chi xoa object MinIO khi
+  # het don vi tham chieu qua grace-period va khong tenant nao con dong file_metadata tro toi.
+  file-registry:
+    enabled: ${FILE_REGISTRY_ENABLED:true}
+    url: ${FILE_REGISTRY_DB_URL:jdbc:postgresql://localhost:5432/tdfileregistry}
+    username: ${FILE_REGISTRY_DB_USERNAME:postgres}
+    password: ${FILE_REGISTRY_DB_PASSWORD:postgres}
+    maximum-pool-size: ${FILE_REGISTRY_DB_MAX_POOL:4}
+    gc-enabled: ${FILE_REGISTRY_GC_ENABLED:true}
+    gc-cron: ${FILE_REGISTRY_GC_CRON:0 30 2 * * *}
+    grace-period: ${FILE_REGISTRY_GRACE_PERIOD:7d}
+    gc-batch-size: ${FILE_REGISTRY_GC_BATCH_SIZE:200}
+    gc-max-batches-per-run: ${FILE_REGISTRY_GC_MAX_BATCHES:50}
+
   # RabbitMQ topology (bật bằng set enabled=true và khai báo queue).
   rabbit:
     enabled: ${WORKER_RABBIT_ENABLED:false}
@@ -187,6 +199,66 @@ worker:
       # Tạo THẬT bản ghi "văn bản đến chờ vào sổ" (bảng documents) cho recipientGroup=contact_unit.
       # Tắt để rollback vận hành về hành vi cũ (chỉ ghi dedup) mà không cần đổi code.
       create-incoming-document: ${WORKER_VBDI_CREATE_INCOMING_DOCUMENT:true}
+
+  # Đồng bộ Elasticsearch (16/10/2026) — SearchSyncProperties, xem docs/21-dong-bo-elasticsearch.md.
+  # MỌI khoá phải có placeholder ở đây: .env nạp dạng properties KHÔNG relaxed-bind khoá không có
+  # placeholder. Thiếu ELASTICSEARCH_URIS → không chạy (hàng đợi DB vẫn ghi, cấu hình sau sẽ tự bù).
+  search-sync:
+    enabled: ${WORKER_SEARCH_SYNC_ENABLED:true}
+    uris: ${ELASTICSEARCH_URIS:}
+    username: ${ELASTICSEARCH_USERNAME:}
+    password: ${ELASTICSEARCH_PASSWORD:}
+    api-key: ${ELASTICSEARCH_API_KEY:}
+    connect-timeout: ${ELASTICSEARCH_CONNECT_TIMEOUT:5s}
+    request-timeout: ${ELASTICSEARCH_REQUEST_TIMEOUT:60s}
+    index-prefix: ${WORKER_SEARCH_SYNC_INDEX_PREFIX:hscv}
+    mapping-version: ${WORKER_SEARCH_SYNC_MAPPING_VERSION:1}
+    number-of-shards: ${WORKER_SEARCH_SYNC_SHARDS:1}
+    number-of-replicas: ${WORKER_SEARCH_SYNC_REPLICAS:0}
+    total-fields-limit: ${WORKER_SEARCH_SYNC_TOTAL_FIELDS_LIMIT:2000}
+    refresh-interval: ${WORKER_SEARCH_SYNC_REFRESH_INTERVAL:1s}
+    # Đánh thức theo sự kiện (LISTEN/NOTIFY, migration td-web V1.0.73); quét định kỳ chỉ là dự phòng.
+    notify-enabled: ${WORKER_SEARCH_SYNC_NOTIFY_ENABLED:true}
+    notify-channel: ${WORKER_SEARCH_SYNC_NOTIFY_CHANNEL:search_index}
+    fallback-sweep-interval: ${WORKER_SEARCH_SYNC_FALLBACK_SWEEP_INTERVAL:2m}
+    max-parallel-tenants: ${WORKER_SEARCH_SYNC_MAX_PARALLEL_TENANTS:4}
+    listener-ping-interval: ${WORKER_SEARCH_SYNC_LISTENER_PING_INTERVAL:60s}
+    listener-reconnect-delay: ${WORKER_SEARCH_SYNC_LISTENER_RECONNECT_DELAY:10s}
+    unavailable-retry-delay: ${WORKER_SEARCH_SYNC_UNAVAILABLE_RETRY_DELAY:15s}
+    batch-size: ${WORKER_SEARCH_SYNC_BATCH_SIZE:500}
+    max-batches-per-tenant-per-cycle: ${WORKER_SEARCH_SYNC_MAX_BATCHES_PER_TENANT:20}
+    retry-initial-backoff: ${WORKER_SEARCH_SYNC_RETRY_INITIAL_BACKOFF:10s}
+    retry-max-backoff: ${WORKER_SEARCH_SYNC_RETRY_MAX_BACKOFF:30m}
+    bootstrap-on-missing-index: ${WORKER_SEARCH_SYNC_BOOTSTRAP:true}
+    reconcile-interval: ${WORKER_SEARCH_SYNC_RECONCILE_INTERVAL:6h}
+    delete-old-indices: ${WORKER_SEARCH_SYNC_DELETE_OLD_INDICES:false}
+    search-text-max-chars: ${WORKER_SEARCH_SYNC_SEARCH_TEXT_MAX_CHARS:32000}
+    excluded-columns: ${WORKER_SEARCH_SYNC_EXCLUDED_COLUMNS:}
+    # Khoá dynamic_fields tìm TỪ KHOÁ (kw.*). Bỏ trống = danh sách mặc định trong SearchSyncProperties.
+    keyword-fields: ${WORKER_SEARCH_SYNC_KEYWORD_FIELDS:code,code_full,subject,title,name,signer,draftor,creator,unit_in_charge,unit_publish,noinhanchutri,process_handler,approved_by,first_topic,second_topic,category,description,lanhdaovanphong,lanhdao1,lanhdao2,status,promulgation_date,received_date,deadline_date,create_date,draft_end_date,document_type}
+    tenants: ${WORKER_SEARCH_SYNC_TENANTS:}
+    # entity_type (tham số trigger ở td-web migration V1.0.72) -> bảng. Thêm bảng: migration trigger + dòng ở đây.
+    entities:
+      documents: ${WORKER_SEARCH_SYNC_TABLE_DOCUMENTS:documents}
+      vbdi: ${WORKER_SEARCH_SYNC_TABLE_VBDI:vbdi_documents}
+      duthao: ${WORKER_SEARCH_SYNC_TABLE_DUTHAO:duthao_documents}
+      hosocv: ${WORKER_SEARCH_SYNC_TABLE_HOSOCV:hosocv_documents}
+      phieutrinhtd: ${WORKER_SEARCH_SYNC_TABLE_PHIEUTRINHTD:phieutrinhtd_documents}
+      vbcddh: ${WORKER_SEARCH_SYNC_TABLE_VBCDDH:vbcddh_documents}
+      hosoluutru: ${WORKER_SEARCH_SYNC_TABLE_HOSOLUUTRU:hosoluutru_documents}
+    # Trích nội dung tệp đính kèm (Apache Tika, KHÔNG OCR: PDF scan -> EMPTY, ảnh -> bỏ qua) - docs/architecture/14-trich-noi-dung-tep.md.
+    # Cần MinIO (worker.minio.*) bật.
+    file-extract:
+      enabled: ${WORKER_FILE_EXTRACT_ENABLED:false}
+      file-timeout: ${WORKER_FILE_EXTRACT_FILE_TIMEOUT:5m}
+      max-file-bytes: ${WORKER_FILE_EXTRACT_MAX_FILE_BYTES:52428800}
+      max-stored-chars: ${WORKER_FILE_EXTRACT_MAX_STORED_CHARS:2000000}
+      max-indexed-chars: ${WORKER_FILE_EXTRACT_MAX_INDEXED_CHARS:300000}
+      skip-content-types: ${WORKER_FILE_EXTRACT_SKIP_CONTENT_TYPES:image/,video/,audio/,application/zip,application/x-rar,application/x-7z,application/octet-stream}
+      batch-size: ${WORKER_FILE_EXTRACT_BATCH_SIZE:3}
+      max-parallel-tenants: ${WORKER_FILE_EXTRACT_MAX_PARALLEL_TENANTS:2}
+      lease: ${WORKER_FILE_EXTRACT_LEASE:15m}
+      max-attempts: ${WORKER_FILE_EXTRACT_MAX_ATTEMPTS:5}
 
 management:
   endpoints:

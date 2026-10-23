@@ -16,8 +16,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -43,7 +43,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_shouldIncludeMailinAndClericalFromDynamicFields() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization agency = newAgencyLevel("Bo Nong nghiep");
         Organization externalUnit = newAgency("Don vi ngoai", agency.getId());
@@ -68,7 +68,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // identifier_other_org — KHÔNG đổi "identifier_other" cũ của node agency (vẫn "").
     @Test
     void execute_shouldExposeConfiguredIdentifierOtherAsSeparateKey() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization root = newAgencyLevel("UBND thanh pho");
         Organization vanPhong = newAgency("Van phong UBND thanh pho", root.getId());
@@ -85,7 +85,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withoutDynamicFields_shouldDefaultToEmptyString() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization agency = newAgencyLevel("Bo Nong nghiep");
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(agency)));
@@ -100,17 +100,18 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // nhận" không đưa được vào user_process — xem javadoc buildNodeData/resolveReceiverUsername).
     @Test
     void execute_withReceiverConfigured_shouldResolveUsernameFromReceiverId() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization unit = newAgencyLevel("Phong Ke hoach");
-        UUID receiverAppUserId = UUID.randomUUID();
+        AppUser receiverUser = new AppUser(
+            "sub", "nguyenvana", "Nguyen Van A", null, null, null, true);
+        UUID receiverAppUserId = receiverUser.getId();
         unit.updateLegacyData(null, receiverAppUserId.toString(), "Nguyen Van A", "Truong phong",
             null, null, null, null, null, null);
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(unit)));
-        AppUser receiverUser = new AppUser(
-            "sub", "nguyenvana", "Nguyen Van A", null, null, null, true);
-        lenient().when(appUserRepository.findByIdAndDeletedOnIsNull(receiverAppUserId))
-            .thenReturn(Optional.of(receiverUser));
+        // 15/10/2026: người đại diện nạp theo lô cho cả cây (bỏ N+1 findByIdAndDeletedOnIsNull).
+        when(appUserRepository.findByIdInAndDeletedOnIsNull(List.of(receiverAppUserId)))
+            .thenReturn(List.of(receiverUser));
 
         List<LegacyOrganizationTreeNode> tree = useCase.execute(null, false).getData();
 
@@ -122,7 +123,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withoutReceiverConfigured_shouldReturnEmptyUserReceiver() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization agency = newAgencyLevel("Bo Nong nghiep");
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(agency)));
@@ -137,14 +138,14 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withReceiverIdPointingToDeletedAppUser_shouldReturnEmptyUserReceiver() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization unit = newAgencyLevel("Phong Ke hoach");
         UUID receiverAppUserId = UUID.randomUUID();
         unit.updateLegacyData(null, receiverAppUserId.toString(), "Nguyen Van A", "Truong phong",
             null, null, null, null, null, null);
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(unit)));
-        lenient().when(appUserRepository.findByIdAndDeletedOnIsNull(receiverAppUserId)).thenReturn(Optional.empty());
+        when(appUserRepository.findByIdInAndDeletedOnIsNull(List.of(receiverAppUserId))).thenReturn(List.of());
 
         List<LegacyOrganizationTreeNode> tree = useCase.execute(null, false).getData();
 
@@ -156,7 +157,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // GetLegacyOrganizationTreeUseCase mục scopeAgencyId/resolveCurrentUserAgencyId.
     @Test
     void execute_withNonAdminUser_shouldOnlyIncludeOwnAgencyBranch() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization root = newAgencyLevel("Tinh Thanh Hoa");
         Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
@@ -178,7 +179,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withAdmin_shouldIncludeFullTreeRegardlessOfCurrentUser() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization root = newAgencyLevel("Tinh Thanh Hoa");
         Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
@@ -196,7 +197,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withUnresolvableCurrentUser_shouldFailOpenToFullTree() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization root = newAgencyLevel("Tinh Thanh Hoa");
         Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
@@ -214,7 +215,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
     // CU THE, khong chi chon theo don vi - xem javadoc execute(jedisKey, includeFullTree, includeUsers)).
     @Test
     void execute_withIncludeUsersTrue_shouldAttachUserLeafNodesUnderTheirOrganization() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization agency = newAgencyLevel("So Khoa hoc va Cong nghe");
         Organization department = newUnit("Phong Quan ly", agency.getId());
@@ -240,7 +241,7 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
     @Test
     void execute_withIncludeUsersFalse_shouldNotQueryOrAttachUsers() {
-        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver());
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), OrganizationTreeCache.passThrough());
 
         Organization agency = newAgencyLevel("So Khoa hoc va Cong nghe");
         when(organizationRepository.search(any(), any())).thenReturn(pageOf(List.of(agency)));
@@ -249,6 +250,29 @@ class GetLegacyOrganizationTreeUseCaseTest {
 
         assertThat(tree.get(0).getChildren()).isEmpty();
         verify(appUserRepository, never()).findByOrganizationIdInAndDeletedOnIsNull(any());
+    }
+
+    // 15/10/2026 (cache cây cơ cấu): cây dùng chung trong cache KHÔNG được bị sửa khi lọc theo cơ quan
+    // người xem — gọi cây đã lọc trước rồi cây đầy đủ, phải còn đủ 2 cơ quan; DB chỉ nạp 1 lần.
+    @Test
+    void execute_withSharedCache_shouldNotMutateCachedTreeAndShouldLoadOnce() {
+        OrganizationTreeCache cache = new OrganizationTreeCache(new InMemoryOrganizationTreeCacheStore(), null);
+        useCase = new GetLegacyOrganizationTreeUseCase(organizationRepository, dynamicDocumentFieldsService, appUserRepository, organizationAgencyResolver, UserDelegationTestSupport.emptyResolver(), cache);
+
+        Organization root = newAgencyLevel("Tinh Thanh Hoa");
+        Organization myAgency = newAgency("So Khoa hoc va Cong nghe", root.getId());
+        Organization otherAgency = newAgency("So Nong nghiep va Moi truong", root.getId());
+        when(organizationRepository.search(any(), any()))
+            .thenReturn(pageOf(List.of(root, myAgency, otherAgency)));
+        when(organizationAgencyResolver.resolveCurrentUserAgencyId()).thenReturn(Optional.of(myAgency.getId()));
+
+        List<LegacyOrganizationTreeNode> scoped = useCase.execute(null, false).getData();
+        List<LegacyOrganizationTreeNode> full = useCase.execute(null, true).getData();
+
+        assertThat(scoped.get(0).getChildren()).hasSize(1);
+        assertThat(full.get(0).getChildren()).hasSize(2);
+        assertThat(full.get(0).getData()).containsKey("delegation_obj");
+        verify(organizationRepository, times(1)).search(any(), any());
     }
 
     private Page<Organization> pageOf(List<Organization> organizations) {

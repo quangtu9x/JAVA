@@ -22,6 +22,9 @@ public class CreatePrivateCategoryRequest {
 
     private String description;
 
+    // 19/10/2026: bắt buộc — danh sách mọi danh mục riêng lọc theo form; thiếu form thì bản ghi "tạo
+    // thành công" nhưng không hiện ở đâu (sự cố nhomnguoinhan: FE ghi đè dataModal làm mất Form).
+    @NotBlank(message = "Form không được để trống")
     @Size(max = 100, message = "Form tối đa 100 ký tự")
     private String form;
 

@@ -37,7 +37,8 @@ class TaoDuThaoUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new TaoDuThaoUseCase(addDuThaoDynamicDocumentUseCase, currentUserProvider,
-            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
+            new DuThaoCoordinatorDelegations(com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver()));
         // Bugfix 24/08/2026: khong phai test nao cung can stub nay (vd. khi request da tu gui san
         // user_creator) - lenient() de tranh UnnecessaryStubbingException.
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nhanvien01"));

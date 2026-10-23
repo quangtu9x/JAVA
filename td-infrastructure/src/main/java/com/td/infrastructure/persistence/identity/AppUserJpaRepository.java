@@ -51,6 +51,10 @@ public interface AppUserJpaRepository extends BaseRepository<AppUser> {
     @Query("SELECT u FROM AppUser u WHERE u.id = :id AND u.deletedOn IS NULL")
     Optional<AppUser> findByIdAndDeletedOnIsNull(@Param("id") UUID id);
 
+    // 15/10/2026: @Query tường minh vì so sánh "id" kế thừa generic (xem ghi chú đầu file).
+    @Query("SELECT u FROM AppUser u WHERE u.id IN :ids AND u.deletedOn IS NULL")
+    List<AppUser> findByIdInAndDeletedOnIsNull(@Param("ids") java.util.Collection<UUID> ids);
+
     @Query("SELECT u FROM AppUser u WHERE u.keycloakSubject = :keycloakSubject AND u.deletedOn IS NULL")
     Optional<AppUser> findByKeycloakSubjectAndDeletedOnIsNull(@Param("keycloakSubject") String keycloakSubject);
 

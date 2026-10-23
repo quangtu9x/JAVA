@@ -167,6 +167,23 @@ class GetDuThaoDetailUseCaseTest {
         assertThat(result.getData()).containsEntry("subject", "Trich yeu da sua");
     }
 
+    // 22/10/2026 (thung rac du thao): du thao da xoa mem van mo duoc, form danh dau "draft_document_Deleted".
+    @Test
+    void execute_whenSoftDeleted_shouldReturnWithDeletedForm() {
+        useCase = newUseCase();
+        DuThaoDocument document = newDocument("duthao", "{\"form\":\"draft_document\"}", "Trich yeu goc");
+        document.markAsDeleted(null);
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        stubEmptyFiles(document.getId());
+
+        var request = new GetDuThaoDetailRequest();
+        request.setId(document.getId().toString());
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).containsEntry("form", "draft_document_Deleted");
+    }
+
     private GetDuThaoDetailUseCase newUseCase() {
         return new GetDuThaoDetailUseCase(
             duThaoDocumentRepository, listDocumentFilesUseCase, dynamicDocumentFieldsService,

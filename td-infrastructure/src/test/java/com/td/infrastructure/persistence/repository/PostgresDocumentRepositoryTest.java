@@ -299,9 +299,9 @@ class PostgresDocumentRepositoryTest {
 
         repository.appendKeywordPredicate(sql, parameters, "Cong Van A", List.of("document_number", "code", "subject"));
 
-        assertThat(sql.toString()).contains("LOWER(COALESCE(d.dynamic_fields->>'document_number', '')) LIKE :keyword0");
-        assertThat(sql.toString()).contains("LOWER(COALESCE(d.dynamic_fields->>'code', '')) LIKE :keyword1");
-        assertThat(sql.toString()).contains("LOWER(COALESCE(d.dynamic_fields->>'subject', '')) LIKE :keyword2");
+        assertThat(sql.toString()).contains("td_search_norm(COALESCE(d.dynamic_fields->>'document_number', '')) LIKE :keyword0");
+        assertThat(sql.toString()).contains("td_search_norm(COALESCE(d.dynamic_fields->>'code', '')) LIKE :keyword1");
+        assertThat(sql.toString()).contains("td_search_norm(COALESCE(d.dynamic_fields->>'subject', '')) LIKE :keyword2");
         assertThat(sql.toString()).contains(" OR ");
         assertThat(parameters).containsEntry("keyword0", "%cong van a%");
         assertThat(parameters).containsEntry("keyword1", "%cong van a%");
@@ -317,11 +317,11 @@ class PostgresDocumentRepositoryTest {
         repository.appendKeywordPredicate(sql, parameters, "Van ban", List.of("code", "subject"));
 
         String text = sql.toString();
-        assertThat(text).contains("LOWER(COALESCE(d.title, '')) LIKE :keyword1");
+        assertThat(text).contains("td_search_norm(COALESCE(d.title, '')) LIKE :keyword1");
         assertThat(text).contains("d.document_type = 'vbden_so' AND EXISTS (SELECT 1 FROM documents p"
             + " WHERE CAST(p.id AS text) = d.dynamic_fields->>'parentid'");
-        assertThat(text).contains("LOWER(COALESCE(p.dynamic_fields->>'code', '')) LIKE :keyword0");
-        assertThat(text).contains("LOWER(COALESCE(p.title, '')) LIKE :keyword1");
+        assertThat(text).contains("td_search_norm(COALESCE(p.dynamic_fields->>'code', '')) LIKE :keyword0");
+        assertThat(text).contains("td_search_norm(COALESCE(p.title, '')) LIKE :keyword1");
         // title chi them cho subject, khong cho code.
         assertThat(text).doesNotContain("d.title, '')) LIKE :keyword0");
     }

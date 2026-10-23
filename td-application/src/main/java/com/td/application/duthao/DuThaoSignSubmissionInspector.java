@@ -53,6 +53,25 @@ public class DuThaoSignSubmissionInspector {
         return new Inspection(submitter, signerActed);
     }
 
+    /**
+     * 19/10/2026 ("Kết thúc" nhầm -> Thu hồi, chỉ người kết thúc): tài khoản người thao tác vết
+     * {@code ketthuc} MỚI NHẤT (records sắp mới nhất trước). Dùng cho dự thảo kết thúc TRƯỚC khi có field
+     * {@code user_ended}. Rỗng nếu không tìm thấy.
+     */
+    public String endedBy(UUID draftId) {
+        var records = draftProcessDocumentRepository
+            .findByParentId(draftId.toString(), PageRequest.of(0, MAX_PROCESS_RECORDS))
+            .getContent();
+        for (DraftProcessDocument record : records) {
+            Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(record.getDynamicFieldsJson());
+            if ("ketthuc".equalsIgnoreCase(text(fields.get("action_type")))) {
+                String actor = text(fields.get(DraftProcessActorFields.USER_CREATOR_FIELD));
+                return actor.isEmpty() ? text(fields.get(DraftProcessActorFields.CREATOR_FIELD)) : actor;
+            }
+        }
+        return "";
+    }
+
     private static String text(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
     }

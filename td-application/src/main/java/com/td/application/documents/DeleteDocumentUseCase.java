@@ -19,7 +19,6 @@ public class DeleteDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
-    private final DocumentSearchService documentSearchService;
     private final DocumentLogService documentLogService;
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
@@ -34,7 +33,6 @@ public class DeleteDocumentUseCase {
             var document = documentOptional.get();
             if (document.isDeleted()) {
                 // Đã xóa trước đó — trả về thành công (idempotent)
-                documentSearchService.delete(documentId);
                 documentCacheService.evict(documentId);
                 documentCacheService.evictAllListCaches();
                 return Result.success(documentId);
@@ -44,7 +42,6 @@ public class DeleteDocumentUseCase {
 
             document.markAsDeleted(resolveCurrentUserId());
             var saved = documentRepository.save(document);
-            documentSearchService.delete(saved.getId());
             documentCacheService.evict(saved.getId());
             documentCacheService.evictAllListCaches();
             documentLogService.logDelete(saved.getId(), before);

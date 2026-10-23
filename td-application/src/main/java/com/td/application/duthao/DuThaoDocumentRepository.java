@@ -48,7 +48,7 @@ public interface DuThaoDocumentRepository extends IRepository<DuThaoDocument> {
     Page<DuThaoDocument> findByFieldOrFieldWithStatus(
             String documentType, String fieldWithoutStatus, String fieldWithStatus,
             List<String> doneStatuses, String value, String keyword, List<String> keywordColumns,
-            Pageable pageable);
+            VbdenOrgViewFilter search, Pageable pageable);
 
     /**
      * 01/10/2026 — view gộp "Văn thư trả lại" (Java-only, xem {@code ViewQueryService#VIEW_DUTHAO_VANTHU_TRALAI}):
@@ -58,7 +58,18 @@ public interface DuThaoDocumentRepository extends IRepository<DuThaoDocument> {
      */
     Page<DuThaoDocument> findReturnedByClerkForUser(
             String documentType, Map<String, String> statusByReturnFor, String username,
-            String keyword, List<String> keywordColumns, Pageable pageable);
+            String keyword, List<String> keywordColumns, VbdenOrgViewFilter search, Pageable pageable);
+
+    /**
+     * 22/10/2026 — {@code vwChoDuyetKyBanHanh}/{@code vwChoDuyetKyBanHanhMC}: mỗi cặp (field → các status)
+     * trong {@code statusesByField} là 1 nhánh OR "{@code value} thuộc field VÀ status thuộc danh sách"
+     * (vd {@code user_signer}→{1,3}, {@code user_other_process_handler}→{9}). {@code requireEmptyField}/
+     * {@code requireNonEmptyField} (field động, có thể null) áp chung cho mọi nhánh.
+     */
+    Page<DuThaoDocument> findByFieldStatusBranches(
+            String documentType, Map<String, List<String>> statusesByField, String value,
+            String requireEmptyField, String requireNonEmptyField,
+            String keyword, List<String> keywordColumns, VbdenOrgViewFilter search, Pageable pageable);
 
     /**
      * 06/10/2026 (bảng document_links - docs/architecture/document-links.md): danh sách văn bản theo

@@ -69,6 +69,7 @@ import java.util.UUID;
 public class LegacyDanhMucController extends BaseController {
 
     private final GetLegacyOrganizationTreeUseCase getLegacyOrganizationTreeUseCase;
+    private final com.td.application.sharedcore.OrganizationTreeCache organizationTreeCache;
     private final GetLegacyOrganizationFlatListUseCase getLegacyOrganizationFlatListUseCase;
     private final GetLegacyOrgLookupForDungChungUseCase getLegacyOrgLookupForDungChungUseCase;
     private final com.td.application.privatecatalog.GetGroupPeopleByTypeUseCase getGroupPeopleByTypeUseCase;
@@ -112,6 +113,22 @@ public class LegacyDanhMucController extends BaseController {
             org.springframework.security.core.Authentication authentication) {
         boolean includeFullTree = isFullTreeAdmin(authentication) || Boolean.TRUE.equals(fullTree);
         return ok(getLegacyOrganizationTreeUseCase.execute(jedisKey, includeFullTree));
+    }
+
+    // 15/10/2026: xoá cache cây cơ cấu tổ chức (Redis) bằng tay — cache tự xoá khi tổ chức/người dùng đổi
+    // qua ứng dụng (OrganizationTreeCacheInvalidationListener); endpoint này dùng khi sửa THẲNG DB lúc
+    // server đang chạy. Chỉ quản trị (cùng điều kiện full tree).
+    @PostMapping("/CayCoCauToChuc/XoaCache")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xoa cache cay co cau to chuc (Redis) - chi quan tri")
+    public ResponseEntity<com.td.application.common.models.ApiResponse<Map<String, Object>>> xoaCacheCayCoCauToChuc(
+            org.springframework.security.core.Authentication authentication) {
+        if (!isFullTreeAdmin(authentication)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                .body(com.td.application.common.models.ApiResponse.error("Chi quan tri duoc xoa cache cay co cau to chuc"));
+        }
+        organizationTreeCache.invalidate();
+        return ok(Map.of("status", true));
     }
 
     // Domino is_full_cay: access=="Manager" hoac (level=="1" && roles chua "CVQuanTri") -

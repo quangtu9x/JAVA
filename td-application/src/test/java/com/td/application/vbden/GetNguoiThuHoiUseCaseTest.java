@@ -35,6 +35,8 @@ class GetNguoiThuHoiUseCaseTest {
     private VbdenResDocumentRepository vbdenResDocumentRepository;
     @Mock
     private CurrentUserProvider currentUserProvider;
+    @Mock
+    private com.td.application.sharedcore.GetLegacyOrgLookupForDungChungUseCase orgLookup;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
 
@@ -42,7 +44,8 @@ class GetNguoiThuHoiUseCaseTest {
 
     private GetNguoiThuHoiUseCase newUseCase() {
         return new GetNguoiThuHoiUseCase(
-            documentRepository, vbdenResDocumentRepository, dynamicDocumentFieldsService, currentUserProvider);
+            documentRepository, vbdenResDocumentRepository, dynamicDocumentFieldsService, currentUserProvider,
+            new VbdenRevokeRecipientMatcher(orgLookup));
     }
 
     @Test
@@ -126,6 +129,132 @@ class GetNguoiThuHoiUseCaseTest {
 
         assertThat(result.getData().get("chutri")).extracting(m -> m.get("username"))
             .containsExactly("nguyenvana");
+    }
+
+    // 11/10/2026 (demo9): chuyen bang "Phan xu ly" (action=phanxuly) cung danh dau user_delivered nen
+    // PHAI thu hoi duoc - truoc day bi bo qua -> "Da khong con nguoi/don vi co the thu hoi".
+    @Test
+    void execute_phanXuLyTransfer_shouldBeRevocable() {
+        useCase = newUseCase();
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"nguyenvana\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo9\","
+            + "\"action\":\"phanxuly\","
+            + "\"user_process_obj\":[{\"username\":\"nguyenvana\",\"name\":\"Nguyen Van A\"}]}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+
+        var request = new GetNguoiThuHoiRequest();
+        request.setId(parent.getId());
+
+        assertThat(useCase.execute(request).getData().get("chutri")).extracting(m -> m.get("username"))
+            .containsExactly("nguyenvana");
+    }
+
+    // Nguoi da nhan nhung khong con thu hoi duoc -> "khongthethuhoi" kem ly do (FE giai thich).
+    @Test
+    void execute_shouldExplainRecipientsNoLongerRevocable() {
+        useCase = newUseCase();
+        BusinessDocument parent = newDocument("vbden", "{"
+            + "\"user_process\":[\"nguyenvana\"],\"user_processed\":[\"daxuly\"],\"user_processing\":[\"dangxuly\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo9\",\"action\":\"chuyenxuly\","
+            + "\"user_process_obj\":[{\"username\":\"nguyenvana\",\"name\":\"A\"},{\"username\":\"daxuly\",\"name\":\"B\"},"
+            + "{\"username\":\"dangxuly\",\"name\":\"C\"},{\"username\":\"dachuyen\",\"name\":\"D\"}]}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+
+        var request = new GetNguoiThuHoiRequest();
+        request.setId(parent.getId());
+
+        List<Map<String, Object>> khongThe = useCase.execute(request).getData().get("khongthethuhoi");
+        assertThat(khongThe).extracting(m -> m.get("name") + "|" + m.get("ly_do")).containsExactly(
+            "B|đã xử lý", "C|đã bắt đầu xử lý", "D|đã chuyển tiếp cho người khác");
+    }
+
+    // 11/10/2026 du lieu that VB 33/BC-SKHCN: chuyen cho DON VI (dai dien demo15), demo15 da ket thuc xu ly
+    // nhung ma don vi van con trong unit_process -> KHONG con thu hoi duoc.
+    @Test
+    void execute_unitWhoseMembersFinished_shouldNotBeRevocable() {
+        useCase = newUseCase();
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[],\"unit_process\":[\"H05.01.05.02\"],"
+            + "\"user_processed\":[\"demo15\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        when(orgLookup.getOrganizationMembers("ORG-QTHT", true)).thenReturn(List.of(
+            Map.of("username", "demo15"), Map.of("username", "demo17")));
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo9\",\"action\":\"chuyenxuly\","
+            + "\"user_process_obj\":[{\"id\":\"ORG-QTHT\",\"name\":\"Phong QTHT\",\"identifier\":\"H05.01.05.02\","
+            + "\"user_receiver\":\"demo15\"}]}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+        var request = new GetNguoiThuHoiRequest();
+        request.setId(parent.getId());
+
+        var data = useCase.execute(request).getData();
+
+        assertThat(data.get("chutri")).isEmpty();
+        assertThat(data.get("khongthethuhoi")).extracting(m -> m.get("name") + "|" + m.get("ly_do"))
+            .containsExactly("Phong QTHT|đã xử lý");
+    }
+
+    // VB 10/BC-SKHCN: demo15 chuyen tiep demo17 CUNG phong -> phong van con dang giu van ban -> thu hoi duoc.
+    @Test
+    void execute_unitStillHeldByMember_shouldBeRevocable() {
+        useCase = newUseCase();
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"demo17\"],\"unit_process\":[\"H05.01.05.02\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo9"));
+        when(orgLookup.getOrganizationMembers("ORG-QTHT", true)).thenReturn(List.of(
+            Map.of("username", "demo15"), Map.of("username", "demo17")));
+        VbdenResDocument historyRecord = newResRecord("{"
+            + "\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo9\",\"action\":\"chuyenxuly\","
+            + "\"user_process_obj\":[{\"id\":\"ORG-QTHT\",\"name\":\"Phong QTHT\",\"identifier\":\"H05.01.05.02\","
+            + "\"user_receiver\":\"demo15\"}]}");
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(historyRecord), PageRequest.of(0, 1000), 1));
+        var request = new GetNguoiThuHoiRequest();
+        request.setId(parent.getId());
+
+        var data = useCase.execute(request).getData();
+
+        assertThat(data.get("chutri")).extracting(m -> m.get("name")).containsExactly("Phong QTHT");
+        assertThat(data.get("khongthethuhoi")).isEmpty();
+    }
+
+    // 12/10/2026 du lieu that demo11 (VB 1/QD-SNNMT): chuyen demo14 -> thu hoi, chuyen demo13 -> thu hoi.
+    // Ly do phai noi ro "ban da thu hoi", khong gop chung voi "chuyen tiep".
+    @Test
+    void execute_recipientsRevokedByMe_shouldSayRevoked() {
+        useCase = newUseCase();
+        BusinessDocument parent = newDocument("vbden", "{\"user_process\":[\"demo11\"]}");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("demo11"));
+        java.time.LocalDateTime t0 = java.time.LocalDateTime.of(2026, 10, 12, 10, 0);
+        VbdenResDocument chuyen14 = newResRecord("{\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo11\","
+            + "\"action\":\"chuyenxuly\",\"user_process_obj\":[{\"username\":\"demo14\",\"name\":\"CV6\"}]}");
+        chuyen14.setCreatedOn(t0);
+        VbdenResDocument thuhoi14 = newResRecord("{\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo11\","
+            + "\"action\":\"thuhoi\",\"user_process_obj\":[{\"username\":\"demo14\",\"name\":\"CV6\"}]}");
+        thuhoi14.setCreatedOn(t0.plusMinutes(1));
+        VbdenResDocument chuyen13 = newResRecord("{\"parentid\":\"" + parent.getId() + "\",\"nguoi_thuc_hien\":\"demo11\","
+            + "\"action\":\"chuyenxuly\",\"user_process_obj\":[{\"username\":\"demo13\",\"name\":\"CV5\"}]}");
+        chuyen13.setCreatedOn(t0.plusMinutes(2));
+        when(vbdenResDocumentRepository.findByParentId(eq(parent.getId().toString()), any()))
+            .thenReturn(new PageImpl<>(List.of(chuyen14, thuhoi14, chuyen13), PageRequest.of(0, 1000), 3));
+        var request = new GetNguoiThuHoiRequest();
+        request.setId(parent.getId());
+
+        List<Map<String, Object>> khongThe = useCase.execute(request).getData().get("khongthethuhoi");
+
+        // demo14: thu hoi SAU lan chuyen -> "ban da thu hoi"; demo13: khong con giu, chua tung bi thu hoi -> chuyen tiep.
+        assertThat(khongThe).extracting(m -> m.get("name") + "|" + m.get("ly_do"))
+            .containsExactlyInAnyOrder("CV6|bạn đã thu hồi", "CV5|đã chuyển tiếp cho người khác");
     }
 
     // Ban ghi lich su do NGUOI KHAC tao (khong phai nguoi dang thao tac) khong duoc tinh.

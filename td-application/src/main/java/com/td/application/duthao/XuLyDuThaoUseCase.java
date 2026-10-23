@@ -154,9 +154,13 @@ public class XuLyDuThaoUseCase {
     private static final String USER_OTHER_PROCESSED_HANDLER_FIELD = "user_other_processed_handler";
     private static final String DRAFT_END_FIELD = "draft_end";
     private static final String DRAFT_END_DATE_FIELD = "draft_end_date";
+    private static final String USER_ENDED_FIELD = "user_ended";
+    private static final String ENDED_STATUS_PRE_FIELD = "ended_status_pre";
     private static final String RECEIVER_USERNAME_FIELD = "receiver_username";
     private static final String SIGNER_OBJ_FIELD = "signer_obj";
     private static final String USER_SIGNER_FIELD = "user_signer";
+    private static final String USER_DELIVERED_FIELD = "user_delivered";
+    private static final String DELEGATED_FROM_FIELD = "process_handler_delegated_from";
     private static final String SIGNER_FIELD = "signer";
     private static final String NGUOICHUYEN_OBJ_FIELD = "nguoichuyen_obj";
     private static final String DRAFT_RATE_FIELD = "draft_rate";
@@ -200,6 +204,8 @@ public class XuLyDuThaoUseCase {
     // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
     private final DraftProcessActorFields draftProcessActorFields;
     private final DuThaoSignSubmissionInspector signSubmissionInspector;
+    // 19/10/2026: xác minh ủy quyền khi chuyển xử lý/chuyển người khác (xem XuLyDuThaoRequest#delegatedFromUsername).
+    private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
 
     private static String text(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
@@ -233,6 +239,11 @@ public class XuLyDuThaoUseCase {
             return Result.failure("Người ký đã xử lý dự thảo, không thể thu hồi.");
         }
 
+        // 19/10/2026: Thu hồi dự thảo ĐÃ KẾT THÚC (thao tác nhầm) — nhánh riêng, xem recallEnded.
+        if (ACTION_THU_HOI.equals(action) && DuThaoStatus.ENDED.equals(document.getStatus())) {
+            return recallEnded(document, fields, request);
+        }
+
         String targetStatus = resolveTargetStatus(action, fields);
         if (targetStatus == null) {
             return Result.failure("Không hỗ trợ action: " + request.getAction());
@@ -243,13 +254,22 @@ public class XuLyDuThaoUseCase {
         String previousStatus = document.getStatus();
 
         applySelfProcessedMarker(fields, actingUsername);
+        if (ACTION_KET_THUC.equals(action)) {
+            // 19/10/2026: nhớ người kết thúc + status_pre CŨ (sắp bị ghi đè dòng dưới) để Thu hồi khôi phục
+            // đúng nguyên trạng — xem recallEnded.
+            fields.put(USER_ENDED_FIELD, actingUsername);
+            fields.put(ENDED_STATUS_PRE_FIELD, text(fields.get(STATUS_PRE_FIELD)));
+        }
         fields.put(STATUS_PRE_FIELD, previousStatus);
         if (ACTION_CHUYEN_KY_DUYET.equals(action)) {
             applySignerAsReceiver(fields, request);
         }
-        createDraftProcessRecord(document.getId(), action, targetStatus, previousStatus, request, actingUsername)
+        String verifiedDelegator = resolveVerifiedDelegator(targetStatus, request);
+        createDraftProcessRecord(document.getId(), action, targetStatus, previousStatus, request, actingUsername,
+                verifiedDelegator)
             .ifPresent(processId -> fields.put(LAST_PROCESS_ID_FIELD, processId));
         applyTargetStatusMutations(targetStatus, previousStatus, fields, request, actingUsername);
+        applyDelegatedFrom(fields, verifiedDelegator);
         if (ACTIONS_CLEARING_RECEIVER_USERNAME.contains(action)) {
             fields.remove(RECEIVER_USERNAME_FIELD);
         }
@@ -265,6 +285,51 @@ public class XuLyDuThaoUseCase {
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
 
+        return Result.success(saved.getId());
+    }
+
+    /**
+     * 19/10/2026 (yêu cầu người dùng: "Kết thúc" nhầm -> "Thu hồi" để tiếp tục xử lý, CHỈ người bấm Kết thúc):
+     * khôi phục NGUYÊN TRẠNG trước khi kết thúc — trạng thái = {@code status_pre} (đã lưu lúc kết thúc),
+     * {@code status_pre} = giá trị cũ ({@code ended_status_pre}), xoá {@code draft_end}/{@code draft_end_date}.
+     * KHÔNG chạy {@link #applyTargetStatusMutations} (sẽ ghi đè người xử lý bằng người thu hồi) — lúc kết thúc
+     * không xoá field người xử lý nào nên chỉ cần trả trạng thái. Người kết thúc: {@code user_ended}, dự thảo
+     * kết thúc trước khi có field này thì lấy từ vết {@code ketthuc} ({@link DuThaoSignSubmissionInspector#endedBy}).
+     */
+    private Result<UUID> recallEnded(DuThaoDocument document, Map<String, Object> fields, XuLyDuThaoRequest request) {
+        String actingUsername = currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME);
+        String endedBy = text(fields.get(USER_ENDED_FIELD));
+        if (endedBy.isEmpty()) {
+            endedBy = signSubmissionInspector.endedBy(document.getId());
+        }
+        if (endedBy.isEmpty() || !endedBy.equalsIgnoreCase(actingUsername)) {
+            return Result.failure("Chỉ người đã kết thúc dự thảo mới thu hồi được.");
+        }
+        String restoreStatus = text(fields.get(STATUS_PRE_FIELD));
+        if (restoreStatus.isEmpty() || DuThaoStatus.ENDED.equals(restoreStatus)) {
+            restoreStatus = DuThaoStatus.DRAFTING;
+        }
+        var before = buildSnapshot(document);
+        String oldStatusPre = text(fields.get(ENDED_STATUS_PRE_FIELD));
+        if (oldStatusPre.isEmpty()) {
+            fields.remove(STATUS_PRE_FIELD);
+        } else {
+            fields.put(STATUS_PRE_FIELD, oldStatusPre);
+        }
+        fields.remove(DRAFT_END_FIELD);
+        fields.remove(DRAFT_END_DATE_FIELD);
+        fields.remove(USER_ENDED_FIELD);
+        fields.remove(ENDED_STATUS_PRE_FIELD);
+        createDraftProcessRecord(document.getId(), ACTION_THU_HOI, restoreStatus, DuThaoStatus.ENDED, request,
+                actingUsername, null)
+            .ifPresent(processId -> fields.put(LAST_PROCESS_ID_FIELD, processId));
+
+        document.replaceDynamicFields(toJson(fields));
+        document.update(null, null, restoreStatus, null, null, null, null);
+        var saved = duThaoDocumentRepository.save(document);
+        documentCacheService.evict(saved.getId());
+        documentCacheService.evictAllListCaches();
+        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
         return Result.success(saved.getId());
     }
 
@@ -302,6 +367,36 @@ public class XuLyDuThaoUseCase {
         Object statusPre = fieldsBeforeMutation.get(STATUS_PRE_FIELD);
         String value = statusPre == null ? "" : String.valueOf(statusPre).trim();
         return value.isBlank() ? DuThaoStatus.DRAFTING : value;
+    }
+
+    // 19/10/2026 (ủy quyền, cùng cách Chuyển xử lý vbden): chỉ 2 nhánh có người nhận được CHỌN (chuyển
+    // duyệt / chuyển người khác). Người ủy quyền chỉ được ghi khi đang ủy quyền phạm vi Dự thảo cho đúng
+    // người nhận - không tin FE.
+    private String resolveVerifiedDelegator(String targetStatus, XuLyDuThaoRequest request) {
+        String delegator = request.getDelegatedFromUsername();
+        if (delegator == null || delegator.isBlank()
+                || !(DuThaoStatus.FORWARDED_FOR_APPROVAL.equals(targetStatus)
+                    || DuThaoStatus.OTHER_HANDLER_SUBMIT.equals(targetStatus))) {
+            return null;
+        }
+        return userDelegationResolver.isActiveDelegation(delegator.trim(), request.getReceiverUsername(),
+                com.td.application.sharedcore.UserDelegationResolver.SCOPE_DUTHAO) ? delegator.trim() : null;
+    }
+
+    // Người ủy quyền vào user_delivered (danh sách ";" không trùng) - vẫn theo dõi được dự thảo đã giao
+    // cho người được ủy quyền, + process_handler_delegated_from để hiển thị.
+    private void applyDelegatedFrom(Map<String, Object> fields, String verifiedDelegator) {
+        if (verifiedDelegator == null) {
+            return;
+        }
+        Object existing = fields.get(USER_DELIVERED_FIELD);
+        String current = existing == null ? "" : String.valueOf(existing).trim();
+        boolean present = !current.isEmpty() && java.util.Arrays.stream(current.split(";"))
+            .anyMatch(u -> u.trim().equalsIgnoreCase(verifiedDelegator));
+        if (!present) {
+            fields.put(USER_DELIVERED_FIELD, current.isEmpty() ? verifiedDelegator : current + ";" + verifiedDelegator);
+        }
+        fields.put(DELEGATED_FROM_FIELD, verifiedDelegator);
     }
 
     // DraftProcesses.java dong 338-345 (DraftProcess_Handler()) - chay TRUOC moi nhanh status,
@@ -425,7 +520,7 @@ public class XuLyDuThaoUseCase {
     // document la VET GHI LAI, khong phai dieu kien tien quyet de chuyen trang thai thanh cong.
     private Optional<String> createDraftProcessRecord(
             UUID draftId, String action, String targetStatus, String previousStatus,
-            XuLyDuThaoRequest request, String actingUsername) {
+            XuLyDuThaoRequest request, String actingUsername, String verifiedDelegator) {
         try {
             var processRequest = new AddDynamicDocumentRequest();
             processRequest.setStatus(targetStatus);
@@ -439,6 +534,7 @@ public class XuLyDuThaoUseCase {
             putIfNotBlank(processFields, RECEIVER_USERNAME_FIELD, request.getReceiverUsername());
             putIfNotBlank(processFields, PROCESS_RECEIVER_FIELD, request.getReceiver());
             putIfNotBlank(processFields, PROCESS_OPINION_FIELD, request.getOpinion());
+            putIfNotBlank(processFields, DELEGATED_FROM_FIELD, verifiedDelegator); // 19/10/2026
             draftProcessActorFields.put(processFields, actingUsername);
             processRequest.setFields(processFields);
 

@@ -48,7 +48,8 @@ class PhieuTrinhTdViewQueryTest {
         DynamicDocumentFieldsService fields = new DynamicDocumentFieldsService();
         viewQuery = new PhieuTrinhTdViewQuery(documentRepository, processRepository,
             new PhieuTrinhTdFieldMapper(fields, listDocumentFilesUseCase),
-            InMemoryDocumentLinkRepository.newService(linkRepository), currentUserProvider);
+            InMemoryDocumentLinkRepository.newService(linkRepository), currentUserProvider,
+            com.td.application.search.AdvancedSearchIndex.DISABLED);
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
         lenient().when(documentRepository.findByCriteria(any(), any())).thenReturn(new PageImpl<>(List.of()));
         lenient().when(listDocumentFilesUseCase.execute(any()))
@@ -118,6 +119,56 @@ class PhieuTrinhTdViewQueryTest {
 
         assertThat(criteria.getIds()).containsExactly(phieuTrinh);
         assertThat(criteria.getMemberRule()).isNull();
+    }
+
+    // Bugfix bảo mật 17/10/2026: khoá là username NGƯỜI KHÁC → rỗng, không truy vấn.
+    @Test
+    void otherUsersKey_shouldReturnEmptyWithoutQuery() {
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("vwUser_All");
+        request.setKeys(List.of("giamdoc"));
+
+        var result = viewQuery.execute(request);
+
+        assertThat(result.getTotalItems()).isZero();
+        verify(documentRepository, org.mockito.Mockito.never()).findByCriteria(any(), any());
+    }
+
+    @Test
+    void ownUsernameKey_shouldStillWork() {
+        assertThat(run("vwUser_All", "NguyenVanA").getMember()).isEqualTo("nguyenvana");
+    }
+
+    // Bugfix 17/10/2026: khoá "search" (true/false) trang tìm kiếm chung chèn vào không được thành điều kiện "chứa".
+    @Test
+    void timkiem_shouldIgnoreSearchFlagKey() {
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("timkiem");
+        request.setSearch(new java.util.HashMap<>(java.util.Map.of("search", true, "code", "12/TT", "form", "submission_dossier")));
+        viewQuery.execute(request);
+        ArgumentCaptor<PhieuTrinhTdListCriteria> captor = ArgumentCaptor.forClass(PhieuTrinhTdListCriteria.class);
+        verify(documentRepository).findByCriteria(captor.capture(), any());
+
+        assertThat(captor.getValue().getContainsFields()).containsOnlyKeys("code");
+    }
+
+    // 17/10/2026: "timkiem" đọc index tìm kiếm: phạm vi tham gia + điều kiện "chứa" + từ khoá trong search.keyword.
+    @Test
+    void timkiem_indexQuery_shouldCarryParticipantScopeAndCriteria() {
+        ViewQueryRequest request = new ViewQueryRequest();
+        request.setViewname("timkiem");
+        request.setSearch(new java.util.HashMap<>(java.util.Map.of(
+            "keyword", "ke hoach", "description", "phần mềm", "status", "2", "search", true,
+            "create_date", List.of("01/10/2026", "31/10/2026"))));
+
+        var query = viewQuery.toIndexQuery("NguyenVanA", request);
+
+        String filters = query.filters().toString();
+        assertThat(filters).contains("user_creator").contains("nguyenvana").contains("trinh5_date").contains("user_lanhdao1")
+            .contains("Match[key=description, text=phần mềm]").contains("key=status").contains("created_on")
+            .doesNotContain("key=search");
+        assertThat(query.keyword()).isEqualTo("ke hoach");
+        assertThat(query.keywordFields()).contains("title", "code");
     }
 
     @Test

@@ -32,38 +32,13 @@
         <postgresql.version>42.7.0</postgresql.version>
         <flyway.version>9.22.3</flyway.version>
         <minio.version>8.5.7</minio.version>
+        <!-- 17/10/2026: trích nội dung tệp (docs/architecture/14-trich-noi-dung-tep.md). OCR cần cài Tesseract ngoài. -->
+        <tika.version>2.9.2</tika.version>
+        <!-- minio 8.5.7 kéo commons-compress 1.24.0 (thắng theo độ sâu) — Tika 2.9.2 cần 1.26.x, thiếu thì NoSuchMethodError khi trích docx/pdf. -->
+        <commons-compress.version>1.26.1</commons-compress.version>
         <httpclient5.version>5.3</httpclient5.version>
         <lombok.version>1.18.38</lombok.version>
     </properties>
-
-    <!-- Repository file cục bộ trong project, KHÔNG phải Nexus/Artifactory ngoài — chứa 2 jar SDK
-         "guinhanquocgia" (com.vnpt.xml:edxml102, com.vpcp.services:sdkvxp) không có trên Maven Central.
-         Cài bằng: mvn install:install-file -Dfile=libs/guinhanquocgia/<jar> -DgroupId=... -DartifactId=...
-         -Dversion=... -Dpackaging=jar -DgeneratePom=true -DlocalRepositoryPath=libs-repo
-         Thay cho scope=system (Maven cảnh báo "unresolvable by dependent projects") — cách này tạo
-         layout + POM Maven chuẩn, commit thẳng trong repo, build tái lập trên mọi máy/CI chỉ cần
-         checkout code, không cần cài vào ~/.m2 hay hạ tầng Nexus nội bộ. Xem
-         docs/16-checklist-tich-hop-gui-nhan-quoc-gia.md mục "Quyết định đóng gói jar". -->
-    <repositories>
-        <repository>
-            <id>guinhanquocgia-local-repo</id>
-            <url>file://${project.basedir}/libs-repo</url>
-            <!-- install-file không sinh file checksum (.sha1) cho repo cục bộ -> bỏ qua kiểm tra
-                 checksum thay vì tự tay tạo file .sha1 dễ lệch mỗi khi cập nhật jar. -->
-            <releases><checksumPolicy>ignore</checksumPolicy></releases>
-            <snapshots><enabled>false</enabled></snapshots>
-        </repository>
-        <!-- Bổ sung — module MỚI "simpki" (com.td.worker.tasks.simpki, ký số SIM-PKI/MSSP qua
-             docs/TDSimSign/sdk-mobilepki). CÙNG thư mục libs-repo/ ở trên (1 thư mục, nhiều <repository>
-             id khác nhau trỏ chung 1 url - Maven cho phép, giữ mỗi module 1 <repository> riêng cho rõ
-             ràng/dễ gỡ sau này) - KHÔNG cần Nexus/Artifactory nội bộ, build tái lập chỉ bằng git clone. -->
-        <repository>
-            <id>simpki-local-repo</id>
-            <url>file://${project.basedir}/libs-repo</url>
-            <releases><checksumPolicy>ignore</checksumPolicy></releases>
-            <snapshots><enabled>false</enabled></snapshots>
-        </repository>
-    </repositories>
 
 <dependencies>
         <!-- Web + Actuator: worker KHÔNG có controller nghiệp vụ, chỉ dùng để phục vụ
@@ -127,172 +102,28 @@
             <artifactId>minio</artifactId>
             <version>${minio.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-compress</artifactId>
+            <version>${commons-compress.version}</version>
+        </dependency>
+        <!-- Trích chữ PDF/Word/Excel/PowerPoint/ODF/RTF/HTML + OCR (Tesseract) — FileContentExtractor -->
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-core</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tika</groupId>
+            <artifactId>tika-parsers-standard-package</artifactId>
+            <version>${tika.version}</version>
+        </dependency>
 
         <!-- HTTP client pool (Apache HttpClient 5) cho handler gọi API ngoài -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>
             <artifactId>httpclient5</artifactId>
             <version>${httpclient5.version}</version>
-        </dependency>
-
-        <!-- ================================================================
-             BỔ SUNG 09/09/2026 — module MỚI "guinhanquocgia" (com.td.worker.tasks.guinhanquocgia),
-             TÁCH BIỆT HOÀN TOÀN khỏi vbdi/vbden hiện có — KHÔNG sửa dependency nào ở trên.
-             2 jar SDK dưới đây copy nguyên từ docs/td-guinhanquocgia/lib/ (project Java cũ tích hợp
-             Trục liên thông văn bản quốc gia VPCP/VXP, chuẩn eDXML QCVN 102) — KHÔNG có trên Maven
-             Central, nên được cài vào repository file cục bộ `libs-repo/` (khai báo ở <repositories>
-             phía trên) bằng install:install-file — KHÔNG dùng scope "system" nữa (Maven cảnh báo
-             "unresolvable by dependent projects", sửa 09/09/2026 đợt 2 sau khi build cảnh báo).
-             Build tái lập được trên mọi máy/CI chỉ cần checkout code (libs-repo/ commit thẳng trong
-             repo), không cần cài vào ~/.m2 hay Nexus/Artifactory nội bộ.
-             LƯU Ý: các dependency transitive của 2 jar này (guava 14.0.1, guice 4.2.0, gson 2.2,
-             jdom2 2.0.3, httpclient 4.5.6, xercesImpl 2.12.0...) CỐ Ý CHƯA được khai báo ở đây — xem
-             lý do (rủi ro xung đột phiên bản guava với testcontainers) ở checklist mục rủi ro. Do đó
-             VpcpGuiNhanQuocGiaGatewayClient (com.td.worker.tasks.guinhanquocgia) CHỈ được Spring khởi
-             tạo khi worker.tasks.guinhanquocgia.enabled=true (mặc định false, an toàn) và bọc
-             try/catch(Throwable) quanh lời gọi SDK — xem javadoc class đó. ================================================================ -->
-        <dependency>
-            <groupId>com.vnpt.xml</groupId>
-            <artifactId>edxml102</artifactId>
-            <version>0.0.3</version>
-        </dependency>
-        <dependency>
-            <groupId>com.vpcp.services</groupId>
-            <artifactId>sdkvxp</artifactId>
-            <version>2.0.0</version>
-        </dependency>
-
-        <!-- ================================================================
-             BỔ SUNG — module MỚI "simpki" (com.td.worker.tasks.simpki), ký số từ xa qua SIM ghép
-             chứng thư số (SIM-PKI/MSSP - Mobile Signature Service Provider, chuẩn ETSI TS 102 204),
-             TÁCH BIỆT HOÀN TOÀN khỏi vbdi/vbden/guinhanquocgia hiện có — KHÔNG sửa dependency nào ở
-             trên. Nguồn: docs/TDSimSign/sdk-mobilepki/java (SDK chính thức của Cục Chứng thực số và
-             Bảo mật thông tin - Bộ Công an, "vgca.mssp.jar" + laverca-mobileid client stack Axis 1.4).
-             KHÔNG có trên Maven Central -> cài vào cùng repository file cục bộ `libs-repo/` phía trên
-             (id "simpki-local-repo") bằng install:install-file, giống hệt cách làm với 2 jar
-             guinhanquocgia — build tái lập 100% chỉ bằng git clone + mvn package, không cần mạng/
-             Nexus nội bộ. Xem docs/17-checklist-tich-hop-kyso-simpki.md mục "Quyết định đóng gói jar".
-             LƯU Ý: axis-1.4 + dàn thư viện phụ trợ (jaxrpc/wsdl4j/commons-discovery/commons-logging/
-             commons-codec/commons-lang/httpclient4/httpcore4/castor) là toàn bộ dependency mà chính
-             SDK gốc đã đóng gói kèm (docs/TDSimSign/sdk-mobilepki/java/sample-libs) — khai báo ĐỦ cả
-             bộ (không chỉ 1-2 jar như guinhanquocgia) để tránh rủi ro NoClassDefFoundError khi gọi SOAP
-             stub Axis thật. Không group/artifactId nào trùng với dependency đang có ở trên (httpclient5
-             khác httpclient4, commons-lang(2) khác không có commons-lang3 trong project này) -> không
-             có rủi ro Maven "nearest wins" hạ cấp bất kỳ dependency hiện có. VgcaMsspSignatureClient
-             (com.td.worker.tasks.simpki) CHỈ được Spring khởi tạo khi worker.tasks.simpki.enabled=true
-             (mặc định false, an toàn) và bọc try/catch(Throwable) quanh lời gọi SDK — xem javadoc class
-             đó. ================================================================ -->
-        <dependency>
-            <groupId>vn.gov.ca.vgca</groupId>
-            <artifactId>vgca-mssp</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>fi.ficom.mobileid</groupId>
-            <artifactId>laverca-mobileid</artifactId>
-            <version>2.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.tomicalab.mobileid</groupId>
-            <artifactId>laverca-mobileid-datatype</artifactId>
-            <version>1.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.axis</groupId>
-            <artifactId>axis</artifactId>
-            <version>1.4</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.axis</groupId>
-            <artifactId>jaxrpc</artifactId>
-            <version>1.1</version>
-        </dependency>
-        <dependency>
-            <groupId>wsdl4j</groupId>
-            <artifactId>wsdl4j</artifactId>
-            <version>1.6.2</version>
-        </dependency>
-        <dependency>
-            <groupId>commons-discovery</groupId>
-            <artifactId>commons-discovery</artifactId>
-            <version>0.5</version>
-        </dependency>
-        <dependency>
-            <groupId>commons-logging</groupId>
-            <artifactId>commons-logging</artifactId>
-            <version>1.1.3</version>
-        </dependency>
-        <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-            <version>1.7</version>
-        </dependency>
-        <dependency>
-            <groupId>commons-lang</groupId>
-            <artifactId>commons-lang</artifactId>
-            <version>2.6</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpclient</artifactId>
-            <version>4.3.6</version>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore</artifactId>
-            <version>4.3.3</version>
-        </dependency>
-        <dependency>
-            <groupId>org.codehaus.castor</groupId>
-            <artifactId>castor</artifactId>
-            <version>1.3.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.codehaus.castor</groupId>
-            <artifactId>castor-core</artifactId>
-            <version>1.3.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.codehaus.castor</groupId>
-            <artifactId>castor-xml</artifactId>
-            <version>1.3.2</version>
-        </dependency>
-
-        <!-- Giải quyết rủi ro A2 (docs/17-checklist mục Phần 3 Nhóm A) — Axis 1.4 (2006) tham chiếu
-             javax.xml.soap.* (SAAJ API), đã bị GỠ khỏi JDK từ Java 11 trở lên (tách thành module
-             Jakarta EE riêng biệt, đổi package sang jakarta.xml.soap.* mà Axis 1.4 KHÔNG dùng được).
-             Bổ sung 2 dependency CHUẨN Maven Central (khác 15 dependency ở trên: 2 jar này CÓ trên
-             Maven Central, không phải SDK vendor riêng, không cần libs-repo cục bộ) giữ ĐÚNG namespace
-             javax.xml.soap mà Axis 1.4 cần — đã THỰC NGHIỆM xác nhận hết NoClassDefFoundError
-             (VgcaMsspSignatureClientTest, xem docs/17-checklist Phần 4). -->
-        <dependency>
-            <groupId>javax.xml.soap</groupId>
-            <artifactId>javax.xml.soap-api</artifactId>
-            <version>1.4.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.sun.xml.messaging.saaj</groupId>
-            <artifactId>saaj-impl</artifactId>
-            <version>1.5.3</version>
-        </dependency>
-
-        <!-- Cùng nguyên nhân với SAAJ ở trên — Axis 1.4 còn tham chiếu javax.activation.DataHandler
-             và javax.mail.internet.MimeMultipart để hỗ trợ đính kèm MIME (SOAP with Attachments),
-             cũng đã bị GỠ khỏi JDK từ Java 11 trở lên. Giao thức MSSP ký số của ta KHÔNG dùng đính
-             kèm MIME (SOAP text thuần, base64 trong XML) nên thiếu 2 lớp này KHÔNG chặn việc ký (đã
-             THỰC NGHIỆM xác nhận: ký thành công, có transId/verificationCode, ngay cả khi thiếu) —
-             chỉ gây WARN "Attachment support is disabled" ở log mỗi lần ký. Bổ sung 2 dependency
-             CHUẨN Maven Central, ĐÚNG namespace javax.* (không phải jakarta.*) mà Axis 1.4 cần, để
-             hết cảnh báo và phòng trường hợp SDK sau này cần đính kèm thật. -->
-        <dependency>
-            <groupId>javax.activation</groupId>
-            <artifactId>javax.activation-api</artifactId>
-            <version>1.2.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.sun.mail</groupId>
-            <artifactId>javax.mail</artifactId>
-            <version>1.6.2</version>
         </dependency>
 
         <!-- Lombok (đúng convention project tham khảo) -->
@@ -316,9 +147,8 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- H2 (PostgreSQL mode) — dùng cho unit test checkpoint store/flow runner (như trước) VÀ
-             (bổ sung — docs/18-trien-khai-test-simpki.md mục "Chưa có Postgres/Docker — H2 file cục
-             bộ") làm TUỲ CHỌN checkpoint store khi máy chủ test CHƯA có Postgres/Docker sẵn — CỐ Ý bỏ
+        <!-- H2 (PostgreSQL mode) — dùng cho unit test checkpoint store/flow runner VÀ
+             làm TUỲ CHỌN checkpoint store khi máy chủ test CHƯA có Postgres/Docker sẵn — CỐ Ý bỏ
              scope "test" (mặc định compile) để có mặt trong jar production, KHÔNG bắt buộc dùng: mặc
              định mọi hướng dẫn/docker-compose.yml của Worker vẫn dùng Postgres, H2 chỉ được kích hoạt
              khi tự tay đổi WORKER_DB_URL sang "jdbc:h2:file:...". WorkerSchemaMigrator đã tự chọn

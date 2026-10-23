@@ -26,8 +26,14 @@ worker:
     enabled: false
   minio:
     enabled: false
+  # .env có thể trỏ DB sổ đăng ký tệp dùng chung thật — test context không được ghi/dọn dẹp ở đó.
+  file-registry:
+    enabled: false
   http:
     enabled: true
   tasks:
     vbdi:
       enabled: true
+  # .env (spring.config.import) có ELASTICSEARCH_URIS thật — test context KHÔNG được chạy đồng bộ ES.
+  search-sync:
+    enabled: false

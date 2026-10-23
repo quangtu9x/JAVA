@@ -52,6 +52,8 @@ public class PhieuTrinhTdViewQuery {
     private final PhieuTrinhTdFieldMapper fieldMapper;
     private final DocumentLinkService documentLinkService;
     private final CurrentUserProvider currentUserProvider;
+    // 17/10/2026: tìm kiếm "timkiem" đọc index tìm kiếm trước (docs/analysis/27), không dùng được thì SQL.
+    private final com.td.application.search.AdvancedSearchIndex advancedSearchIndex;
 
     public static boolean handles(String dbType) {
         return DB_TYPE.equalsIgnoreCase(dbType) || RES_DB_TYPE.equalsIgnoreCase(dbType);
@@ -82,6 +84,18 @@ public class PhieuTrinhTdViewQuery {
                 && (request.getColumns() == null || request.getColumns().isEmpty())
                 ? DEFAULT_KEYWORD_COLUMNS : request.getColumns());
         String me = resolveUser(firstKey);
+        if (me == null && !"vwdocument_profiles_id".equals(viewname)) {
+            // Bugfix bảo mật 17/10/2026: khoá không phải chính người đăng nhập (hoặc chưa đăng nhập) → rỗng,
+            // KHÔNG để quy tắc thành viên chạy với member = null. Ngoại lệ: vwDocument_profiles_id có khoá là
+            // id HỒ SƠ (không lọc theo người dùng).
+            return toResponse(List.of(), new PageImpl<>(List.of(), pageable, 0));
+        }
+        if ("timkiem".equals(viewname)) {
+            PaginationResponse<Map<String, Object>> fromIndex = searchViaIndex(me, request, pageable);
+            if (fromIndex != null) {
+                return fromIndex;
+            }
+        }
 
         switch (viewname) {
             case "vwuser_all", "phieutrinhtd_toanbo" -> criteria.member(me).memberRule(MemberRule.THAM_GIA).storaged(false);
@@ -131,7 +145,9 @@ public class PhieuTrinhTdViewQuery {
 
     // Tìm kiếm nâng cao (CollapsePhieuTrinhTD.jsx gửi "search"): create_date = [từ, đến] dd/MM/yyyy,
     // status = mã trạng thái, các field văn bản còn lại = "chứa". form/author/keyword là meta Domino.
-    private static final java.util.Set<String> SEARCH_META_KEYS = java.util.Set.of("form", "author", "keyword", "create_date", "status");
+    // Bugfix 17/10/2026: "search" (true/false) do trang tìm kiếm chung chèn vào — trước đây thành LIKE '%true%'
+    // trên dynamic_fields->>'search' nên tìm kiếm phiếu trình luôn RỖNG.
+    private static final java.util.Set<String> SEARCH_META_KEYS = java.util.Set.of("form", "author", "keyword", "create_date", "status", "search");
     private static final java.time.format.DateTimeFormatter SEARCH_DATE = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private PhieuTrinhTdListCriteria.PhieuTrinhTdListCriteriaBuilder applyAdvancedSearch(
@@ -280,11 +296,90 @@ public class PhieuTrinhTdViewQuery {
         return toResponse(page.getContent(), page);
     }
 
+    /**
+     * Bugfix bảo mật 17/10/2026: trước đây khoá khác "$username$" được dùng NGUYÊN (client đổi keys là xem được phiếu
+     * trình người khác). Nay chỉ chấp nhận chính người đăng nhập; khác → null (trang rỗng).
+     */
     private String resolveUser(String key) {
+        String current = currentUserProvider.currentUsername().orElse(null);
         if (key == null || key.isBlank() || USERNAME_TOKEN.equals(key.trim())) {
-            return currentUserProvider.currentUsername().orElse(null);
+            return current;
         }
-        return key.trim();
+        return current != null && current.equalsIgnoreCase(key.trim()) ? current : null;
+    }
+
+    // ===== Tìm kiếm qua index tìm kiếm (17/10/2026, docs/analysis/27) =====
+
+    private PaginationResponse<Map<String, Object>> searchViaIndex(String me, ViewQueryRequest request, Pageable pageable) {
+        var query = toIndexQuery(me, request);
+        var hits = advancedSearchIndex.search(DB_TYPE, DB_TYPE, query, pageable.getPageNumber(), pageable.getPageSize())
+            .orElse(null);
+        if (hits == null) {
+            return null;
+        }
+        Map<UUID, PhieuTrinhTdDocument> byId = new java.util.HashMap<>();
+        if (!hits.ids().isEmpty()) {
+            phieuTrinhTdDocumentRepository.findByCriteria(PhieuTrinhTdListCriteria.builder().ids(hits.ids()).build(),
+                    PageRequest.of(0, hits.ids().size()))
+                .forEach(document -> byId.put(document.getId(), document));
+        }
+        boolean withFiles = wantsField(request.getItems(), "files");
+        List<Map<String, Object>> content = hits.ids().stream()
+            .map(byId::get)
+            .filter(java.util.Objects::nonNull)
+            .map(document -> fieldMapper.filter(fieldMapper.toDocumentMap(document, withFiles), request.getItems()))
+            .toList();
+        return toResponse(content, new PageImpl<>(content, pageable, hits.total()));
+    }
+
+    /**
+     * Cùng ngữ nghĩa SQL "timkiem": chưa xoá + người dùng THAM GIA (người tạo / lãnh đạo văn phòng khi đã trình cấp 2 /
+     * người đồng ý / từ chối / lãnh đạo cấp 2 khi đã trình cấp 25 / lãnh đạo cấp 1 khi đã trình cấp 5 / người phối hợp)
+     * + điều kiện nâng cao (create_date, status, các trường "chứa") + từ khoá.
+     */
+    com.td.application.search.AdvancedSearchQuery toIndexQuery(String me, ViewQueryRequest request) {
+        String member = me.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", "");
+        var query = new com.td.application.search.AdvancedSearchQuery();
+        query.filter(new com.td.application.search.AdvancedSearchQuery.Not(new com.td.application.search.AdvancedSearchQuery.Exists(
+            com.td.application.search.AdvancedSearchQuery.Source.COL, "deleted_on")));
+        query.filter(com.td.application.search.AdvancedSearchQuery.anyOf(List.of(
+            com.td.application.search.AdvancedSearchQuery.dyn("user_creator", member),
+            whenSubmitted("trinh2_date", "user_lanhdaovanphong", member),
+            com.td.application.search.AdvancedSearchQuery.dyn("user_receivers_agree", member),
+            com.td.application.search.AdvancedSearchQuery.dyn("user_receivers_refuse", member),
+            whenSubmitted("trinh25_date", "user_lanhdao2", member),
+            whenSubmitted("trinh5_date", "user_lanhdao1", member),
+            com.td.application.search.AdvancedSearchQuery.dyn("user_coordinator", member))));
+        Map<String, Object> search = request.getSearch() == null ? Map.of() : request.getSearch();
+        if (search.get("create_date") instanceof List<?> range && range.size() == 2) {
+            var from = parseDate(range.get(0));
+            var to = parseDate(range.get(1));
+            if (from != null || to != null) {
+                query.filter(new com.td.application.search.AdvancedSearchQuery.DateRange(
+                    com.td.application.search.AdvancedSearchQuery.Source.COL, "created_on", from, to));
+            }
+        }
+        Object status = search.get("status");
+        if (status != null && hasText(status.toString())) {
+            query.filter(com.td.application.search.AdvancedSearchQuery.col("status", status.toString().trim()));
+        }
+        search.forEach((key, value) -> {
+            if (!SEARCH_META_KEYS.contains(key) && key != null && key.matches("[A-Za-z0-9_]{1,100}") && value != null
+                    && !(value instanceof Map) && !(value instanceof List) && hasText(value.toString())) {
+                query.filter(new com.td.application.search.AdvancedSearchQuery.Match(key, value.toString().trim()));
+            }
+        });
+        String keyword = hasText(request.getKeyword()) ? request.getKeyword()
+            : search.get("keyword") == null ? null : search.get("keyword").toString();
+        query.keyword(keyword, request.getColumns() == null || request.getColumns().isEmpty()
+            ? DEFAULT_KEYWORD_COLUMNS : request.getColumns());
+        return query.sortDesc(com.td.application.search.AdvancedSearchQuery.SortField.CREATED_ON);
+    }
+
+    private static com.td.application.search.AdvancedSearchQuery.Condition whenSubmitted(String dateKey, String userField, String member) {
+        return new com.td.application.search.AdvancedSearchQuery.AllOf(List.of(
+            new com.td.application.search.AdvancedSearchQuery.Exists(com.td.application.search.AdvancedSearchQuery.Source.DYN, dateKey),
+            com.td.application.search.AdvancedSearchQuery.dyn(userField, member)));
     }
 
     private static boolean wantsField(String items, String field) {

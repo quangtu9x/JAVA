@@ -7,15 +7,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -56,20 +56,35 @@ import java.util.UUID;
  * {@code fetchOrganizationTree()} không tham số — xem {@code organizationApi.js}), CHỈ
  * {@code JSTreePhatHanhCQLH.jsx} truyền {@code true} khi {@code danhsach === "cocautochuc"} (tab
  * "Cơ quan, đơn vị thuộc Tỉnh") để xin cây ĐẦY ĐỦ bất kể vai trò.</p>
+ *
+ * <p><b>15/10/2026 — cache Redis</b> (cây thật ~50k node; Domino từng treo khi không cache): cây ĐẦY ĐỦ
+ * (không lọc, chưa gắn ủy quyền) dựng 1 lần và lưu qua {@link OrganizationTreeCache} (Redis + JVM),
+ * tự vô hiệu khi tổ chức/người dùng đổi ({@code OrganizationTreeCacheInvalidationListener}, td-infrastructure).
+ * Mỗi request chỉ còn SAO CHÉP cây trong bộ nhớ, đồng thời: (1) cắt nhánh cơ quan khác
+ * ({@code includeFullTree=false}) và (2) gắn {@code delegation_obj} (ủy quyền phụ thuộc NGÀY — không
+ * cache cứng được). Bỏ luôn N+1 tra "người đại diện nhận" từng node (nạp theo lô).
+ * KHÔNG còn {@code @Transactional} ở mức lớp: lần dựng cây chạy trong transaction riêng
+ * (xem {@link OrganizationTreeCache}), request chờ không giữ kết nối DB.</p>
  */
 @Service
 @RequiredArgsConstructor
-@Transactional(value = "identityTransactionManager", readOnly = true)
 public class GetLegacyOrganizationTreeUseCase {
 
     private static final String DEFAULT_JEDIS_KEY = "qlvb_CoCauToChuc_#";
     private static final String FORM_AGENCY = "agency";
+    private static final String FORM_USER = "user";
+    private static final String DELEGATION_OBJ = "delegation_obj";
+    static final String VARIANT_ORGANIZATIONS = "org";
+    static final String VARIANT_WITH_USERS = "org+users";
+    // PostgreSQL giới hạn 32767 tham số / câu lệnh — chia lô mệnh đề IN.
+    private static final int IN_CLAUSE_BATCH_SIZE = 1000;
 
     private final OrganizationRepository organizationRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final AppUserRepository appUserRepository;
     private final OrganizationAgencyResolver organizationAgencyResolver;
     private final UserDelegationResolver userDelegationResolver;
+    private final OrganizationTreeCache organizationTreeCache;
 
     public LegacyOrganizationTreeResponse execute(String jedisKey, boolean includeFullTree) {
         return execute(jedisKey, includeFullTree, false);
@@ -92,12 +107,12 @@ public class GetLegacyOrganizationTreeUseCase {
         String normalizedJedisKey = normalizeJedisKey(jedisKey);
 
         try {
-            List<Organization> organizations = loadOrganizationsForTree();
             String scopeAgencyId = includeFullTree ? null : resolveCurrentUserAgencyId();
-            Map<UUID, List<AppUser>> usersByOrganizationId = includeUsers
-                ? loadUsersByOrganizationId(organizations)
-                : Map.of();
-            List<LegacyOrganizationTreeNode> nodes = buildTree(organizations, scopeAgencyId, usersByOrganizationId);
+            List<LegacyOrganizationTreeNode> fullTree = organizationTreeCache.getFullTree(
+                includeUsers ? VARIANT_WITH_USERS : VARIANT_ORGANIZATIONS,
+                () -> buildFullTree(includeUsers));
+            List<LegacyOrganizationTreeNode> nodes = materialize(
+                fullTree, scopeAgencyId, userDelegationResolver.allActiveToday());
             return LegacyOrganizationTreeResponse.success(nodes, normalizedJedisKey);
         } catch (Exception ex) {
             return LegacyOrganizationTreeResponse.failure(
@@ -110,20 +125,85 @@ public class GetLegacyOrganizationTreeUseCase {
 
     // Nap 1 lan CHO CA CAY (tranh N+1 - cung convention voi
     // AppUserRepository#findByParentUserIdInAndDeletedOnIsNull), gom san theo organizationId.
+    // Cây ĐẦY ĐỦ đưa vào cache: không lọc theo cơ quan người xem, delegation_obj để "" (gắn lúc đọc).
+    private List<LegacyOrganizationTreeNode> buildFullTree(boolean includeUsers) {
+        List<Organization> organizations = loadOrganizationsForTree();
+        Map<UUID, List<AppUser>> usersByOrganizationId = includeUsers
+            ? loadUsersByOrganizationId(organizations)
+            : Map.of();
+        return buildTree(organizations, usersByOrganizationId, loadReceiverUsernames(organizations));
+    }
+
+    // Sao chép cây dùng chung (KHÔNG sửa node trong cache): cắt nhánh "agency" khác scopeAgencyId (xem
+    // javadoc buildNode cũ — bugfix 03/09/2026) và gắn delegation_obj của người đại diện nhận (node tổ
+    // chức) hoặc của chính người dùng (node "user").
+    private List<LegacyOrganizationTreeNode> materialize(
+            List<LegacyOrganizationTreeNode> nodes,
+            String scopeAgencyId,
+            Map<String, Map<String, Object>> delegations) {
+        if (nodes == null || nodes.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<LegacyOrganizationTreeNode> result = new ArrayList<>(nodes.size());
+        for (LegacyOrganizationTreeNode node : nodes) {
+            if (scopeAgencyId != null && FORM_AGENCY.equals(node.getForm()) && !scopeAgencyId.equals(node.getId())) {
+                continue;
+            }
+            Map<String, String> data = node.getData() == null ? new LinkedHashMap<>() : new LinkedHashMap<>(node.getData());
+            String delegator = FORM_USER.equals(node.getForm()) ? data.get("username") : data.get("user_receiver");
+            data.put(DELEGATION_OBJ, userDelegationResolver.activeJsonOrEmpty(delegations, safe(delegator)));
+            result.add(new LegacyOrganizationTreeNode(
+                node.getId(),
+                node.getText(),
+                node.getForm(),
+                data,
+                materialize(node.getChildren(), scopeAgencyId, delegations)));
+        }
+        return result;
+    }
+
     private Map<UUID, List<AppUser>> loadUsersByOrganizationId(List<Organization> organizations) {
         List<UUID> organizationIds = organizations.stream().map(Organization::getId).toList();
         if (organizationIds.isEmpty()) {
             return Map.of();
         }
         Map<UUID, List<AppUser>> byOrganizationId = new HashMap<>();
-        for (AppUser user : appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(organizationIds)) {
-            // 06/10/2026: cay chon nguoi - bo nguoi dang bi Khoa.
-            if (user.getOrganizationId() == null || !user.isActive()) {
-                continue;
+        for (List<UUID> batch : partition(organizationIds)) {
+            for (AppUser user : appUserRepository.findByOrganizationIdInAndDeletedOnIsNull(batch)) {
+                // 06/10/2026: cay chon nguoi - bo nguoi dang bi Khoa.
+                if (user.getOrganizationId() == null || !user.isActive()) {
+                    continue;
+                }
+                byOrganizationId.computeIfAbsent(user.getOrganizationId(), key -> new ArrayList<>()).add(user);
             }
-            byOrganizationId.computeIfAbsent(user.getOrganizationId(), key -> new ArrayList<>()).add(user);
         }
         return byOrganizationId;
+    }
+
+    // receiverId (UUID dạng String) -> username, nạp theo lô cho CẢ cây (thay N+1 từng node).
+    private Map<UUID, String> loadReceiverUsernames(List<Organization> organizations) {
+        Set<UUID> receiverIds = new LinkedHashSet<>();
+        for (Organization organization : organizations) {
+            UUID receiverId = parseUuid(organization.getReceiverId());
+            if (receiverId != null) {
+                receiverIds.add(receiverId);
+            }
+        }
+        Map<UUID, String> usernames = new HashMap<>();
+        for (List<UUID> batch : partition(new ArrayList<>(receiverIds))) {
+            for (AppUser user : appUserRepository.findByIdInAndDeletedOnIsNull(batch)) {
+                usernames.put(user.getId(), safe(user.getUsername()));
+            }
+        }
+        return usernames;
+    }
+
+    private static List<List<UUID>> partition(List<UUID> ids) {
+        List<List<UUID>> batches = new ArrayList<>();
+        for (int from = 0; from < ids.size(); from += IN_CLAUSE_BATCH_SIZE) {
+            batches.add(ids.subList(from, Math.min(from + IN_CLAUSE_BATCH_SIZE, ids.size())));
+        }
+        return batches;
     }
 
     // Bugfix 18/09/2026 (hoan thien "phat hanh vbdi -> den noi bo"): thuat toan di len parentId toi
@@ -171,7 +251,9 @@ public class GetLegacyOrganizationTreeUseCase {
     }
 
     private List<LegacyOrganizationTreeNode> buildTree(
-            List<Organization> organizations, String scopeAgencyId, Map<UUID, List<AppUser>> usersByOrganizationId) {
+            List<Organization> organizations,
+            Map<UUID, List<AppUser>> usersByOrganizationId,
+            Map<UUID, String> receiverUsernames) {
         if (organizations == null || organizations.isEmpty()) {
             return List.of();
         }
@@ -201,39 +283,28 @@ public class GetLegacyOrganizationTreeUseCase {
 
         List<LegacyOrganizationTreeNode> result = new ArrayList<>();
         for (Organization root : roots) {
-            LegacyOrganizationTreeNode node = buildNode(
-                root, childrenByParent, new NodeContext(null, null, null, userDelegationResolver.allActiveToday()), scopeAgencyId, usersByOrganizationId);
-            if (node != null) {
-                result.add(node);
-            }
+            result.add(buildNode(
+                root, childrenByParent, new NodeContext(null, null, null, receiverUsernames), usersByOrganizationId));
         }
 
         return result;
     }
 
-    // scopeAgencyId == null -> khong loc gi (full tree, dung cho admin hoac khi khong resolve duoc
-    // co quan cua nguoi dung - xem javadoc lop). scopeAgencyId co gia tri -> BAT KY node nao co
-    // form == "agency" MA KHAC scopeAgencyId se bi cat bo CA NHANH (return null) - ap dung du node do
-    // la root hay long sau trong cay (khong gia dinh "agency" luon o 1 cap co dinh), giu nguyen moi
-    // node khac (agency_level/unit/department khong bi loc rieng - chi loc tai diem "agency").
+    // 15/10/2026: dựng cây ĐẦY ĐỦ (đưa vào cache) — việc cắt nhánh "agency" khác cơ quan người xem đã
+    // chuyển sang materialize() (cùng quy tắc: bất kỳ node form "agency" nào khác scopeAgencyId bị cắt
+    // CẢ NHÁNH, dù ở root hay lồng sâu).
     private LegacyOrganizationTreeNode buildNode(
             Organization organization,
             Map<UUID, List<Organization>> childrenByParent,
             NodeContext context,
-            String scopeAgencyId,
             Map<UUID, List<AppUser>> usersByOrganizationId) {
         String form = resolveForm(organization);
-        if (scopeAgencyId != null && FORM_AGENCY.equals(form)
-                && !organization.getId().toString().equals(scopeAgencyId)) {
-            return null;
-        }
         NodeContext nextContext = nextContext(organization, form, context);
 
         List<LegacyOrganizationTreeNode> children = new ArrayList<>(childrenByParent
             .getOrDefault(organization.getId(), List.of())
             .stream()
-            .map(child -> buildNode(child, childrenByParent, nextContext, scopeAgencyId, usersByOrganizationId))
-            .filter(Objects::nonNull)
+            .map(child -> buildNode(child, childrenByParent, nextContext, usersByOrganizationId))
             .toList());
         for (AppUser user : usersByOrganizationId.getOrDefault(organization.getId(), List.of())) {
             children.add(buildUserNode(user, nextContext));
@@ -259,14 +330,14 @@ public class GetLegacyOrganizationTreeUseCase {
         data.put("username", safe(user.getUsername()));
         data.put("position", asString(dynamicFields.get("position")));
         data.put("cap_lanh_dao", safe(user.getCapLanhDao()));
-        data.put("delegation_obj", userDelegationResolver.activeJsonOrEmpty(context.delegations(), user.getUsername()));
+        data.put(DELEGATION_OBJ, ""); // gắn lúc đọc (materialize) — ủy quyền đổi theo ngày
         data.put("agency_id", safe(context.agencyId()));
         data.put("unit_id", safe(context.unitId()));
 
         return new LegacyOrganizationTreeNode(
             user.getId().toString(),
             safe(user.getFullName()),
-            "user",
+            FORM_USER,
             data,
             List.of()
         );
@@ -285,7 +356,7 @@ public class GetLegacyOrganizationTreeUseCase {
         // có receiverId trỏ tới AppUser.id). Resolve username thật từ receiverId ở đây — nguồn DUY
         // NHẤT để CayChonNoiXuLyCapN.jsx/SubFormChuyenXuLy.jsx build đúng user_process/user_coordinate/
         // user_to_read khi người dùng chọn 1 ĐƠN VỊ (không phải 1 người dùng cụ thể) làm người xử lý.
-        String receiverUsername = resolveReceiverUsername(organization.getReceiverId());
+        String receiverUsername = resolveReceiverUsername(organization.getReceiverId(), context.receiverUsernames());
 
         Map<String, String> data = new LinkedHashMap<>();
         switch (form) {
@@ -329,7 +400,8 @@ public class GetLegacyOrganizationTreeUseCase {
         data.put("receiver_position", safe(organization.getReceiverPosition()));
         // 09/10/2026 (port Ủy quyền): thay Domino UyQuyen#capnhat_daidien_nhan_vanban (chép delegation_obj
         // sang bản ghi tổ chức) — gắn LÚC ĐỌC ủy quyền đang hiệu lực của người đại diện nhận (chuỗi JSON).
-        data.put("delegation_obj", userDelegationResolver.activeJsonOrEmpty(context.delegations(), receiverUsername));
+        // 15/10/2026: gắn lúc đọc (materialize) — ủy quyền đổi theo ngày, không cache cứng được.
+        data.put(DELEGATION_OBJ, "");
 
         // Bugfix 21/08/2026 (D.22 tài liệu phân tích vbden — tiếp): "clerical"/"mailin" - đơn vị
         // NGOÀI hệ thống, nhận văn bản qua email thay vì tài khoản (dùng ở
@@ -353,15 +425,20 @@ public class GetLegacyOrganizationTreeUseCase {
     // receiverId luu UUID (dang String) cua AppUser dai dien - "" hoac khong parse duoc/khong con
     // ton tai (da bi xoa) -> tra "" (khong chan luong doc cay, giu hanh vi cu voi node chua/khong con
     // cau hinh dai dien).
-    private String resolveReceiverUsername(String receiverId) {
-        if (receiverId == null || receiverId.isBlank()) {
-            return "";
+    // 15/10/2026: tra trong bản đồ đã nạp theo lô (loadReceiverUsernames), không truy vấn từng node.
+    private String resolveReceiverUsername(String receiverId, Map<UUID, String> receiverUsernames) {
+        UUID id = parseUuid(receiverId);
+        return id == null ? "" : receiverUsernames.getOrDefault(id, "");
+    }
+
+    private static UUID parseUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
         }
         try {
-            UUID id = UUID.fromString(receiverId.trim());
-            return appUserRepository.findByIdAndDeletedOnIsNull(id).map(AppUser::getUsername).orElse("");
+            return UUID.fromString(value.trim());
         } catch (IllegalArgumentException ex) {
-            return "";
+            return null;
         }
     }
 
@@ -389,7 +466,7 @@ public class GetLegacyOrganizationTreeUseCase {
             unitId = organization.getId().toString();
         }
 
-        return new NodeContext(agencyId, agencyIdentifier, unitId, current.delegations());
+        return new NodeContext(agencyId, agencyIdentifier, unitId, current.receiverUsernames());
     }
 
     private String normalizeJedisKey(String jedisKey) {
@@ -407,9 +484,9 @@ public class GetLegacyOrganizationTreeUseCase {
         return value == null ? "" : String.valueOf(value);
     }
 
-    // 09/10/2026: "delegations" = ủy quyền đang hiệu lực hôm nay (UserDelegationResolver#allActiveToday, 1
-    // truy vấn cho CẢ cây) — gắn delegation_obj vào node tổ chức (người đại diện nhận) và node người dùng.
+    // 15/10/2026: ủy quyền (delegation_obj) không còn đi qua context — gắn ở materialize() lúc đọc.
+    // "receiverUsernames" = receiverId -> username, nạp theo lô 1 lần cho CẢ cây.
     private record NodeContext(String agencyId, String agencyIdentifier, String unitId,
-                               Map<String, Map<String, Object>> delegations) {
+                               Map<UUID, String> receiverUsernames) {
     }
 }

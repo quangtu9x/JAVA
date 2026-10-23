@@ -70,6 +70,8 @@ class FeCompatibilityUrlMappingTest {
     @MockBean
     private GetLegacyOrganizationTreeUseCase getLegacyOrganizationTreeUseCase;
     @MockBean
+    private com.td.application.sharedcore.OrganizationTreeCache organizationTreeCache;
+    @MockBean
     private GetLegacyOrganizationFlatListUseCase getLegacyOrganizationFlatListUseCase;
     @MockBean
     private GetLegacyOrgLookupForDungChungUseCase getLegacyOrgLookupForDungChungUseCase;

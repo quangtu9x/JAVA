@@ -71,7 +71,7 @@ public class PhanCongNhiemVuUseCase {
     // Domino: qlvb/add?databasetype=vbcddh (form=nhiemvu), 1 bản ghi/1 đơn vị (NhiemVuChiTietPage.jsx).
     private Result<UUID> createNhiemVu(UUID idVanBan, NhiemVuAssignment assignment) {
         var childRequest = new AddDynamicDocumentRequest();
-        childRequest.setTitle(assignment.getDonViThucHien());
+        childRequest.setTitle(AddDynamicDocumentRequest.labelTitle(assignment.getDonViThucHien())); // 19/10/2026
         childRequest.setDocumentType(DOCUMENT_TYPE);
 
         Map<String, String> fields = new LinkedHashMap<>();

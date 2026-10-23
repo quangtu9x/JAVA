@@ -21,7 +21,6 @@ public class CreateDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
-    private final DocumentSearchService documentSearchService;
     private final DocumentLogService documentLogService;
     private final DocumentNumberingService documentNumberingService;
 
@@ -42,7 +41,6 @@ public class CreateDocumentUseCase {
             );
 
             var saved = documentRepository.save(document);
-            documentSearchService.index(saved);
             documentCacheService.evictAllListCaches();
             documentLogService.logCreate(saved.getId(), DocumentDtoMapper.map(saved));
             return Result.success(saved.getId());

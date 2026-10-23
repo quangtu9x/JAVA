@@ -207,6 +207,47 @@ class XinYKienPhoiHopUseCaseTest {
         verify(addDraftProcessDocumentUseCase, never()).execute(any());
     }
 
+    // 20/10/2026: người đã cho ý kiến (user_coordinated) cho thêm ý kiến lần 2 -> ghi thêm vết, danh sách giữ nguyên.
+    @Test
+    void execute_secondOpinionFromCoordinatedUser_shouldCreateAnotherOpinionRecord() {
+        DuThaoDocument draft = newDraft("duthao", "{\"user_coordinator\":\"tranvanb\",\"user_coordinated\":\"nguyenvana\"}");
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
+        UUID childId = UUID.randomUUID();
+        when(addDraftProcessDocumentUseCase.execute(any())).thenReturn(Result.success(childId));
+
+        var request = new XinYKienPhoiHopRequest();
+        request.setId(draft.getId());
+        request.setOpinion("Bo sung y kien");
+
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData()).isEqualTo(childId);
+        Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson());
+        assertThat(fields).containsEntry("user_coordinator", "tranvanb");
+        assertThat(fields).containsEntry("user_coordinated", "nguyenvana");
+    }
+
+    @Test
+    void execute_opinionWhenDraftPendingSignature_shouldFail() {
+        DuThaoDocument draft = new DuThaoDocument("Du thao", "duthao", DuThaoStatus.PENDING_SIGNATURE, null, null, null, null);
+        draft.replaceDynamicFields("{\"user_coordinator\":\"nguyenvana\"}");
+        when(duThaoDocumentRepository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
+
+        var request = new XinYKienPhoiHopRequest();
+        request.setId(draft.getId());
+        request.setOpinion("Y kien muon");
+
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isFalse();
+        verify(addDraftProcessDocumentUseCase, never()).execute(any());
+        verify(duThaoDocumentRepository, never()).save(any());
+    }
+
     private DuThaoDocument newDraft(String documentType, String dynamicFieldsJson) {
         DuThaoDocument document = new DuThaoDocument("Du thao", documentType, "DRAFTING", null, null, null, null);
         document.replaceDynamicFields(dynamicFieldsJson);

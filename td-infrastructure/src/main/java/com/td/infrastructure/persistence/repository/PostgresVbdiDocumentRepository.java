@@ -251,6 +251,7 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
         }
         appendIncludeFieldValuesPredicates(sql, parameters, filter.getIncludeFieldValues());
         appendContainsAnyFieldValuePredicates(sql, parameters, filter.getContainsAnyFieldValues());
+        TextContainsSql.append(sql, parameters, filter.getTextContainsFieldValues(), true); // 19/10/2026
         // Bugfix 21/08/2026 style (PostgresDocumentRepository#dynamicSortExpression): promulgation_date
         // luon luu "DD/MM/YYYY" (chuoi) - guard regex truoc khi TO_DATE, tranh throw voi du lieu
         // cu/sai dang (tra NULL, khong khop khoang ngay thay vi loi runtime).
@@ -286,14 +287,14 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
         String keyword = filter.getKeyword();
         List<String> keywordColumns = filter.getKeywordColumns();
         if (keyword != null && !keyword.isBlank() && keywordColumns != null && !keywordColumns.isEmpty()) {
-            String likeValue = "%" + keyword.trim().toLowerCase() + "%";
+            String likeValue = SearchTextSql.containsLike(keyword); // 20/10/2026: không phân biệt dấu
             sql.append(" AND (");
             for (int index = 0; index < keywordColumns.size(); index++) {
                 if (index > 0) {
                     sql.append(" OR ");
                 }
                 String parameterName = "keyword" + index;
-                sql.append("LOWER(").append(keywordColumnExpression(keywordColumns.get(index))).append(")")
+                sql.append("td_search_norm(").append(keywordColumnExpression(keywordColumns.get(index))).append(")")
                     .append(" LIKE :").append(parameterName);
                 parameters.put(parameterName, likeValue);
             }
@@ -658,14 +659,14 @@ public class PostgresVbdiDocumentRepository implements VbdiDocumentRepository {
             parameters.put("documentType", documentType.trim().toLowerCase());
         }
         if (keyword != null && !keyword.isBlank() && keywordColumns != null && !keywordColumns.isEmpty()) {
-            String likeValue = "%" + keyword.trim().toLowerCase() + "%";
+            String likeValue = SearchTextSql.containsLike(keyword); // 20/10/2026: không phân biệt dấu
             sql.append(" AND (");
             for (int index = 0; index < keywordColumns.size(); index++) {
                 if (index > 0) {
                     sql.append(" OR ");
                 }
                 String parameterName = "keyword" + index;
-                sql.append("LOWER(").append(keywordColumnExpression(keywordColumns.get(index))).append(")")
+                sql.append("td_search_norm(").append(keywordColumnExpression(keywordColumns.get(index))).append(")")
                     .append(" LIKE :").append(parameterName);
                 parameters.put(parameterName, likeValue);
             }

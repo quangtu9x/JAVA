@@ -28,13 +28,14 @@ class HardDeleteDocumentUseCaseTest {
     @Mock
     private DocumentCacheService documentCacheService;
     @Mock
-    private DocumentSearchService documentSearchService;
-    @Mock
     private DocumentLogService documentLogService;
+    @Mock
+    private SharedDocumentFilesReleaser sharedDocumentFilesReleaser;
 
     @Test
     void execute_shouldHardDeleteThenLogHardDelete() {
-        var useCase = new HardDeleteDocumentUseCase(documentRepository, documentCacheService, documentSearchService, documentLogService);
+        var useCase = new HardDeleteDocumentUseCase(documentRepository, documentCacheService, documentLogService,
+            sharedDocumentFilesReleaser);
 
         BusinessDocument existing = new BusinessDocument("Van ban", null, "DRAFT", null, null, null, null);
         UUID id = existing.getId();
@@ -44,14 +45,16 @@ class HardDeleteDocumentUseCaseTest {
 
         assertThat(result.isSuccess()).isTrue();
 
-        InOrder inOrder = inOrder(documentRepository, documentLogService);
+        InOrder inOrder = inOrder(sharedDocumentFilesReleaser, documentRepository, documentLogService);
+        inOrder.verify(sharedDocumentFilesReleaser).releaseSharedFiles(id);
         inOrder.verify(documentRepository).hardDelete(existing);
         inOrder.verify(documentLogService).logHardDelete(eq(id), any());
     }
 
     @Test
     void execute_documentNotFound_shouldNotLog() {
-        var useCase = new HardDeleteDocumentUseCase(documentRepository, documentCacheService, documentSearchService, documentLogService);
+        var useCase = new HardDeleteDocumentUseCase(documentRepository, documentCacheService, documentLogService,
+            sharedDocumentFilesReleaser);
         UUID id = UUID.randomUUID();
         when(documentRepository.findById(id)).thenReturn(Optional.empty());
 

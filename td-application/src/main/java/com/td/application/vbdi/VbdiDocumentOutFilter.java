@@ -83,4 +83,12 @@ public class VbdiDocumentOutFilter {
      * {@code VbdenOrgViewFilter#containsAnyFieldValues}.
      */
     private Map<String, List<String>> containsAnyFieldValues;
+
+
+    /**
+     * 19/10/2026: field → chuỗi con, khớp ILIKE {@code %giá trị%} (không phân biệt hoa thường) — cho ô
+     * nhập TỰ DO của bộ lọc nâng cao (vd "Cơ quan ban hành", "Số, ký hiệu", "Ký hiệu/Tiêu đề hồ sơ") để
+     * không phải gõ đúng nguyên giá trị như {@link #containsAnyFieldValues}. Nhiều field kết hợp AND.
+     */
+    private Map<String, String> textContainsFieldValues;
 }

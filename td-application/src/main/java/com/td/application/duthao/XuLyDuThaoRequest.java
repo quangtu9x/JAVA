@@ -46,6 +46,14 @@ public class XuLyDuThaoRequest {
     /** Username người nhận (Domino: {@code receiver_username} trên document con {@code draft_process}). */
     private String receiverUsername;
 
+    /**
+     * 19/10/2026 (ủy quyền — cùng cách Chuyển xử lý vbden): người nhận được chọn đang ủy quyền phạm vi
+     * Dự thảo cho {@link #receiverUsername} → đây là username NGƯỜI ỦY QUYỀN. Server tự xác minh
+     * ({@code UserDelegationResolver#isActiveDelegation}) rồi mới ghi vào {@code user_delivered} (người ủy
+     * quyền vẫn theo dõi được) + vết xử lý; không khớp ủy quyền đang hiệu lực thì bỏ qua.
+     */
+    private String delegatedFromUsername;
+
     /** Ý kiến/ghi chú tự do — hiện CHƯA lưu ở đâu (document con {@code draft_process}/lịch sử xử lý
      * thuộc DT-007, chưa port) — chỉ nhận để tương thích payload FE, không có tác dụng field nào. */
     private String opinion;

@@ -30,8 +30,6 @@ class DeleteDocumentUseCaseTest {
     @Mock
     private DocumentCacheService documentCacheService;
     @Mock
-    private DocumentSearchService documentSearchService;
-    @Mock
     private DocumentLogService documentLogService;
     @Mock
     private CurrentUserProvider currentUserProvider;
@@ -41,7 +39,7 @@ class DeleteDocumentUseCaseTest {
     @Test
     void execute_shouldLogDelete() {
         var useCase = new DeleteDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService,
+            documentRepository, documentCacheService, documentLogService,
             currentUserProvider, appUserRepository);
 
         BusinessDocument existing = new BusinessDocument("Van ban", null, "DRAFT", null, null, null, null);
@@ -59,7 +57,7 @@ class DeleteDocumentUseCaseTest {
     @Test
     void execute_shouldStampDeletedByWithRealUserId_notRandomUuid() {
         var useCase = new DeleteDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService,
+            documentRepository, documentCacheService, documentLogService,
             currentUserProvider, appUserRepository);
 
         BusinessDocument existing = new BusinessDocument("Van ban", null, "DRAFT", null, null, null, null);
@@ -80,7 +78,7 @@ class DeleteDocumentUseCaseTest {
     @Test
     void execute_whenCurrentUserUnresolvable_shouldStampNullInsteadOfRandomUuid() {
         var useCase = new DeleteDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService,
+            documentRepository, documentCacheService, documentLogService,
             currentUserProvider, appUserRepository);
 
         BusinessDocument existing = new BusinessDocument("Van ban", null, "DRAFT", null, null, null, null);
@@ -97,7 +95,7 @@ class DeleteDocumentUseCaseTest {
     @Test
     void execute_alreadyDeleted_shouldNotLogAgain() {
         var useCase = new DeleteDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService,
+            documentRepository, documentCacheService, documentLogService,
             currentUserProvider, appUserRepository);
 
         BusinessDocument existing = new BusinessDocument("Van ban", null, "DRAFT", null, null, null, null);

@@ -12,6 +12,21 @@ import java.util.Map;
 @Data
 public class AddDynamicDocumentRequest {
 
+    /** Độ dài cột tĩnh title (VARCHAR(300)) ở mọi bảng văn bản. */
+    public static final int TITLE_MAX_LENGTH = 300;
+
+    /**
+     * 19/10/2026: CHỈ dùng cho bản ghi con/vết mà title là NHÃN lấy từ nội dung tự do (ý kiến, tên đơn vị…) —
+     * nội dung đầy đủ đã lưu ở field riêng; cắt để không vượt cột (trước đây ý kiến dài làm lỗi cả thao tác).
+     * KHÔNG dùng cho Trích yếu của văn bản chính (cắt = mất dữ liệu — FE/BE phải báo người dùng rút gọn).
+     */
+    public static String labelTitle(String value) {
+        if (value == null || value.length() <= TITLE_MAX_LENGTH) {
+            return value;
+        }
+        return value.substring(0, TITLE_MAX_LENGTH - 1) + "…";
+    }
+
     private String title;
 
     private String documentType;

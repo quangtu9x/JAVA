@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.td.worker.config.WorkerProperties;
 import com.td.worker.core.task.TaskContext;
 import com.td.worker.core.task.UnitResult;
+import com.td.worker.infrastructure.fileregistry.SharedFileRegistry;
 import com.td.worker.infrastructure.minio.WorkerMinioClient;
 import com.td.worker.infrastructure.tenant.TenantDataSourceManager;
 import com.td.worker.transport.rabbit.RabbitPublisher;
@@ -31,6 +32,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -69,6 +72,7 @@ class VbdiDeliveryIncomingDocumentIntegrationTest {
     private final ObjectProvider<RabbitPublisher> rabbitPublisher = mock(ObjectProvider.class);
     private WorkerProperties props;
     private VbdiDeliveryTaskHandler handler;
+    private SharedFileRegistry sharedFileRegistry;
 
     @BeforeAll
     static void startContainer() {
@@ -151,6 +155,7 @@ class VbdiDeliveryIncomingDocumentIntegrationTest {
                 uploaded_by UUID,
                 uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 is_public BOOLEAN DEFAULT FALSE,
+                is_shared BOOLEAN NOT NULL DEFAULT FALSE,
                 description TEXT
             )
             """);
@@ -181,8 +186,9 @@ class VbdiDeliveryIncomingDocumentIntegrationTest {
         props = new WorkerProperties();
         props.getTasks().getVbdi().setEnabled(true);
         props.getTasks().getVbdi().setVerifyObjectExists(false);
+        sharedFileRegistry = mock(SharedFileRegistry.class);
         handler = new VbdiDeliveryTaskHandler(
-            props, tenantDataSources, mock(WorkerMinioClient.class), objectMapper, rabbitPublisher);
+            props, tenantDataSources, mock(WorkerMinioClient.class), objectMapper, rabbitPublisher, sharedFileRegistry);
     }
 
     @AfterEach
@@ -340,6 +346,17 @@ class VbdiDeliveryIncomingDocumentIntegrationTest {
         assertThat(fileRows.get(1).get("original_filename")).isEqualTo("to_trinh.pdf");
         assertThat(fileRows.get(1).get("file_path")).isEqualTo("vbdi-delivery/H05.01/2026/09/07/doc-1/aaa.pdf");
         assertThat(fileRows.get(1).get("file_extension")).isEqualTo("pdf");
+        // 22/10/2026: dong dung chung (chan xoa nhu "Chuyen xu ly") + ghi tham chieu vao so dang ky sau commit.
+        assertThat(fileRows).allSatisfy(r -> assertThat(r.get("is_shared")).isEqualTo(true));
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<SharedFileRegistry.SharedFileRef>> refs = ArgumentCaptor.forClass(List.class);
+        verify(sharedFileRegistry).registerQuietly(eq("H06"), eq(SharedFileRegistry.SOURCE_VBDI_DELIVERY), refs.capture());
+        assertThat(refs.getValue()).extracting(SharedFileRegistry.SharedFileRef::fileMetadataId)
+            .containsExactlyInAnyOrderElementsOf(fileRows.stream().map(r -> (UUID) r.get("id")).toList());
+        assertThat(refs.getValue()).allSatisfy(r -> {
+            assertThat(r.documentId()).isEqualTo(documentId);
+            assertThat(r.bucketName()).isEqualTo("td-webapi-files");
+        });
 
         Map<String, Object> dynamicFields = objectMapper.readValue(
             doc.get("dynamic_fields").toString(), Map.class);
@@ -563,5 +580,32 @@ class VbdiDeliveryIncomingDocumentIntegrationTest {
         org.mockito.Mockito.verify(rabbitPublisherMock).publish(any(), any(), bodyCaptor.capture());
         JsonNode innerPayload = objectMapper.readTree(bodyCaptor.getValue()).get("units").get(0).get("payload");
         assertThat(innerPayload.has("statusDetails")).isFalse();
+    }
+
+    @Test
+    void nationalIncomingPublishesGatewayAckOnlyAfterCommit() throws Exception {
+        var publisher = mock(RabbitPublisher.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            java.util.function.Consumer<RabbitPublisher> consumer = invocation.getArgument(0);
+            consumer.accept(publisher); return null;
+        }).when(rabbitPublisher).ifAvailable(any());
+        props.getRabbit().setEnabled(true);
+        ObjectNode payload = basePayload(VbdiTaskConstants.GROUP_CONTACT_UNIT);
+        payload.put("sendId", "transport-123");
+        payload.put("documentId", "business-456");
+        payload.put("senderTenantId", "H06");
+        payload.put("nationalIncoming", true);
+        payload.put("recipientIdentifier", "H56.01");
+        assertThat(handler.execute(context("H06"), payload).isSuccess()).isTrue();
+        ArgumentCaptor<String> route = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(publisher).publish(any(), route.capture(), body.capture());
+        assertThat(route.getValue()).isEqualTo("worker.guinhanquocgia.receive.ack");
+        JsonNode envelope = objectMapper.readTree(body.getValue());
+        assertThat(envelope.path("taskType").asText()).isEqualTo("guinhanquocgia.receive.ack");
+        assertThat(envelope.path("units").get(0).path("payload").path("documentId").asText())
+            .isEqualTo("transport-123");
+        assertThat(envelope.path("units").get(0).path("payload").path("recipientIdentifier").asText())
+            .isEqualTo("H56.01");
     }
 }

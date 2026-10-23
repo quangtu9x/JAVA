@@ -257,8 +257,9 @@ public class HoSoCVController extends BaseController {
 
     @PostMapping("/XuLyLai")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Xử lý lại hồ sơ bị từ chối duyệt (đơn/nhiều) (G3/G9)",
-        description = "trinhlanhdaoduyet: \"3\" → \"\" — nhận danh sách id "
+    @Operation(summary = "Mở lại hồ sơ đã kết thúc để xử lý lại (đơn/nhiều) (G3/G9)",
+        description = "status: \"1\" → \"0\", xoá end_date/summary; nếu bị từ chối duyệt thì "
+            + "trinhlanhdaoduyet: \"3\" → \"\" — nhận danh sách id "
             + "(xulylaihoso/xulylainhieuhoso cùng 1 luồng)")
     public ResponseEntity<ApiResponse<List<UUID>>> xuLyLai(@RequestBody XuLyLaiHoSoRequest request) {
         return ok(xuLyLaiHoSoUseCase.execute(request));

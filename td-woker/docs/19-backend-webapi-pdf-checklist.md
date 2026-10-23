@@ -1,5 +1,9 @@
 # Checklist: Nâng td-woker thành Backend (Web API + PDF)
 
+> Lưu ý hiện trạng: dịch vụ ký SIM-PKI đã được tách khỏi `td-woker`. Các mục SIM-PKI bên dưới chỉ là
+> nội dung lịch sử của bản kế hoạch và không được triển khai lại trong worker; nếu cần ký số, backend
+> phải tích hợp với dịch vụ ký độc lập.
+
 > Mục tiêu: Biến td-woker từ sim worker (message-driven) thành backend có Web API để nhận yêu cầu HTTP và xử lý PDF, KHÔNG sửa cấu trúc hiện tại, KHÔNG hỏng worker đang chạy.
 > Tài liệu tham chiếu: 17-checklist-tich-hop-kyso-simpki.md, 18-trien-khai-test-simpki.md, promt-Extensible-Worker-Architecture.txt
 > Trạng thái: CHƯA BẮT ĐẦU — đang ở giai đoạn lập kế hoạch

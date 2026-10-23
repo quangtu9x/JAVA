@@ -81,11 +81,19 @@ public class PublishVbdiReplyStatusUseCase {
     private final OrganizationRepository organizationRepository;
     private final OutboxPublisherService outboxPublisherService;
     private final CurrentTenantProvider currentTenantProvider;
+    private final PublishNationalStatusUseCase publishNationalStatusUseCase;
 
     public void execute(PublishVbdiReplyStatusRequest request) {
         try {
             Map<String, Object> fields = request.getDynamicFields();
             if (fields == null) {
+                return;
+            }
+            // 14/10/2026: văn bản đến TỪ TRỤC QUỐC GIA (send_log_id "national:...") — phản hồi qua TD Gateway (gói
+            // trạng thái eDXML), KHÔNG qua vbdi.reply nội tỉnh (đơn vị gửi ngoài tỉnh không có trong bảng tổ chức —
+            // trước đây rơi vào nhánh "không tìm thấy tổ chức" và không bao giờ phản hồi).
+            if (PublishNationalStatusUseCase.isNationalIncoming(fields)) {
+                publishNationalStatusUseCase.execute(request);
                 return;
             }
             String sendLogId = asString(fields.get(SEND_LOG_ID_FIELD));
@@ -103,7 +111,10 @@ public class PublishVbdiReplyStatusUseCase {
                     request.getStatusCode(), sendLogId, senderIdentifier);
                 return;
             }
-            String targetTenantId = orgOptional.get().getLinkedTenantId();
+            // 12/10/2026: bên gửi là đơn vị/phòng con (không khai báo linked_tenant_id) -> tenant của tổ
+            // tiên gần nhất (OrganizationTenantLookup); chỉ khi cả chuỗi không khai báo mới fallback bên dưới.
+            String targetTenantId = com.td.application.sharedcore.OrganizationTenantLookup
+                .resolveLinkedTenantId(organizationRepository, orgOptional.get()).orElse(null);
             if (targetTenantId == null || targetTenantId.isBlank()) {
                 // Bugfix 07/09/2026 (5, bao loi nguoi dung: publish "im lang" khong log gi, td-woker
                 // khong nhan duoc message nao) - doi chieu lai AddVbdiSendLogUseCase#resolveTargetTenantId

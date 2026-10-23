@@ -18,7 +18,6 @@ public class UpdateDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
-    private final DocumentSearchService documentSearchService;
     private final DocumentLogService documentLogService;
 
     public Result<UUID> execute(UpdateDocumentRequest request) {
@@ -104,7 +103,6 @@ public class UpdateDocumentUseCase {
             );
 
             var saved = documentRepository.save(document);
-            documentSearchService.index(saved);
             documentCacheService.evict(saved.getId());
             documentCacheService.evictAllListCaches();
             documentLogService.logUpdate(saved.getId(), before, DocumentDtoMapper.map(saved));

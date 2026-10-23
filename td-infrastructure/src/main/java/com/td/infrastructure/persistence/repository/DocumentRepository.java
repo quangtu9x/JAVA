@@ -320,6 +320,7 @@ public abstract class DocumentRepository implements com.td.application.documents
             appendDynamicFieldValuePredicates(sql, parameters, advancedFilter.getIncludeFieldValues(), true);
             appendDynamicFieldValuePredicates(sql, parameters, advancedFilter.getExcludeFieldValues(), false);
             appendContainsAnyFieldValuePredicates(sql, parameters, advancedFilter.getContainsAnyFieldValues());
+            TextContainsSql.append(sql, parameters, advancedFilter.getTextContainsFieldValues(), true);
             if (advancedFilter.getMinReceivedDate() != null || advancedFilter.getMaxReceivedDate() != null) {
                 appendReceivedDateInRangePredicate(
                     sql, parameters, advancedFilter.getMinReceivedDate(), advancedFilter.getMaxReceivedDate());
@@ -439,6 +440,10 @@ public abstract class DocumentRepository implements com.td.application.documents
         appendStatusPredicate(sql, parameters, filter.getExcludeFieldValues(), false);
         appendDynamicFieldValuePredicates(sql, parameters, filter.getIncludeFieldValues(), true);
         appendDynamicFieldValuePredicates(sql, parameters, filter.getExcludeFieldValues(), false);
+        // 19/10/2026: TRƯỚC ĐÂY method này KHÔNG áp containsAnyFieldValues — tiêu chí Đơn vị xử lý/Người xử
+        // lý (CollapseVBden) bị bỏ qua âm thầm trên đường SQL (chỉ đường index tìm kiếm có áp).
+        appendContainsAnyFieldValuePredicates(sql, parameters, filter.getContainsAnyFieldValues());
+        TextContainsSql.append(sql, parameters, filter.getTextContainsFieldValues(), true);
 
         if (filter.getMinDeadline() != null || filter.getMaxDeadline() != null) {
             appendDeadlineInRangePredicate(sql, parameters, filter.getMinDeadline(), filter.getMaxDeadline());
@@ -681,15 +686,16 @@ public abstract class DocumentRepository implements com.td.application.documents
         if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
             sql.append("""
                  AND (
-                     LOWER(COALESCE(d.title, '')) LIKE :keyword
-                     OR LOWER(COALESCE(d.content, '')) LIKE :keyword
-                     OR LOWER(COALESCE(d.document_type, '')) LIKE :keyword
-                     OR LOWER(COALESCE(d.status, '')) LIKE :keyword
-                     OR LOWER(COALESCE(d.tags_json, '')) LIKE :keyword
-                     OR LOWER(COALESCE(d.attributes_json, '')) LIKE :keyword
+                     td_search_norm(COALESCE(d.title, '')) LIKE :keyword
+                     OR td_search_norm(COALESCE(d.content, '')) LIKE :keyword
+                     OR td_search_norm(COALESCE(d.document_type, '')) LIKE :keyword
+                     OR td_search_norm(COALESCE(d.status, '')) LIKE :keyword
+                     OR td_search_norm(COALESCE(d.tags_json, '')) LIKE :keyword
+                     OR td_search_norm(COALESCE(d.attributes_json, '')) LIKE :keyword
                  )
                 """);
-            parameters.put("keyword", "%" + request.getKeyword().trim().toLowerCase() + "%");
+            // 20/10/2026: không phân biệt dấu (td_search_norm — V1.0.75).
+            parameters.put("keyword", SearchTextSql.containsLike(request.getKeyword()));
         }
 
         if (request.getDocumentType() != null && !request.getDocumentType().isBlank()) {

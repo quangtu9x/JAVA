@@ -61,6 +61,14 @@ public class VbdenOrgViewFilter {
      */
     private Map<String, List<String>> containsAnyFieldValues;
 
+
+    /**
+     * 19/10/2026: field → chuỗi con, khớp ILIKE {@code %giá trị%} (không phân biệt hoa thường) — cho ô
+     * nhập TỰ DO của bộ lọc nâng cao (vd "Cơ quan ban hành", "Số, ký hiệu", "Ký hiệu/Tiêu đề hồ sơ") để
+     * không phải gõ đúng nguyên giá trị như {@link #containsAnyFieldValues}. Nhiều field kết hợp AND.
+     */
+    private Map<String, String> textContainsFieldValues;
+
     /** Khoảng ngày cho {@code deadline_date} (field động) — {@code null} ở 1 đầu = không giới hạn đầu đó. */
     private LocalDate minDeadline;
     private LocalDate maxDeadline;

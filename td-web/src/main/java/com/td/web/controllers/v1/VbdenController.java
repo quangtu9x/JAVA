@@ -81,6 +81,7 @@ import com.td.application.vbden.XoaVanBanDenUseCase;
 import com.td.application.vbden.PhucHoiVanBanDenRequest;
 import com.td.application.vbden.PhucHoiVanBanDenUseCase;
 import com.td.application.vbden.VbdenDuplicateDto;
+import com.td.application.vbden.VbdenStatisticsGroupRequest;
 import com.td.application.vbden.VbdenQuaTrinhXuLyRequest;
 import com.td.application.vbden.VBdenChuyenVanBanPhapQuyRequest;
 import com.td.application.vbden.VBdenChuyenVanBanPhapQuyUseCase;
@@ -283,6 +284,20 @@ public class VbdenController extends BaseController {
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getView(
             @Valid @RequestBody ViewQueryRequest request) {
         return ok(viewQueryService.execute(DB_TYPE, request));
+    }
+
+    @PostMapping("/GetViewGroups")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Cây thống kê văn bản đến theo người/đơn vị chủ trì",
+        description = "Port trực tiếp hai Domino view theonguoichutri và theodonvichutri; "
+            + "trả response tương thích GroupTableVbden cũ.")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getViewGroups(
+            @Valid @RequestBody VbdenStatisticsGroupRequest request) {
+        var result = viewQueryService.executeVbdenStatisticsGroups(request);
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("type", result.type());
+        properties.put("total_group", result.totalGroup());
+        return ResponseEntity.ok(ApiResponse.success(result.data(), result.total(), properties));
     }
 
     @PostMapping("/QuaTrinhXuLy")

@@ -295,9 +295,9 @@ public class PostgresPhieuTrinhTdDocumentRepository implements PhieuTrinhTdDocum
                     continue;
                 }
                 String param = "contains" + index++;
-                sql.append(" AND LOWER(COALESCE(d.dynamic_fields->>'").append(entry.getKey())
+                sql.append(" AND td_search_norm(COALESCE(d.dynamic_fields->>'").append(entry.getKey())
                     .append("', '')) LIKE :").append(param);
-                parameters.put(param, "%" + entry.getValue().trim().toLowerCase() + "%");
+                parameters.put(param, SearchTextSql.containsLike(entry.getValue())); // 20/10/2026: không phân biệt dấu
             }
         }
         if (criteria.getCreatedFrom() != null) {

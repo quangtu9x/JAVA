@@ -5,6 +5,7 @@ import com.td.application.common.models.PaginationResponse;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.documents.SearchDocumentsRequest;
 import com.td.application.documentlinks.DocumentLinkService;
 import com.td.application.documents.FileDto;
 import com.td.application.documents.ListDocumentFilesByProcessUseCase;
@@ -33,6 +34,8 @@ import com.td.application.vbden.ChuyenXuLyVbdenUseCase;
 import com.td.application.vbden.VbdenResDocumentRepository;
 import com.td.application.vbden.VbdenStatusService;
 import com.td.application.vbden.XinYKienDocumentRepository;
+import com.td.application.vbden.VbdenStatisticsGroupRequest;
+import com.td.application.vbden.VbdenStatisticsGroupResult;
 import com.td.application.vbcddh.CapNhatTienDoUseCase;
 import com.td.application.vbcddh.VbcddhDocumentRepository;
 import com.td.application.phieutrinhtd.PhieuTrinhTdDocumentRepository;
@@ -50,6 +53,7 @@ import com.td.domain.vbden.XinYKienDocument;
 import com.td.domain.vbdi.VbdiDocument;
 import com.td.domain.sharedcore.AppUser;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -64,12 +68,14 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -77,10 +83,14 @@ import java.util.UUID;
  * truy vấn cụ thể. View tối thiểu: {@code vwDocument_ChoXuLy}, {@code vwuserbyusername},
  * {@code vwuserbyparentid}.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ViewQueryService {
+
+    private static final String VIEW_VBDEN_THEO_NGUOI_CHU_TRI = "theonguoichutri";
+    private static final String VIEW_VBDEN_THEO_DON_VI_CHU_TRI = "theodonvichutri";
 
     static final String VIEW_DOCUMENT_CHO_XU_LY = "vwdocument_choxuly";
     // Slice 7: FE gui viewname="chutri" (khong phai "vwdocument_choxuly") cho tab "Cho xu ly" mac
@@ -708,6 +718,13 @@ public class ViewQueryService {
     static final String VIEW_DUTHAO_TOANBO_TOCHUC = "toanbotochuc";
     private static final List<String> DUTHAO_TOANBO_TOCHUC_ORG_FIELDS =
         List.of("unit_publish_identifier", "unit_identifier", "unit_in_charge_identifier");
+    /**
+     * 17/10/2026 (bỏ Elasticsearch Domino — FE route duthao/tracuu/xuly/toanbocoquan|toanbodonvi|toanbophong trước
+     * gọi qlvb/tichhop/GetViewEs): dự thảo của 1 tổ chức theo CẤP do FE chọn — khoá = mã định danh cấp cơ quan /
+     * đơn vị / phòng của chính người dùng (FE getIdentifierByLevel 3/4/5), PHẢI là mã của chính họ
+     * ({@link #isOwnIdentifier}). Phạm vi = cùng 3 trường mã định danh như {@link #VIEW_DUTHAO_TOANBO_TOCHUC}.
+     */
+    static final String VIEW_DUTHAO_BY_UNIT = "vw_by_unit";
 
     static final String VIEW_DUTHAO_USER_CREATOR = "vwuser_creator";
     static final String VIEW_DUTHAO_CREATOR_DRAFTING = "vwcreator_drafting";
@@ -789,6 +806,29 @@ public class ViewQueryService {
     static final String VIEW_DUTHAO_CHODUYETKYBANHANHMC_SIGNER = "vwchoduyetkybanhanhmc_signer_internal";
     static final String VIEW_DUTHAO_CHODUYETKYBANHANHMC_HANDLER = "vwchoduyetkybanhanhmc_handler_internal";
     private static final String DUTHAO_MC_MAHS_FIELD = "mc_mahs";
+    // 22/10/2026 (cutover FE route duthao/xuly/chokybanhanh|mcchokybanhanh, trước gọi Domino): 2 view THẬT, gộp
+    // 2 nhánh trên trong 1 query OR (findByFieldStatusBranches) - cùng nhánh với số đếm nên danh sách khớp badge.
+    // Khác Domino ở chỗ khoá đi theo nhánh: Domino cột khoá luôn gồm user_signer (kể cả dự thảo status 9) -
+    // giữ theo số đếm đã port để danh sách = badge.
+    static final String VIEW_DUTHAO_CHODUYETKYBANHANH = "vwchoduyetkybanhanh";
+    static final String VIEW_DUTHAO_CHODUYETKYBANHANHMC = "vwchoduyetkybanhanhmc";
+
+    // 22/10/2026 - 4 view tra cứu/thùng rác còn gọi Domino (view_duthao.dxl), khoá đều là username:
+    //   vwCreator_UserCreate (dxl 1415, "Là người tạo"): Form="draft_document", khoá user_creator, mọi status.
+    //   vwCreator_UserSigned (dxl 1515, "Là người ký"): như trên, khoá user_signer.
+    //   vwDraft_Rated (dxl 1445, "Đánh giá văn bản"): draft_rate != "", khoá user_creator:user_signer:user_pre_signer.
+    //   vwUser_Assignment_Table_Created (dxl 1545): tinhtrangphancong = "Đã phân công", khoá author (đơn giản
+    //     hoá thành user_creator - cùng quyết định của VIEW_DUTHAO_USER_INVOKED); bỏ phần tử khoá "all".
+    //   vwUser_Draft_Deleted (dxl 1280, thùng rác): Domino đổi Form sang draft_document_Deleted; Java = xoá mềm
+    //     (deleted_on, DeleteDuThaoUseCase) - khoá user_creator.
+    static final String VIEW_DUTHAO_CREATOR_USERCREATE = "vwcreator_usercreate";
+    static final String VIEW_DUTHAO_CREATOR_USERSIGNED = "vwcreator_usersigned";
+    static final String VIEW_DUTHAO_DRAFT_RATED = "vwdraft_rated";
+    static final String VIEW_DUTHAO_USER_ASSIGNMENT_TABLE_CREATED = "vwuser_assignment_table_created";
+    static final String VIEW_DUTHAO_USER_DRAFT_DELETED = "vwuser_draft_deleted";
+    private static final String DUTHAO_DRAFT_RATE_FIELD = "draft_rate";
+    private static final String DUTHAO_TINH_TRANG_PHAN_CONG_FIELD = "tinhtrangphancong";
+    private static final String DUTHAO_DA_PHAN_CONG = "Đã phân công";
 
     // =====================================================================================
     // DT-002 - PORT LOAT 2 (25/08/2026): 19 view hang doi con lai dung boi FE (SystemsPageDuThao
@@ -1222,6 +1262,195 @@ public class ViewQueryService {
     private final com.td.application.phieutrinhtd.PhieuTrinhTdViewQuery phieuTrinhTdViewQuery;
     // 09/10/2026: delegation_obj lãnh đạo (vwuserleaderbyparentid) lấy từ bảng user_delegations.
     private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
+    // 17/10/2026: tìm kiếm nâng cao đọc index tìm kiếm (Elasticsearch) — docs/analysis/27. Không dùng được thì SQL.
+    private final com.td.application.search.AdvancedSearchIndex advancedSearchIndex;
+
+    /**
+     * Port trực tiếp hai categorized view Domino:
+     * {@code view_vanbanden_theonguoichutri.dxl} và
+     * {@code view_vanbanden_theodonvichutri.dxl}. Cây có đúng 4 cấp: chủ trì, trạng thái quy đổi,
+     * năm và tháng của {@code promulgation_date}. Vị trí node giữ dạng Domino (1, 1.2, ...), để FE
+     * hiện tại có thể mở dần từng cấp mà không phụ thuộc giá trị category.
+     */
+    public VbdenStatisticsGroupResult executeVbdenStatisticsGroups(VbdenStatisticsGroupRequest request) {
+        String viewname = request.getViewname() == null ? "" : request.getViewname().trim().toLowerCase(Locale.ROOT);
+        boolean byUser = VIEW_VBDEN_THEO_NGUOI_CHU_TRI.equals(viewname);
+        if (!byUser && !VIEW_VBDEN_THEO_DON_VI_CHU_TRI.equals(viewname)) {
+            throw new IllegalArgumentException("View thống kê văn bản đến chưa được hỗ trợ: " + request.getViewname());
+        }
+
+        StatisticsNode root = buildVbdenStatisticsTree(byUser);
+        String nodePosition = request.getNode() == null || request.getNode().isBlank()
+            ? "#" : request.getNode().trim();
+        StatisticsNode selected = "#".equals(nodePosition) ? root : findStatisticsNode(root, nodePosition);
+        if (selected == null) {
+            return new VbdenStatisticsGroupResult(List.of(), 0, 0, "isCategory");
+        }
+
+        List<StatisticsNode> children = sortedStatisticsChildren(selected);
+        if (children.isEmpty()) {
+            List<Map<String, Object>> documents = selected.documents.stream()
+                .map(document -> toFilteredDocumentFields(document, request.getItems()))
+                .toList();
+            return new VbdenStatisticsGroupResult(documents, documents.size(), 0, "listdoc");
+        }
+
+        int pageSize = request.isGetallchild() ? 2000 : Math.max(request.getPageSize(), 1);
+        int pageNumber = Math.max(request.getPageNumber(), 1);
+        int fromIndex = request.isGetallchild() ? 0 : Math.min((pageNumber - 1) * pageSize, children.size());
+        int toIndex = Math.min(fromIndex + pageSize, children.size());
+        List<Map<String, Object>> data = new ArrayList<>();
+        for (int index = fromIndex; index < toIndex; index++) {
+            StatisticsNode child = children.get(index);
+            String key = "#".equals(nodePosition)
+                ? String.valueOf(index + 1)
+                : nodePosition + "." + (index + 1);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("key", key);
+            item.put("name", child.name);
+            item.put("count", child.count);
+            item.put("children", List.of());
+            data.add(item);
+        }
+        return new VbdenStatisticsGroupResult(data, selected.count, children.size(), "isCategory");
+    }
+
+    private StatisticsNode buildVbdenStatisticsTree(boolean byUser) {
+        StatisticsNode root = new StatisticsNode("#", -1);
+        SearchDocumentsRequest search = new SearchDocumentsRequest();
+        search.setDocumentType("vbden");
+        search.setSortBy("createdOn");
+        search.setSortDirection("desc");
+
+        int pageNumber = 0;
+        Page<BusinessDocument> page;
+        do {
+            page = documentRepository.search(search, PageRequest.of(pageNumber++, 1000));
+            for (BusinessDocument document : page.getContent()) {
+                Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(
+                    document.getDynamicFieldsJson());
+                if (stringValue(fields.get("identifier_creator")).isBlank()) {
+                    continue;
+                }
+                Set<String> owners = byUser
+                    ? statisticsMembers(fields, "user_process", "user_receiver", "user_processing", "user_processed")
+                    : statisticsMembers(fields, "unit_process", "unit_process_registered");
+                if (owners.isEmpty()) {
+                    owners = Set.of("Không xác định");
+                }
+                String normalizedStatus = "3".equals(document.getStatus()) || "4".equals(document.getStatus())
+                    ? "04" : "02";
+                LocalDate promulgationDate = parseStatisticsDate(fields.get("promulgation_date"));
+                String year = promulgationDate == null ? "0" : String.valueOf(promulgationDate.getYear());
+                String month = promulgationDate == null ? "0" : String.valueOf(promulgationDate.getMonthValue());
+                for (String owner : owners) {
+                    addStatisticsDocument(root, List.of(owner, normalizedStatus, year, month), document);
+                }
+            }
+        } while (page.hasNext());
+        return root;
+    }
+
+    private Set<String> statisticsMembers(Map<String, Object> fields, String... fieldNames) {
+        Set<String> result = new LinkedHashSet<>();
+        for (String fieldName : fieldNames) {
+            Object value = fields.get(fieldName);
+            if (value instanceof Iterable<?> values) {
+                values.forEach(item -> addStatisticsMember(result, item));
+            } else {
+                addStatisticsMember(result, value);
+            }
+        }
+        return result;
+    }
+
+    private void addStatisticsMember(Set<String> result, Object value) {
+        if (value == null) return;
+        for (String part : String.valueOf(value).split(";")) {
+            String member = part.trim();
+            if (!member.isBlank()) result.add(member);
+        }
+    }
+
+    private LocalDate parseStatisticsDate(Object value) {
+        String raw = stringValue(value);
+        if (raw.isBlank()) return null;
+        for (DateTimeFormatter formatter : List.of(
+                DateTimeFormatter.ofPattern("dd/MM/yyyy"), DateTimeFormatter.ISO_LOCAL_DATE)) {
+            try {
+                return LocalDate.parse(raw.length() > 10 ? raw.substring(0, 10) : raw, formatter);
+            } catch (RuntimeException ignored) {
+                // Dữ liệu migrate có thể lẫn hai định dạng; thử định dạng kế tiếp.
+            }
+        }
+        return null;
+    }
+
+    private void addStatisticsDocument(
+            StatisticsNode root, List<String> path, BusinessDocument document) {
+        StatisticsNode current = root;
+        current.count++;
+        for (int level = 0; level < path.size(); level++) {
+            String name = path.get(level);
+            int childLevel = level;
+            current = current.children.computeIfAbsent(name, ignored -> new StatisticsNode(name, childLevel));
+            current.count++;
+        }
+        current.documents.add(document);
+    }
+
+    private StatisticsNode findStatisticsNode(StatisticsNode root, String position) {
+        StatisticsNode current = root;
+        for (String segment : position.split("\\.")) {
+            int index;
+            try {
+                index = Integer.parseInt(segment) - 1;
+            } catch (NumberFormatException ex) {
+                return null;
+            }
+            List<StatisticsNode> children = sortedStatisticsChildren(current);
+            if (index < 0 || index >= children.size()) return null;
+            current = children.get(index);
+        }
+        return current;
+    }
+
+    private List<StatisticsNode> sortedStatisticsChildren(StatisticsNode node) {
+        List<StatisticsNode> children = new ArrayList<>(node.children.values());
+        Comparator<StatisticsNode> ascending = Comparator.comparing(
+            child -> child.name, String.CASE_INSENSITIVE_ORDER);
+        if (!children.isEmpty() && children.get(0).level >= 2) {
+            ascending = Comparator.comparingInt((StatisticsNode child) -> parseStatisticsNumber(child.name))
+                .reversed();
+        }
+        children.sort(ascending);
+        return children;
+    }
+
+    private int parseStatisticsNumber(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private static final class StatisticsNode {
+        private final String name;
+        private final int level;
+        private final Map<String, StatisticsNode> children = new LinkedHashMap<>();
+        private final List<BusinessDocument> documents = new ArrayList<>();
+        private int count;
+
+        private StatisticsNode(String name, int level) {
+            this.name = name;
+            this.level = level;
+        }
+    }
 
     public PaginationResponse<Map<String, Object>> execute(String dbType, ViewQueryRequest request) {
         // 06/10/2026 (cutover FE phieu trinh): moi view phieu trinh (ten view Domino that, nhieu ten TRUNG
@@ -1239,6 +1468,18 @@ public class ViewQueryService {
         // (CollapseHoSoCV, object "search") trước đây CHỈ áp cho VIEW_HOSOCV_TOAN_BO — mọi hàng đợi
         // hồ sơ cá nhân khác bỏ qua. Tính 1 lần, truyền vào queryHoSoCVPersonalQueue*.
         VbdenOrgViewFilter hoSoCVSearch = buildHoSoCVAdvancedSearchFilter(request.getSearch());
+        // 19/10/2026 (báo lỗi "Phối hợp dự thảo -> lọc vẫn ra dữ liệu cũ"): bộ lọc dự thảo
+        // (CollapseVBduthao, object "search") trước đây CHỈ áp cho VIEW_DUTHAO_TOANBO_TOCHUC — mọi hàng
+        // đợi dự thảo khác bỏ qua. Tính 1 lần, gộp vào filter của từng view qua withDuThaoSearch.
+        VbdenOrgViewFilter duThaoSearch = buildDuThaoAdvancedSearchFilter(request.getSearch());
+        // 19/10/2026 (cùng đợt): bộ lọc văn bản đến (CollapseVBden) trước đây chỉ áp ~6/58 view vbden
+        // (toanbovanban, theodoi...). Chỉ tính cho dbType vbden — vài viewname dùng chung module khác.
+        VbdenOrgViewFilter vbdenSearch = "vbden".equalsIgnoreCase(dbType)
+            ? buildAdvancedSearchFilter(request.getSearch()) : null;
+        // 19/10/2026 (cùng đợt): bộ lọc văn bản đi (CollapseVBdi) trước đây chỉ áp "Toàn bộ"
+        // (vwCreator_DocumentOut_All) — mọi hàng đợi vbdi khác bỏ qua. Gộp qua withVbdiSearch.
+        VbdiDocumentOutFilter vbdiSearch = "vbdi".equalsIgnoreCase(dbType)
+            ? buildVbdiAdvancedSearchFilter(request.getSearch()) : null;
 
         // 09/10/2026 (port "Sử dụng xin ý kiến" - Văn bản đi -> Tra cứu "VB xin ý kiến TVUB/BTV..."):
         // truoc day FE vbdi/xinykien goi Domino qlvb/view/query. Xem queryVbdiXinYKienView.
@@ -1250,39 +1491,39 @@ public class ViewQueryService {
 
         return switch (viewname) {
             case VIEW_DOCUMENT_CHO_XU_LY, VIEW_VBDEN_CHUTRI ->
-                queryDocumentsChoXuLy(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DOCUMENT_DA_XU_LY -> queryDocumentsDaXuLy(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryDocumentsChoXuLy(dbType, vbdenSearch, key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DOCUMENT_DA_XU_LY -> queryDocumentsDaXuLy(dbType, vbdenSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_QTXL_BY_PARENT_ID -> queryChildrenByParentId(dbType, key, request.getItems(), pageable);
             case VIEW_USER_BY_USERNAME -> queryUserByUsername(key, request.getItems(), pageable);
             case VIEW_USER_BY_PARENT_ID -> queryUsersByParentId(key, request.getItems(), keyword, pageable);
             case VIEW_USER_LEADER_BY_PARENT_ID -> queryUserLeadersByParentId(key, request.getItems(), pageable);
             case VIEW_VANDI_CHO_BAN_HANH ->
-                queryVbdiByStatus(dbType, VbdiStatus.PENDING_SIGNATURE, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiByStatus(dbType, vbdiSearch, VbdiStatus.PENDING_SIGNATURE, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VANDI_DA_BAN_HANH ->
-                queryVbdiByStatus(dbType, VbdiStatus.ISSUED, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiByStatus(dbType, vbdiSearch, VbdiStatus.ISSUED, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_DOCUMENTOUT_TEXTBOOK ->
-                queryVbdiDocumentOutTextBook(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutTextBook(dbType, vbdiSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_KIEMTRUNGVB ->
                 queryVbdiKiemTrungVanBan(dbType, key, request.getItems(), pageable);
             case VIEW_VBDI_DOCUMENTOUT_TODAY, VIEW_VBDI_DOCUMENTOUT_YESTERDAY,
                  VIEW_VBDI_DOCUMENTOUT_THISWEEK, VIEW_VBDI_DOCUMENTOUT_THISMONTH ->
-                queryVbdiDocumentOutByDateRange(dbType, key, viewname, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutByDateRange(dbType, vbdiSearch, key, viewname, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SNV_NCC ->
-                queryVbdiDocumentOutBySnvCategory(dbType, key, SNV_FILTER_NCC, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutBySnvCategory(dbType, vbdiSearch, key, SNV_FILTER_NCC, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SNV_BHTN ->
-                queryVbdiDocumentOutBySnvCategory(dbType, key, SNV_FILTER_BHTN, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutBySnvCategory(dbType, vbdiSearch, key, SNV_FILTER_BHTN, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SNV_GPLD ->
-                queryVbdiDocumentOutBySnvCategory(dbType, key, SNV_FILTER_GPLD, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutBySnvCategory(dbType, vbdiSearch, key, SNV_FILTER_GPLD, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SNV_HANHCHINH ->
-                queryVbdiDocumentOutBySnvCategory(dbType, key, SNV_FILTER_HANHCHINH, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutBySnvCategory(dbType, vbdiSearch, key, SNV_FILTER_HANHCHINH, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_DOCUMENTOUT_BYTEXTBOOK ->
-                queryVbdiDocumentOutByTextBook(dbType, request.getKeys(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutByTextBook(dbType, vbdiSearch, request.getKeys(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_BY_AUTHOR ->
-                queryVbdiFieldContainsNoStatus(dbType, "author", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiFieldContainsNoStatus(dbType, vbdiSearch, "author", key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_BY_USER_DRAFT ->
-                queryVbdiFieldContainsNoStatus(dbType, "user_draft", resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiFieldContainsNoStatus(dbType, vbdiSearch, "user_draft", resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_TOANBO_ALL_BO ->
-                queryVbdiByFieldsEquals(dbType, key, List.of("unit_publish_identifier"), VbdiStatus.ISSUED,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key, List.of("unit_publish_identifier"), VbdiStatus.ISSUED,
                     null, request.getItems(), keyword, keywordColumns, pageable);
             // 09/09/2026 (yeu cau nguoi dung cutover route dashboard tu Domino qlvb/tichhop/TimKiem?
             // databasetype=vbdi, bo qua Elasticsearch): view nay CHINH LA "toan bo van ban di cua to
@@ -1297,17 +1538,14 @@ public class ViewQueryService {
             // nhung case nay lúc port (09/09/2026) chi liet ke 3, thieu "unit_creator_identifier" - bo
             // sung du 4 de KHONG bi hep pham vi ket qua sau khi FE khong con fallback qua Elastic nua.
             case VIEW_VBDI_DOCUMENTOUT_ALL ->
-                queryVbdiByFieldsEquals(dbType, (key != null && !key.isBlank()) ? key : resolveCurrentIdentifier(),
-                    List.of("unit_publish_identifier", "unit_identifier", "unit_in_charge_identifier",
-                        "unit_creator_identifier"),
-                    VbdiStatus.ISSUED, null, buildVbdiAdvancedSearchFilter(request.getSearch()),
-                    request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiDocumentOutAll(dbType, (key != null && !key.isBlank()) ? key : resolveCurrentIdentifier(),
+                    buildVbdiAdvancedSearchFilter(request.getSearch()), request.getItems(), keyword, keywordColumns, pageable);
             // Pham vi = "toan bo van ban di cua to chuc" da ban hanh (cung 4 field identifier tren,
             // identifier LUON resolve server-side); "Trich yeu" (trichyeu) di qua keyword tren subject.
             case VIEW_VBDI_REPORT_DOCUMENT_REGISTER -> {
                 String trichYeu = asString(request.getSearch() == null ? null : request.getSearch().get("trichyeu"));
                 boolean hasTrichYeu = trichYeu != null && !trichYeu.isBlank();
-                yield queryVbdiByFieldsEquals(dbType, resolveCurrentIdentifier(),
+                yield queryVbdiByFieldsEquals(dbType, vbdiSearch, resolveCurrentIdentifier(),
                     List.of("unit_publish_identifier", "unit_identifier", "unit_in_charge_identifier",
                         "unit_creator_identifier"),
                     VbdiStatus.ISSUED, null, buildVbdiInSoFilter(request.getSearch()),
@@ -1315,7 +1553,7 @@ public class ViewQueryService {
                     hasTrichYeu ? List.of("subject") : null, pageable);
             }
             case VIEW_VBDI_USER_ALL ->
-                queryVbdiByFieldsContainsMember(dbType,
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch,
                     resolveUsernameToken(key),
                     List.of("user_creator", "user_draft", "coordinator_hide_rtext", "userxemdebiet"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
@@ -1326,19 +1564,19 @@ public class ViewQueryService {
             // lieu ghi qua Java. Doc ten thuong truoc, giu ten camelCase lam fallback (du lieu Domino neu
             // migrate nguyen key goc).
             case VIEW_VBDI_WAITING_TO_SEND ->
-                queryVbdiDocumentOutTextBookLike(dbType, key, VbdiStatus.ISSUED,
+                queryVbdiDocumentOutTextBookLike(dbType, vbdiSearch, key, VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'send_agent', '') = '0' AND COALESCE(d.dynamic_fields->>'deletelistwaitingtosend', d.dynamic_fields->>'deletelistWaitingToSend', '') != '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SENT ->
-                queryVbdiDocumentOutTextBookLike(dbType, key, VbdiStatus.ISSUED,
+                queryVbdiDocumentOutTextBookLike(dbType, vbdiSearch, key, VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'send_agent', '') = '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_REVOKE ->
-                queryVbdiByFieldsEquals(dbType, key, List.of("user_creator", "unit_creator_identifier"),
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key, List.of("user_creator", "unit_creator_identifier"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'revoke_documentout', d.dynamic_fields->>'revoke_documentOut', '') = '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_REPLY_REFUSE ->
-                queryVbdiByFieldsEquals(dbType, key,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key,
                     List.of("user_creator", "unit_creator_identifier", "unit_publish_identifier", "user_draft"),
                     VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'is_document_reply', '') = '1'"
@@ -1346,94 +1584,94 @@ public class ViewQueryService {
                         + " AND COALESCE(d.dynamic_fields->>'is_unit_reply_refuse', '') = '1')",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_REPLY_DRAFTOR ->
-                queryVbdiByFieldsEquals(dbType, key,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key,
                     List.of("user_creator", "unit_creator_identifier", "unit_publish_identifier"),
                     VbdiStatus.RETURNED_BY_CLERK, null, request.getItems(), keyword, keywordColumns, pageable);
             // xem javadoc VIEW_VBDI_CREATOR_DOCUMENTOUT_REFUSE/_REPLY.
             case VIEW_VBDI_CREATOR_DOCUMENTOUT_REFUSE ->
-                queryVbdiByFieldsEquals(dbType, key,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key,
                     List.of("user_creator", "unit_creator_identifier"),
                     VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'unit_reply_refuse', '') != ''"
                         + " AND COALESCE(d.dynamic_fields->>'is_unit_reply_refuse', '') = '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_CREATOR_DOCUMENTOUT_REPLY ->
-                queryVbdiByFieldsEquals(dbType, key,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key,
                     List.of("user_creator", "unit_creator_identifier", "unit_publish_identifier", "user_draft"),
                     VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'is_document_reply', '') = '1'"
                         + " AND COALESCE(d.dynamic_fields->>'deletelistwaitingtosend', d.dynamic_fields->>'deletelistWaitingToSend', '') != '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_DOCUMENT_REPLACE ->
-                queryVbdiByFieldsEquals(dbType, key,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key,
                     List.of("user_creator", "unit_creator_identifier", "unit_publish_identifier"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'document_replace_retrieve', '') = '4'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_COORDINATER_RECEIVE ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key), List.of("usercoordinater"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key), List.of("usercoordinater"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'isgiveopinion', '') != '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_COORDINATER ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key), List.of("usercoordinater_send"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key), List.of("usercoordinater_send"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_CHO_XEM_DE_BIET ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key),
                     List.of("coordinator_hide_not_seen_rtext", "userxemdebiet"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_XEM_DE_BIET ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key), List.of("userxemdebiet_send"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key), List.of("userxemdebiet_send"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'userxemdebiet', '') != ''",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SEND_NO_RESPONSE ->
-                queryVbdiSendNoResponse(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiSendNoResponse(dbType, vbdiSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_XULY ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key), List.of("userchuyenxuly"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key), List.of("userchuyenxuly"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'userchuyenxuly', '') != ''",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_NHANXEMDEBIET ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key), List.of("userxemdebiet"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key), List.of("userxemdebiet"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'userxemdebiet', '') != ''",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_DAXEMDEBIET ->
-                queryVbdiByFieldsContainsMember(dbType, resolveUsernameToken(key), List.of("coordinator_hide_seen_rtext"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, resolveUsernameToken(key), List.of("coordinator_hide_seen_rtext"),
                     VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'coordinator_hide_seen_rtext', '') != ''",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_NHANDEBIET_UNSEEN ->
-                queryVbdiByFieldsContainsMember(dbType, key,
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, key,
                     List.of("coordinator_hide_not_seen_rtext", "userxemdebiet"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_NHANDEBIET_SEEN ->
-                queryVbdiByFieldsContainsMember(dbType, key, List.of("coordinator_hide_seen_rtext"),
+                queryVbdiByFieldsContainsMember(dbType, vbdiSearch, key, List.of("coordinator_hide_seen_rtext"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_BAOCAO_CHUA_XEM ->
-                queryVbdiBaoCaoChuaXem(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiBaoCaoChuaXem(dbType, vbdiSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_DRAFTING_MC ->
-                queryVbdiByFieldsEquals(dbType, key,
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key,
                     List.of("unit_publish_identifier", "unit_publish_identifier_other"),
                     VbdiStatus.DRAFT, "COALESCE(d.dynamic_fields->>'mc_madv', '') != ''",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_GROUP_BY_SIGNER ->
-                queryVbdiByFieldsEqualsUnvalidated(dbType, key, List.of("user_signer"), VbdiStatus.ISSUED,
+                queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, key, List.of("user_signer"), VbdiStatus.ISSUED,
                     null, request.getItems(), keyword, keywordColumns, pageable);
             // xem javadoc VIEW_VBDI_SIGNER_DOCUMENTOUT_WAITINGTOSEND/_SENT.
             case VIEW_VBDI_SIGNER_DOCUMENTOUT_WAITINGTOSEND ->
-                queryVbdiByFieldsEqualsUnvalidated(dbType, key, List.of("user_signer"), VbdiStatus.ISSUED,
+                queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, key, List.of("user_signer"), VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'send_agent', '') = '0'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_SIGNER_DOCUMENTOUT_SENT ->
-                queryVbdiByFieldsEqualsUnvalidated(dbType, key, List.of("user_signer"), VbdiStatus.ISSUED,
+                queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, key, List.of("user_signer"), VbdiStatus.ISSUED,
                     "COALESCE(d.dynamic_fields->>'send_agent', '') = '1'",
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_GROUP_BY_DRAFTOR ->
-                queryVbdiByFieldsEqualsUnvalidated(dbType, key, List.of("user_draft"), VbdiStatus.ISSUED,
+                queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, key, List.of("user_draft"), VbdiStatus.ISSUED,
                     null, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_GROUP_UNIT_IN_CHARGE ->
-                queryVbdiByFieldsEquals(dbType, key, List.of("unit_in_charge_identifier", "unit_identifier"),
+                queryVbdiByFieldsEquals(dbType, vbdiSearch, key, List.of("unit_in_charge_identifier", "unit_identifier"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_TRASH ->
                 queryVbdiTrash(dbType, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_PRIVATE_IMPORTANT ->
-                queryVbdiPrivateImportant(dbType, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdiPrivateImportant(dbType, vbdiSearch, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
             // Mo rong BL-240 (bugfix): doi "creator" -> "user_creator" (dung field TaoHoSoCVUseCase
             // that su stamp - xem javadoc lop do) + doi sang HoSoCVDocumentRepository (bang rieng
             // hosocv_documents, khong con la "documents" dung chung).
@@ -1452,10 +1690,30 @@ public class ViewQueryService {
             // chi hop nhat them cac tieu chi loc phu tu buildHoSoCVAdvancedSearchFilter.
             case VIEW_HOSOCV_TOAN_BO -> {
                 VbdenOrgViewFilter advancedFilter = buildHoSoCVAdvancedSearchFilter(request.getSearch());
+                // Bugfix 17/10/2026: trang tìm kiếm chung gửi từ khoá trong search.keyword (không ở cấp ngoài) —
+                // trước đây hosocv bỏ qua nên tìm theo từ khoá ở "Tìm kiếm hồ sơ" không có tác dụng.
+                String hoSoKeyword = (keyword != null && !keyword.isBlank()) ? keyword
+                    : asString(request.getSearch() == null ? null : request.getSearch().get("keyword"));
+                String username = resolveUsernameToken(key);
+                if (isSearchRequest(hoSoKeyword, advancedFilter) && username != null && !username.isBlank()) {
+                    VbdenOrgViewFilter indexFilter = (advancedFilter != null ? advancedFilter.toBuilder() : VbdenOrgViewFilter.builder())
+                        .orgFieldNames(List.of(HOSOCV_USER_CREATOR_FIELD))
+                        .orgValue(username.trim())
+                        .keyword(hoSoKeyword)
+                        .keywordColumns(hoSoCVKeywordColumns(keywordColumns))
+                        .build();
+                    PaginationResponse<Map<String, Object>> fromIndex = searchViaIndex("hosocv", "hosocv",
+                        com.td.application.search.AdvancedSearchTranslator.fromOrgView(indexFilter, dbType, false), pageable,
+                        hoSoCVDocumentRepository::findAllByIds,
+                        HoSoCVDocument::getId, document -> toFilteredDocumentFields(document, request.getItems()));
+                    if (fromIndex != null) {
+                        yield fromIndex;
+                    }
+                }
                 yield (advancedFilter != null)
-                    ? queryHoSoCVOrgView(dbType, HOSOCV_USER_CREATOR_FIELD, resolveUsernameToken(key),
-                        advancedFilter, request.getItems(), keyword, keywordColumns, pageable)
-                    : queryHoSoCVPersonalQueue(dbType, hoSoCVSearch, HOSOCV_USER_CREATOR_FIELD, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
+                    ? queryHoSoCVOrgView(dbType, HOSOCV_USER_CREATOR_FIELD, username,
+                        advancedFilter, request.getItems(), hoSoKeyword, keywordColumns, pageable)
+                    : queryHoSoCVPersonalQueue(dbType, hoSoCVSearch, HOSOCV_USER_CREATOR_FIELD, username, request.getItems(), hoSoKeyword, keywordColumns, pageable);
             }
             case VIEW_HOSOCV_USER_PROCESS_HANDLER ->
                 queryHoSoCVPersonalQueue(dbType, hoSoCVSearch, HOSOCV_USER_PROCESS_HANDLER_FIELD, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
@@ -1487,7 +1745,7 @@ public class ViewQueryService {
                 dbType, hoSoCVSearch, HOSOCV_USER_PROCESS_HANDLER_FIELD, HOSOCV_TRINHLANHDAODUYET_FIELD, List.of("3"),
                 resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_PROCESS_HANDLER_DEN_HAN_NOP_LUU_TRU -> queryHoSoCVDueDate(
-                dbType, HOSOCV_USER_PROCESS_HANDLER_FIELD, resolveUsernameToken(key), HOSOCV_STORAGE_DEADLINE_FIELD, false,
+                dbType, hoSoCVSearch, HOSOCV_USER_PROCESS_HANDLER_FIELD, resolveUsernameToken(key), HOSOCV_STORAGE_DEADLINE_FIELD, false,
                 Map.of(HOSOCV_STORAGED_FIELD, "0"), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_APPROVED_BY_TRINH_2 -> queryHoSoCVPersonalQueueWithStatus(
                 dbType, hoSoCVSearch, HOSOCV_USER_APPROVED_BY_FIELD, HOSOCV_TRINHLANHDAODUYET_FIELD, List.of("2"),
@@ -1497,12 +1755,12 @@ public class ViewQueryService {
             // VIEW_HOSOCV_COORDINATOR ("vwuser_coordinator") TRUNG ten voi VIEW_DUTHAO_USER_COORDINATOR
             // - xu ly gop trong case do (nhanh dbType="hosocv"), xem chu thich o day.
             case VIEW_HOSOCV_BY_COORDINATOR ->
-                queryHoSoCVListMember(dbType, HOSOCV_USER_COORDINATOR_FIELD, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
+                queryHoSoCVListMember(dbType, hoSoCVSearch, HOSOCV_USER_COORDINATOR_FIELD, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_COORDINATED_STATUS ->
                 // Khoa la "<username>_chua"/"<username>_da" (FE tu ghep username that truoc, xem
-                // ItemsList.jsx dong 173/178) - KHONG BAO GIO la macro "$username$" thuan, nhung goi
-                // resolveUsernameToken van AN TOAN (no-op neu key khac dung "$username$").
-                queryHoSoCVCoordinatedStatus(dbType, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
+                // ItemsList.jsx dong 173/178). 17/10/2026: kiem tra quyen tren PHAN username (tach hau to
+                // truoc) - resolveUsernameToken nay tu choi username khong phai chinh minh.
+                queryHoSoCVCoordinatedStatus(dbType, resolveUsernameWithStatusSuffix(key), request.getItems(), keyword, keywordColumns, pageable);
             // "vwtrash" TRUNG ten voi VIEW_HOSOLUUTRU_TRASH (module hosoluutru dung chung 1 hang so
             // rong hon - xem khai bao VIEW_HOSOLUUTRU_TOAN_BO...) - nhanh theo dbType, dung khuon
             // collision VIEW_DUTHAO_USER_COORDINATOR da dung.
@@ -1525,10 +1783,10 @@ public class ViewQueryService {
             case VIEW_HOSOCV_BY_DOCUMENT_PROFILES_TYPE ->
                 queryHoSoCVPersonalQueue(dbType, hoSoCVSearch, HOSOCV_CATEGORY_FIELD, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_USER_OVERDUE_PROCESSING -> queryHoSoCVDueDate(
-                dbType, HOSOCV_USER_PROCESS_HANDLER_FIELD, resolveUsernameToken(key), HOSOCV_DEADLINE_DATE_FIELD, true,
+                dbType, hoSoCVSearch, HOSOCV_USER_PROCESS_HANDLER_FIELD, resolveUsernameToken(key), HOSOCV_DEADLINE_DATE_FIELD, true,
                 Map.of(HOSOCV_STATUS_STATIC_FIELD, HOSOCV_STATUS_DANG_XU_LY), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_OVERDUE_PROCESSING -> queryHoSoCVDueDate(
-                dbType, null, null, HOSOCV_DEADLINE_DATE_FIELD, true,
+                dbType, hoSoCVSearch, null, null, HOSOCV_DEADLINE_DATE_FIELD, true,
                 Map.of(HOSOCV_STATUS_STATIC_FIELD, HOSOCV_STATUS_DANG_XU_LY), request.getItems(), keyword, keywordColumns, pageable);
             // Port module "Phieu trinh tham dinh" (phieutrinhtd), 09/09/2026 - xem khai bao hang so
             // VIEW_PHIEUTRINHTD_* + docs/analysis/20-phan-tich-port-phieutrinh-domino-sang-java.md muc 6.3.
@@ -1610,57 +1868,57 @@ public class ViewQueryService {
                 queryVbdenTrash(vbdenTrashBithuhoiFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_TRASH_REQUEST_FORM ->
                 queryVbdenTrash(vbdenTrashRequestFormFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_CAPTRENGIAO -> queryVbdenOrgView(dbType, captrengiaoFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_DENNOIBO -> queryVbdenOrgView(dbType, dennoiboFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_QUAMANGNOIBO -> queryVbdenOrgView(dbType, quamangnoiboFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_LIENTHONG -> queryVbdenOrgView(dbType, lienthongFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_DENDIENTU -> queryVbdenOrgView(dbType, dendientuFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_DENQUAMANG -> queryVbdenOrgView(dbType, denquamangFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_TUCHOIDENQUAMANG -> queryVbdenOrgView(dbType, tuChoiDenQuaMangFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_CAPTRENGIAO -> queryVbdenOrgView(dbType, vbdenSearch, captrengiaoFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_DENNOIBO -> queryVbdenOrgView(dbType, vbdenSearch, dennoiboFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_QUAMANGNOIBO -> queryVbdenOrgView(dbType, vbdenSearch, quamangnoiboFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_LIENTHONG -> queryVbdenOrgView(dbType, vbdenSearch, lienthongFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_DENDIENTU -> queryVbdenOrgView(dbType, vbdenSearch, dendientuFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_DENQUAMANG -> queryVbdenOrgView(dbType, vbdenSearch, denquamangFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_TUCHOIDENQUAMANG -> queryVbdenOrgView(dbType, vbdenSearch, tuChoiDenQuaMangFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_TOANBOVANBAN ->
-                queryVbdenOrgView(dbType, toanbovanbanFilter(request), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenToanBoVanBan(dbType, request, keyword, keywordColumns, pageable);
             case VIEW_VBDEN_PHAIXULY_CUATOCHUC ->
-                queryVbdenOrgView(dbType, phaixulyCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, phaixulyCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_QUAHAN_CUATOCHUC ->
-                queryVbdenOrgView(dbType, quahanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, quahanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DAXULY_QUAHAN_CUATOCHUC ->
-                queryVbdenOrgView(dbType, daxulyQuahanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, daxulyQuahanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DAXULY_DUNGHAN_CUATOCHUC ->
-                queryVbdenOrgView(dbType, daxulyDunghanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, daxulyDunghanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_SAPTOIHAN_CUATOCHUC ->
-                queryVbdenOrgView(dbType, saptoihanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, saptoihanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DENHAN_CUATOCHUC ->
-                queryVbdenOrgView(dbType, denhanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, denhanCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_CHOPHANXULY ->
-                queryVbdenOrgView(dbType, chophanxulyFilter(), request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDEN_CUATOCHUC -> queryVbdenOrgView(dbType, cuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, chophanxulyFilter(), request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_CUATOCHUC -> queryVbdenOrgView(dbType, vbdenSearch, cuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DAXULY_CUATOCHUC ->
-                queryVbdenOrgView(dbType, daxulyCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, daxulyCuatochucFilter(), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_KHONGVAOSO ->
-                queryVbdenOrgView(dbType, khongvaosoFilter(), request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenOrgView(dbType, vbdenSearch, khongvaosoFilter(), request.getItems(), keyword, keywordColumns, pageable);
             // dxl 14-45: N07 (Chờ phân phối) - user_distributor!="".
             case VIEW_VBDEN_CHOPHANPHOI ->
-                queryVbdenPersonalQueue(dbType, "user_distributor", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_distributor", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // 09/09/2026 (SoLuongCanXuLy) - xem javadoc VIEW_VBDEN_DENNOIBO_CHOXULY/VIEW_VBDEN_PHUTRACH_CHUAXEM.
             case VIEW_VBDEN_DENNOIBO_CHOXULY ->
-                queryVbdenPersonalQueue(dbType, "user_receiver", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_receiver", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             case VIEW_VBDEN_PHUTRACH_CHUAXEM ->
-                queryVbdenPersonalQueue(dbType, "user_manage", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_manage", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 2052-2077: "Đã phân phối" - user_distributed!="".
             case VIEW_VBDEN_DAPHANPHOI ->
-                queryVbdenPersonalQueue(dbType, "user_distributed", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_distributed", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 81-113: N10 Phối hợp - user_coordinate!="".
             case VIEW_VBDEN_PHOIHOP ->
-                queryVbdenPersonalQueue(dbType, "user_coordinate", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_coordinate", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 115-140: N10 Đã phối hợp - user_coordinated!="".
             case VIEW_VBDEN_DAPHOIHOP ->
-                queryVbdenPersonalQueue(dbType, "user_coordinated", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_coordinated", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 47-79: N10 Xem để biết - user_to_read!="".
             case VIEW_VBDEN_XEMDEBIET ->
-                queryVbdenPersonalQueue(dbType, "user_to_read", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_to_read", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 142-167: N10 Đã xem để biết - user_to_readed!="".
             case VIEW_VBDEN_DAXEMDEBIET ->
-                queryVbdenPersonalQueue(dbType, "user_to_readed", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_to_readed", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 743-768: N10 Theo dõi - user_track!="". Ho tro "tim kiem nang cao" (D.44) - xem
             // buildAdvancedSearchFilter. "theodoi_sort_thoihan" alias CUNG dieu kien (xem hang so).
             // 02/10/2026: sap xep theo dung view Domino - xem withTheoDoiSort.
@@ -1682,80 +1940,80 @@ public class ViewQueryService {
                     buildAdvancedSearchFilter(request.getSearch()), pageable);
             // dxl 1879-1904: N10 Đã chuyển phối hợp - user_coordinated_movement!="".
             case VIEW_VBDEN_DACHUYENPHOIHOP ->
-                queryVbdenPersonalQueue(dbType, "user_coordinated_movement", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_coordinated_movement", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 169-194: N06 Đã chuyển xử lý - user_delivered!="".
             case VIEW_VBDEN_DACHUYENXULY ->
-                queryVbdenPersonalQueue(dbType, "user_delivered", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_delivered", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 196-221: user_processed!="" - CHINH LA vwDocument_DaXuLy da co, tai dung.
-            case VIEW_VBDEN_DAKETTHUCXULY -> queryDocumentsDaXuLy(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDEN_DAKETTHUCXULY -> queryDocumentsDaXuLy(dbType, vbdenSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 618-642: N06 Đang xử lý - (status="1"|status="2") & key=user_processing.
             case VIEW_VBDEN_DANGXULY ->
                 queryVbdenPersonalQueueWithStatus(
-                    dbType, "user_processing",
+                    dbType, vbdenSearch, "user_processing",
                     List.of(VbdenStatusService.STATUS_QUA_HAN_DANG_XU_LY, VbdenStatusService.STATUS_CON_HAN_DANG_XU_LY),
                     key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 1161-1189: N06 Đã kết thúc XL quá hạn - status="3" & key=user_processed.
             case VIEW_VBDEN_DAKETTHUCXULY_QUAHAN ->
                 queryVbdenPersonalQueueWithStatus(
-                    dbType, "user_processed", List.of(VbdenStatusService.STATUS_QUA_HAN_DA_XU_LY),
+                    dbType, vbdenSearch, "user_processed", List.of(VbdenStatusService.STATUS_QUA_HAN_DA_XU_LY),
                     key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 1191-1218: N06 Đã chuyển XL quá hạn - (status="1"|status="3") & key=user_delivered.
             case VIEW_VBDEN_DACHUYENXULY_QUAHAN ->
                 queryVbdenPersonalQueueWithStatus(
-                    dbType, "user_delivered",
+                    dbType, vbdenSearch, "user_delivered",
                     List.of(VbdenStatusService.STATUS_QUA_HAN_DANG_XU_LY, VbdenStatusService.STATUS_QUA_HAN_DA_XU_LY),
                     key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 223-251: N11 Chủ trì quá hạn - (status="1"|status="3") & user_process!="".
             case VIEW_VBDEN_CHUTRIQUAHAN ->
                 queryVbdenPersonalQueueWithStatus(
-                    dbType, "user_process",
+                    dbType, vbdenSearch, "user_process",
                     List.of(VbdenStatusService.STATUS_QUA_HAN_DANG_XU_LY, VbdenStatusService.STATUS_QUA_HAN_DA_XU_LY),
                     key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 2532-2557: N11 Văn bản trả lại - user_returned!="".
             case VIEW_VBDEN_VANBANTRALAI ->
-                queryVbdenPersonalQueue(dbType, "user_returned", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_returned", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 1134-1159: N11 Đã thu hồi - user_recalled!="".
             case VIEW_VBDEN_DATHUHOI ->
-                queryVbdenPersonalQueue(dbType, "user_recalled", key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, "user_recalled", key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             case VIEW_VBDEN_CHUTRI_GROUP ->
-                queryChuTriGroup(dbType, request.getItems(), keyword, keywordColumns, pageable);
+                queryChuTriGroup(dbType, vbdenSearch, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 1220-1247: "toan bo VB den cua ca nhan" - union 9 field ca nhan, khong dieu kien status/ngay.
             case VIEW_VBDEN_CUACANHAN ->
-                queryVbdenPersonalQueue(dbType, VBDEN_CUACANHAN_FIELDS, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryVbdenPersonalQueue(dbType, VBDEN_CUACANHAN_FIELDS, key, request.getItems(), keyword, keywordColumns, vbdenSearch, pageable);
             // dxl 2504-2530: "sap den han (ca nhan)" - union 3 field ca nhan + status!=3/4 + 0<=deadline-today<=2 + document_type!=Giay moi.
             case VIEW_VBDEN_SAPDENHAN_CUACANHAN ->
-                querySapDenHanCuaCaNhan(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                querySapDenHanCuaCaNhan(dbType, vbdenSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             // N08 (31/08/2026) - xem javadoc XINYKIEN_DOCUMENT_TYPE: 14 view, document_type RIENG,
             // bo qua dbType tham so truyen vao (giong tien le QuaTrinhXuLy/vbden_res).
             case VIEW_VBDEN_CHOCHOYKIEN ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_TVUB, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_TVUB, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_CHOCHOYKIEN_NOI_BO ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_TVNB, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_TVNB, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_CHOCHOYKIENBCH ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_BCH, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_BCH, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_CHOCHOYKIENBTV ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_BTV, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_BTV, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_CHOCHOYKIENTTDU ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_TTDU, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESS_FIELD, OPINION_FLAG_TTDU, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHOYKIEN ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_TVUB, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_TVUB, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHOYKIEN_NOI_BO ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_TVNB, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_TVNB, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHOYKIENBCH ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_BCH, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_BCH, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHOYKIENBTV ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_BTV, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_BTV, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHOYKIENTTDU ->
-                queryXinYkienQueue(XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_TTDU, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_PROCESSED_FIELD, OPINION_FLAG_TTDU, key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 3118-3143: KHONG co dieu kien co - NGOAI LE duy nhat, giu nguyen dung DXL.
             case VIEW_VBDEN_DACHUYENCHOYKIEN ->
-                queryXinYkienQueue(XINYKIEN_USER_DELIVERED_FIELD, null, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_DELIVERED_FIELD, null, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHUYENCHOYKIENBCH ->
-                queryXinYkienQueue(XINYKIEN_USER_DELIVERED_FIELD, OPINION_FLAG_BCH, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_DELIVERED_FIELD, OPINION_FLAG_BCH, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHUYENCHOYKIENBTV ->
-                queryXinYkienQueue(XINYKIEN_USER_DELIVERED_FIELD, OPINION_FLAG_BTV, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_DELIVERED_FIELD, OPINION_FLAG_BTV, key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDEN_DACHUYENCHOYKIENTTDU ->
-                queryXinYkienQueue(XINYKIEN_USER_DELIVERED_FIELD, OPINION_FLAG_TTDU, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryXinYkienQueue(vbdenSearch, XINYKIEN_USER_DELIVERED_FIELD, OPINION_FLAG_TTDU, key, request.getItems(), keyword, keywordColumns, pageable);
             // DT-002 Slice dau: xem javadoc VIEW_DUTHAO_USER_CREATOR o tren ve pham vi/ly do hoan
             // 16+ view con lai. Cap nhat 24/08/2026 (yeu cau nguoi dung "tao bang rieng, de doc lap
             // du lieu"): duthao chuyen sang bang doc lap duthao_documents - KHONG con tai dung
@@ -1763,7 +2021,7 @@ public class ViewQueryService {
             // phai co method rieng doc DuThaoDocumentRepository (xem queryDuThaoPersonalQueue*).
             case VIEW_DUTHAO_USER_CREATOR, VIEW_DUTHAO_USER_INVOKED ->
                 queryDuThaoPersonalQueue(
-                    dbType, DUTHAO_USER_CREATOR_FIELD, key, request.getItems(), keyword, keywordColumns, pageable);
+                    dbType, duThaoSearch, DUTHAO_USER_CREATOR_FIELD, key, request.getItems(), keyword, keywordColumns, pageable);
             // 09/09/2026 (cutover dashboard - xem javadoc VIEW_DUTHAO_TOANBO_TOCHUC): org-scope, KHONG
             // phai personal - identifier tu resolveCurrentIdentifier() (server-resolved, cung co che
             // vbden/vbdi), KHONG dung "key"/request.getKeys() (route nay FE khong gui keys).
@@ -1776,9 +2034,31 @@ public class ViewQueryService {
                     .keyword(keyword)
                     .keywordColumns(keywordColumns)
                     .build();
-                yield (identifier == null || identifier.isBlank())
-                    ? emptyPage(pageable)
-                    : queryDuThaoQueueByFilter(dbType, filter, request.getItems(), pageable);
+                if (identifier == null || identifier.isBlank()) {
+                    yield emptyPage(pageable);
+                }
+                // 17/10/2026: có từ khoá/điều kiện → đọc index tìm kiếm trước (docs/analysis/27), không được thì SQL.
+                PaginationResponse<Map<String, Object>> fromIndex = isSearchRequest(keyword, advancedFilter)
+                    ? searchViaIndex("duthao", "duthao",
+                        com.td.application.search.AdvancedSearchTranslator.fromOrgView(filter, dbType, false), pageable,
+                        ids -> duThaoDocumentRepository.findByIds(dbType, ids, null, null, PageRequest.of(0, ids.size()))
+                            .getContent(),
+                        DuThaoDocument::getId, document -> toFilteredDocumentFields(document, request.getItems()))
+                    : null;
+                yield fromIndex != null ? fromIndex : queryDuThaoQueueByFilter(dbType, filter, request.getItems(), pageable);
+            }
+            case VIEW_DUTHAO_BY_UNIT -> {
+                String unitIdentifier = key == null ? null : key.trim();
+                if (unitIdentifier == null || unitIdentifier.isBlank() || !isOwnIdentifier(unitIdentifier)) {
+                    yield emptyPage(pageable);
+                }
+                VbdenOrgViewFilter filter = VbdenOrgViewFilter.builder()
+                    .orgFieldNames(DUTHAO_TOANBO_TOCHUC_ORG_FIELDS)
+                    .orgValue(unitIdentifier)
+                    .keyword(keyword)
+                    .keywordColumns(keywordColumns)
+                    .build();
+                yield queryDuThaoQueueByFilter(dbType, withAdvancedSearch(filter, duThaoSearch), request.getItems(), pageable);
             }
             // 27/08/2026 (port route FE "vbdi/xuly/chocapkyso"): TRÙNG TÊN THẬT với view "chờ vào
             // sổ" của module vbdi (dxl view_vanbandi.dxl dòng ~276-306) — 2 view Domino HOÀN TOÀN
@@ -1792,31 +2072,31 @@ public class ViewQueryService {
             // execute(dbType, request)} dispatch THUẦN theo viewname (dbType không dùng để routing —
             // xem javadoc lớp), PHẢI tự phân nhánh theo dbType ngay trong case này.
             case VIEW_DUTHAO_CREATOR_DRAFTING -> "vbdi".equalsIgnoreCase(dbType)
-                ? queryVbdiWaitingForRegistration(dbType, request.getItems(), keyword, keywordColumns, pageable)
+                ? queryVbdiWaitingForRegistration(dbType, vbdiSearch, request.getItems(), keyword, keywordColumns, pageable)
                 : queryDuThaoPersonalQueueWithStatus(
-                    dbType, DUTHAO_USER_CREATOR_FIELD, List.of(DUTHAO_STATUS_DRAFTING), key,
+                    dbType, duThaoSearch, DUTHAO_USER_CREATOR_FIELD, List.of(DUTHAO_STATUS_DRAFTING), key,
                     request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_DUTHAO_USERCREATOR_PROCESS_HANDLER_SUBMIT ->
                 queryDuThaoCreatorProcessHandlerSubmit(
-                    dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                    dbType, duThaoSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             // ---- DT-002 port loat 2 (25/08/2026): cac view con lai, xem khoi comment constants ----
-            case VIEW_DUTHAO_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", DUTHAO_STATUS_SIGNER_WAITING)).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_PRE_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_PRE_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_PRE_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.PRE_SIGN_SUBMIT))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_USER_RETURN_DRAFT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USER_RETURN_DRAFT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.RETURNED)))
                     .requireEmptyFieldName(DUTHAO_RETURN_DOCOUT_FOR_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_CREATOR_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CREATOR_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.PUBLISHED))).build(),
@@ -1827,80 +2107,102 @@ public class ViewQueryService {
             // 29/09/2026 (yeu cau nguoi dung "danh sach can hien thi voi ca nguoi ky nua" - route
             // duthao/xuly/chobanhanh): khoa mo rong user_creator OR user_signer (orgFieldNames = OR),
             // khac Domino goc (chi author). So dem SoLuongCanXuLy dung chung view nay nen khop theo.
-            case VIEW_DUTHAO_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD, DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.PUBLISHED)))
                     .requireEmptyFieldName(DUTHAO_XOA_VAN_BAN_DI_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // 4 nhanh noi bo cua "vwChoDuyetKyBanHanh"/"vwChoDuyetKyBanHanhMC" - xem javadoc hang so.
-            case VIEW_DUTHAO_CHODUYETKYBANHANH_SIGNER -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CHODUYETKYBANHANH_SIGNER -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", DUTHAO_STATUS_SIGNER_WAITING))
                     .requireEmptyFieldName(DUTHAO_MC_MAHS_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_CHODUYETKYBANHANH_HANDLER -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CHODUYETKYBANHANH_HANDLER -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_OTHER_PROCESS_HANDLER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DUTHAO_STATUS_OTHER_HANDLER_SUBMIT)))
                     .requireEmptyFieldName(DUTHAO_MC_MAHS_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_CHODUYETKYBANHANHMC_SIGNER -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CHODUYETKYBANHANHMC_SIGNER -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", DUTHAO_STATUS_SIGNER_WAITING))
                     .requireNonEmptyFieldName(DUTHAO_MC_MAHS_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_CHODUYETKYBANHANHMC_HANDLER -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CHODUYETKYBANHANHMC_HANDLER -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_OTHER_PROCESS_HANDLER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DUTHAO_STATUS_OTHER_HANDLER_SUBMIT)))
                     .requireNonEmptyFieldName(DUTHAO_MC_MAHS_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_DOCUMENTOUT_PUBLISHED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CHODUYETKYBANHANH, VIEW_DUTHAO_CHODUYETKYBANHANHMC ->
+                queryDuThaoChoDuyetKyBanHanh(dbType, duThaoSearch, VIEW_DUTHAO_CHODUYETKYBANHANHMC.equals(viewname),
+                    key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_CREATOR_USERCREATE -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
+                VbdenOrgViewFilter.builder().orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD)).build(),
+                key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_CREATOR_USERSIGNED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
+                VbdenOrgViewFilter.builder().orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD)).build(),
+                key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_DRAFT_RATED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
+                VbdenOrgViewFilter.builder()
+                    .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD, DUTHAO_USER_SIGNER_FIELD, DUTHAO_USER_PRE_SIGNER_FIELD))
+                    .requireNonEmptyFieldName(DUTHAO_DRAFT_RATE_FIELD).build(),
+                key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_USER_ASSIGNMENT_TABLE_CREATED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
+                VbdenOrgViewFilter.builder()
+                    .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
+                    .includeFieldValues(Map.of(DUTHAO_TINH_TRANG_PHAN_CONG_FIELD, List.of(DUTHAO_DA_PHAN_CONG))).build(),
+                key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_USER_DRAFT_DELETED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
+                VbdenOrgViewFilter.builder().orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD)).deletedOnly(true).build(),
+                key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_DOCUMENTOUT_PUBLISHED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
                     .includeFieldValues(Map.of("status", DUTHAO_STATUS_DOCOUT_PUBLISHED)).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_CREATOR_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CREATOR_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
                     .includeFieldValues(Map.of("status", DUTHAO_STATUS_SIGNER_WAITING))
                     .requireNonEmptyFieldName(DUTHAO_USER_SIGNER_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // Header cua cot khoa ghi 'user_signer' nhung cong thuc that su la user_creator (artefact).
-            case VIEW_DUTHAO_CREATOR_PRE_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CREATOR_PRE_SIGNER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.PRE_SIGN_SUBMIT)))
                     .requireNonEmptyFieldName(DUTHAO_USER_PRE_SIGNER_FIELD).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_USER_PROCESS_HANDLER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USER_PROCESS_HANDLER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_PROCESS_HANDLER_PLAIN_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.FORWARDED_FOR_APPROVAL))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_USER_SIGNER_RETURN_DRAFT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USER_SIGNER_RETURN_DRAFT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.RETURNED))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // Khoa la union user_process_handler (scalar) : explode(user_processed;";") - member match
             // boundary-LIKE khop dung ca 2 dang luu.
-            case VIEW_DUTHAO_USER_HANDLER_RETURN_DRAFT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USER_HANDLER_RETURN_DRAFT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgListFieldNames(List.of(
                         DUTHAO_USER_PROCESS_HANDLER_PLAIN_FIELD, DUTHAO_USER_PROCESSED_LIST_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.RETURNED))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_SIGNER_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_SIGNER_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.PUBLISHED))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // Header ghi 'user_signer' nhung khoa that su la user_creator (artefact, dxl 624-625).
-            case VIEW_DUTHAO_CREATOR_PROCESS_HANDLER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CREATOR_PROCESS_HANDLER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.FORWARDED_FOR_APPROVAL)))
@@ -1908,25 +2210,25 @@ public class ViewQueryService {
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // Cong thuc cot that su (sau khoi REM) = uniq(user_creator) : explode(user_processed)
             // - KHONG co user_process_handler du selection co nhac den (dxl 657-664).
-            case VIEW_DUTHAO_USER_PROCESS_HANDLER_FORWARD -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USER_PROCESS_HANDLER_FORWARD -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgListFieldNames(List.of(DUTHAO_USER_CREATOR_FIELD, DUTHAO_USER_PROCESSED_LIST_FIELD))
                     .includeFieldValues(Map.of("status", List.of(
                         DuThaoStatus.PENDING_SIGNATURE, DuThaoStatus.FORWARDED_FOR_APPROVAL))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_BY_HANDLER_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_BY_HANDLER_DOCUMENTOUT_SUBMITED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgListFieldNames(List.of(
                         DUTHAO_USER_PROCESS_HANDLER_PLAIN_FIELD, DUTHAO_USER_PROCESSED_LIST_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.PUBLISHED))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // Khong loc status - selection chi la pre_signer_signed = "1" (dxl 726).
-            case VIEW_DUTHAO_PRE_SIGNER_SIGNED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_PRE_SIGNER_SIGNED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_PRE_SIGNER_FIELD))
                     .includeFieldValues(Map.of(DUTHAO_PRE_SIGNER_SIGNED_FIELD, List.of("1"))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_USER_DOCUMENTOUT_PUBLISHED -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USER_DOCUMENTOUT_PUBLISHED -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgListFieldNames(List.of(
                         DUTHAO_USER_SIGNER_FIELD, DUTHAO_USER_PROCESS_HANDLER_PLAIN_FIELD,
@@ -1934,7 +2236,7 @@ public class ViewQueryService {
                     .includeFieldValues(Map.of("status", DUTHAO_STATUS_DOCOUT_PUBLISHED)).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // Van thu tra lai: retfor="2" la dieu kien IN tren field dong (khong phai requireEmpty).
-            case VIEW_DUTHAO_CREATOR_DOCUMENTOUT_RETURN -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_CREATOR_DOCUMENTOUT_RETURN -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgListFieldNames(List.of(
                         DUTHAO_USER_CREATOR_FIELD, DUTHAO_USER_SIGNER_FIELD,
@@ -1943,7 +2245,7 @@ public class ViewQueryService {
                         "status", List.of(DuThaoStatus.RETURNED),
                         DUTHAO_RETURN_DOCOUT_FOR_FIELD, List.of("2"))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_SIGNER_DOCUMENTOUT_RETURN -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_SIGNER_DOCUMENTOUT_RETURN -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of(
@@ -1951,35 +2253,35 @@ public class ViewQueryService {
                         DUTHAO_RETURN_DOCOUT_FOR_FIELD, List.of("1"))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_DUTHAO_VANTHU_TRALAI ->
-                queryDuThaoVanThuTraLai(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_DUTHAO_SIGNER_DOCUMENTOUT_WAITINGSUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+                queryDuThaoVanThuTraLai(dbType, duThaoSearch, key, request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_DUTHAO_SIGNER_DOCUMENTOUT_WAITINGSUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgFieldNames(List.of(DUTHAO_USER_SIGNER_FIELD))
                     .includeFieldValues(Map.of("status", List.of(DuThaoStatus.SIGNED_WAITING_SUBMIT))).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             // dxl 1874-1903: chi co user_other_processed_handler != "" - KHONG loc status.
-            case VIEW_DUTHAO_USERCREATOR_PROCESSED_HANDLER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType,
+            case VIEW_DUTHAO_USERCREATOR_PROCESSED_HANDLER_SUBMIT -> queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                 VbdenOrgViewFilter.builder()
                     .orgListFieldNames(List.of(DUTHAO_USER_OTHER_PROCESSED_HANDLER_FIELD)).build(),
                 key, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_DUTHAO_USER_OTHER_PROCESS_HANDLER_SUBMIT ->
                 queryDuThaoPersonalQueueWithStatus(
-                    dbType, DUTHAO_USER_OTHER_PROCESS_HANDLER_FIELD, List.of(DUTHAO_STATUS_OTHER_HANDLER_SUBMIT),
+                    dbType, duThaoSearch, DUTHAO_USER_OTHER_PROCESS_HANDLER_FIELD, List.of(DUTHAO_STATUS_OTHER_HANDLER_SUBMIT),
                     key, request.getItems(), keyword, keywordColumns, pageable);
             // DT-002 (26/08/2026), chogopy: "Cho phoi hop" - AND don gian, khong loc "all".
             // Mo rong BL-240: "vwuser_coordinator" TRUNG ten voi view hosocv (VIEW_HOSOCV_COORDINATOR)
             // - dispatch THUAN theo viewname (khong theo dbType) nen phai tu if/else NGAY TRONG case,
             // dung khuon da co (vd VIEW_DUTHAO_CREATOR_DRAFTING) khi 2 module trung ten view.
             case VIEW_DUTHAO_USER_COORDINATOR -> "hosocv".equalsIgnoreCase(dbType)
-                ? queryHoSoCVListMember(dbType, HOSOCV_USER_COORDINATOR_FIELD, key, request.getItems(), keyword, keywordColumns, pageable)
-                : queryDuThaoPersonalQueueByFilter(dbType,
+                ? queryHoSoCVListMember(dbType, hoSoCVSearch, HOSOCV_USER_COORDINATOR_FIELD, key, request.getItems(), keyword, keywordColumns, pageable)
+                : queryDuThaoPersonalQueueByFilter(dbType, duThaoSearch,
                     VbdenOrgViewFilter.builder()
                         .orgFieldNames(List.of(DUTHAO_USER_COORDINATOR_FIELD))
                         .excludeFieldValues(Map.of("status", DUTHAO_COORDINATOR_DONE_STATUSES)).build(),
                     key, request.getItems(), keyword, keywordColumns, pageable);
             // "Da phoi hop" - OR-group thuc su, xem javadoc VIEW_DUTHAO_USER_COORDINATED.
             case VIEW_DUTHAO_USER_COORDINATED ->
-                queryDuThaoCoordinatedQueue(dbType, key, request.getItems(), keyword, keywordColumns, pageable);
+                queryDuThaoCoordinatedQueue(dbType, duThaoSearch, key, request.getItems(), keyword, keywordColumns, pageable);
             // DT-007 (26/08/2026) - lich su xu ly 1 du thao cu the, khoa la id du thao (khong phai
             // username) - xem javadoc VIEW_DUTHAO_GROUP_PROCESS_BY_DRAFT_ID.
             case VIEW_DUTHAO_GROUP_PROCESS_BY_DRAFT_ID ->
@@ -2117,9 +2419,15 @@ public class ViewQueryService {
     }
 
     private PaginationResponse<Map<String, Object>> queryDocumentsChoXuLy(
-            String dbType, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdenOrgViewFilter search, String username, String items, String keyword,
+            List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
+        }
+        if (search != null) {
+            // 19/10/2026: có bộ lọc -> findByAnyFieldContains(user_process, filter) - cùng predicate khoá
+            // (containment + thành viên "a;b") và cùng thứ tự sắp xếp vbden với findPendingForUser.
+            return queryVbdenPersonalQueue(dbType, List.of("user_process"), username, items, keyword, keywordColumns, search, pageable);
         }
 
         Page<BusinessDocument> page = hasKeyword(keyword, keywordColumns)
@@ -2136,9 +2444,14 @@ public class ViewQueryService {
      * dựa trên field động {@code user_processed} thay vì {@code user_process}.
      */
     private PaginationResponse<Map<String, Object>> queryDocumentsDaXuLy(
-            String dbType, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdenOrgViewFilter search, String username, String items, String keyword,
+            List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
+        }
+        if (search != null) {
+            // 19/10/2026: xem queryDocumentsChoXuLy.
+            return queryVbdenPersonalQueue(dbType, List.of("user_processed"), username, items, keyword, keywordColumns, search, pageable);
         }
 
         Page<BusinessDocument> page = hasKeyword(keyword, keywordColumns)
@@ -2287,6 +2600,62 @@ public class ViewQueryService {
      * {@code vbdi} nữa sau khi tách).
      */
     // 01/10/2026: chi mang keyword/keywordColumns (o "tim trong danh sach") - null neu khong co tu khoa.
+    /**
+     * 19/10/2026: gộp bộ lọc nâng cao vbdi ({@link #buildVbdiAdvancedSearchFilter}) vào filter CỦA VIEW
+     * — cùng quy tắc {@link #withAdvancedSearch}: điều kiện view giữ nguyên (extraPredicateSql,
+     * documentRegisterId, excludeMember...), cùng field 2 bên → GIAO; khoảng ngày ban hành → GIAO
+     * (vd tab "Trong tuần" ∩ khoảng người dùng chọn). {@code viewFilter} null = chỉ bộ lọc.
+     */
+    static VbdiDocumentOutFilter withVbdiSearch(VbdiDocumentOutFilter viewFilter, VbdiDocumentOutFilter search) {
+        if (search == null) {
+            return viewFilter;
+        }
+        if (viewFilter == null) {
+            return search;
+        }
+        LocalDate from = maxDate(viewFilter.getPromulgationDateFrom(), search.getPromulgationDateFrom());
+        LocalDate to = minDate(viewFilter.getPromulgationDateTo(), search.getPromulgationDateTo());
+        return viewFilter.toBuilder()
+            .includeFieldValues(intersectFieldValues(viewFilter.getIncludeFieldValues(), search.getIncludeFieldValues()))
+            .containsAnyFieldValues(intersectFieldValues(viewFilter.getContainsAnyFieldValues(), search.getContainsAnyFieldValues()))
+            .textContainsFieldValues(mergeTextContains(viewFilter.getTextContainsFieldValues(), search.getTextContainsFieldValues()))
+            .promulgationDateFrom(from)
+            .promulgationDateTo(to)
+            .build();
+    }
+
+    private static LocalDate maxDate(LocalDate a, LocalDate b) {
+        return a == null ? b : (b == null || a.isAfter(b) ? a : b);
+    }
+
+    private static LocalDate minDate(LocalDate a, LocalDate b) {
+        return a == null ? b : (b == null || a.isBefore(b) ? a : b);
+    }
+
+    // Gộp 2 map field -> giá trị: field chỉ 1 bên giữ nguyên; field cả 2 bên → giao (rỗng → không khớp gì).
+    private static Map<String, List<String>> intersectFieldValues(
+            Map<String, List<String>> view, Map<String, List<String>> search) {
+        if (search == null || search.isEmpty()) {
+            return view;
+        }
+        Map<String, List<String>> merged = new LinkedHashMap<>();
+        if (view != null) {
+            merged.putAll(view);
+        }
+        search.forEach((field, values) -> {
+            List<String> viewValues = merged.get(field);
+            if (viewValues == null) {
+                merged.put(field, values);
+                return;
+            }
+            List<String> common = viewValues.stream()
+                .filter(v -> values.stream().anyMatch(u -> u != null && v != null && u.trim().equalsIgnoreCase(v.trim())))
+                .toList();
+            merged.put(field, common.isEmpty() ? List.of(ADVANCED_SEARCH_NO_MATCH) : common);
+        });
+        return merged;
+    }
+
     private VbdiDocumentOutFilter vbdiKeywordFilter(String keyword, List<String> keywordColumns) {
         if (keyword == null || keyword.isBlank()) {
             return null;
@@ -2295,8 +2664,8 @@ public class ViewQueryService {
     }
 
     private PaginationResponse<Map<String, Object>> queryVbdiByStatus(
-            String dbType, String status, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
-        Page<VbdiDocument> page = vbdiDocumentRepository.findByStatus(dbType, status, vbdiKeywordFilter(keyword, keywordColumns), pageable);
+            String dbType, VbdiDocumentOutFilter search, String status, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+        Page<VbdiDocument> page = vbdiDocumentRepository.findByStatus(dbType, status, withVbdiSearch(vbdiKeywordFilter(keyword, keywordColumns), search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2321,13 +2690,13 @@ public class ViewQueryService {
      * spoof identifier).</p>
      */
     private PaginationResponse<Map<String, Object>> queryVbdiWaitingForRegistration(
-            String dbType, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdiDocumentOutFilter search, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         String identifier = resolveCurrentIdentifier();
         if (identifier == null) {
             return emptyPage(pageable);
         }
         Page<VbdiDocument> page = vbdiDocumentRepository.findWaitingForRegistrationByIdentifier(
-            dbType, VbdiStatus.DRAFT, identifier, vbdiKeywordFilter(keyword, keywordColumns), pageable);
+            dbType, VbdiStatus.DRAFT, identifier, withVbdiSearch(vbdiKeywordFilter(keyword, keywordColumns), search), pageable);
 
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
@@ -2365,7 +2734,7 @@ public class ViewQueryService {
      * trong lớp này).</p>
      */
     private PaginationResponse<Map<String, Object>> queryVbdiDocumentOutTextBook(
-            String dbType, String identifier, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdiDocumentOutFilter search, String identifier, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
             return emptyPage(pageable);
         }
@@ -2378,7 +2747,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findIssuedByPublishOrCreatorIdentifier(
-            dbType, VbdiStatus.ISSUED, trimmedIdentifier, filter, pageable);
+            dbType, VbdiStatus.ISSUED, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2434,7 +2803,7 @@ public class ViewQueryService {
     }
 
     private PaginationResponse<Map<String, Object>> queryVbdiDocumentOutByDateRange(
-            String dbType, String identifier, String viewname, String items,
+            String dbType, VbdiDocumentOutFilter search, String identifier, String viewname, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
             return emptyPage(pageable);
@@ -2471,7 +2840,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findIssuedByCreatorOrUnitIdentifier(
-            dbType, VbdiStatus.ISSUED, trimmedIdentifier, filter, pageable);
+            dbType, VbdiStatus.ISSUED, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2486,7 +2855,7 @@ public class ViewQueryService {
      * {@link VbdiDocumentOutFilter#extraPredicateSql}).
      */
     private PaginationResponse<Map<String, Object>> queryVbdiDocumentOutBySnvCategory(
-            String dbType, String identifier, String snvFilterSql, String items,
+            String dbType, VbdiDocumentOutFilter search, String identifier, String snvFilterSql, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
             return emptyPage(pageable);
@@ -2501,7 +2870,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findIssuedByCreatorOrUnitIdentifier(
-            dbType, VbdiStatus.ISSUED, trimmedIdentifier, filter, pageable);
+            dbType, VbdiStatus.ISSUED, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2523,7 +2892,7 @@ public class ViewQueryService {
      * nên dropdown "Chọn sổ văn bản" có thể trộn CẢ 2 nguồn mà không cần đổi gì ở tầng này.</p>
      */
     private PaginationResponse<Map<String, Object>> queryVbdiDocumentOutByTextBook(
-            String dbType, List<String> keys, String items,
+            String dbType, VbdiDocumentOutFilter search, List<String> keys, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         String identifier = keys != null && keys.size() > 0 ? keys.get(0) : null;
         String documentRegisterId = keys != null && keys.size() > 1 ? keys.get(1) : null;
@@ -2540,7 +2909,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findIssuedByPublishOrCreatorIdentifier(
-            dbType, VbdiStatus.ISSUED, trimmedIdentifier, filter, pageable);
+            dbType, VbdiStatus.ISSUED, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2557,7 +2926,7 @@ public class ViewQueryService {
      * không đổi kết quả).
      */
     private PaginationResponse<Map<String, Object>> queryVbdiDocumentOutTextBookLike(
-            String dbType, String identifier, String status, String extraPredicateSql,
+            String dbType, VbdiDocumentOutFilter search, String identifier, String status, String extraPredicateSql,
             String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
             return emptyPage(pageable);
@@ -2572,7 +2941,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findIssuedByPublishOrCreatorIdentifier(
-            dbType, status, trimmedIdentifier, filter, pageable);
+            dbType, status, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2587,9 +2956,9 @@ public class ViewQueryService {
      * mật đã áp dụng cho {@link #queryVbdiDocumentOutTextBook}.
      */
     private PaginationResponse<Map<String, Object>> queryVbdiByFieldsEquals(
-            String dbType, String identifier, List<String> fieldNames, String status, String extraPredicateSql,
+            String dbType, VbdiDocumentOutFilter search, String identifier, List<String> fieldNames, String status, String extraPredicateSql,
             String items, String keyword, List<String> keywordColumns, Pageable pageable) {
-        return queryVbdiByFieldsEquals(dbType, identifier, fieldNames, status, extraPredicateSql, null,
+        return queryVbdiByFieldsEquals(dbType, search, identifier, fieldNames, status, extraPredicateSql, null,
             items, keyword, keywordColumns, pageable);
     }
 
@@ -2601,8 +2970,36 @@ public class ViewQueryService {
      * từ {@code advancedFilter} vào filter cuối cùng (không đổi hành vi các view khác đang gọi
      * overload cũ — {@code advancedFilter=null}).
      */
+    private static final List<String> VBDI_DOCUMENTOUT_ALL_IDENTIFIER_FIELDS = List.of(
+        "unit_publish_identifier", "unit_identifier", "unit_in_charge_identifier", "unit_creator_identifier");
+
+    // 17/10/2026: "vwCreator_DocumentOut_All" = tìm kiếm nâng cao VB đi (cũng là danh sách cq/dv/pb_toanbo) — có
+    // từ khoá/điều kiện thì đọc index tìm kiếm trước (docs/analysis/27), không dùng được thì SQL như cũ.
+    private PaginationResponse<Map<String, Object>> queryVbdiDocumentOutAll(
+            String dbType, String identifier, VbdiDocumentOutFilter advancedFilter, String items, String keyword,
+            List<String> keywordColumns, Pageable pageable) {
+        if (isSearchRequest(keyword, advancedFilter) && identifier != null && !identifier.isBlank()
+                && isOwnIdentifier(identifier.trim())) {
+            VbdiDocumentOutFilter indexFilter = (advancedFilter != null ? advancedFilter.toBuilder() : VbdiDocumentOutFilter.builder())
+                .keyword(keyword).keywordColumns(keywordColumns).build();
+            PaginationResponse<Map<String, Object>> fromIndex = searchViaIndex("vbdi", "vbdi",
+                com.td.application.search.AdvancedSearchTranslator.fromVbdiIssuedByIdentifier(
+                    indexFilter, VbdiStatus.ISSUED, VBDI_DOCUMENTOUT_ALL_IDENTIFIER_FIELDS, identifier.trim()),
+                pageable,
+                ids -> vbdiDocumentRepository.findByIds(dbType, ids, VbdiDocumentOutFilter.builder().build(),
+                    PageRequest.of(0, ids.size())).getContent(),
+                VbdiDocument::getId, document -> toFilteredDocumentFields(document, items));
+            if (fromIndex != null) {
+                return fromIndex;
+            }
+        }
+        // advancedFilter đã là bộ lọc nâng cao -> search=null (không gộp 2 lần).
+        return queryVbdiByFieldsEquals(dbType, null, identifier, VBDI_DOCUMENTOUT_ALL_IDENTIFIER_FIELDS, VbdiStatus.ISSUED,
+            null, advancedFilter, items, keyword, keywordColumns, pageable);
+    }
+
     private PaginationResponse<Map<String, Object>> queryVbdiByFieldsEquals(
-            String dbType, String identifier, List<String> fieldNames, String status, String extraPredicateSql,
+            String dbType, VbdiDocumentOutFilter search, String identifier, List<String> fieldNames, String status, String extraPredicateSql,
             VbdiDocumentOutFilter advancedFilter,
             String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
@@ -2620,7 +3017,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findByAnyFieldEqualsIdentifier(
-            dbType, status, fieldNames, trimmedIdentifier, filter, pageable);
+            dbType, status, fieldNames, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2674,19 +3071,24 @@ public class ViewQueryService {
                 "unit_in_charge_identifier", "user_signer", "draftor", "lien_thong", "send_agent")) {
             putIfNonBlank(includeFieldValues, field, asString(search.get(field)));
         }
-        Map<String, List<String>> containsAnyFieldValues = new LinkedHashMap<>();
-        putIfNonBlank(containsAnyFieldValues, "code_full", asString(search.get("code_full")));
-        putIfNonBlank(containsAnyFieldValues, "mc_thutuc", asString(search.get("mc_thutuc")));
+        // 19/10/2026: "Số, ký hiệu"/"Thủ tục" là ô nhập tự do -> khớp chứa chuỗi (trước đây phải gõ nguyên giá trị).
+        Map<String, String> textContains = new LinkedHashMap<>();
+        for (String field : List.of("code_full", "mc_thutuc")) {
+            String value = asString(search.get(field));
+            if (value != null && !value.isBlank()) {
+                textContains.put(field, value.trim());
+            }
+        }
 
         if (minPromulgationDate == null && maxPromulgationDate == null
-                && includeFieldValues.isEmpty() && containsAnyFieldValues.isEmpty()) {
+                && includeFieldValues.isEmpty() && textContains.isEmpty()) {
             return null;
         }
         return VbdiDocumentOutFilter.builder()
             .promulgationDateFrom(minPromulgationDate)
             .promulgationDateTo(maxPromulgationDate)
             .includeFieldValues(includeFieldValues.isEmpty() ? null : includeFieldValues)
-            .containsAnyFieldValues(containsAnyFieldValues.isEmpty() ? null : containsAnyFieldValues)
+            .textContainsFieldValues(textContains.isEmpty() ? null : textContains)
             .build();
     }
 
@@ -2761,7 +3163,7 @@ public class ViewQueryService {
      * này không tự resolve lại.
      */
     private PaginationResponse<Map<String, Object>> queryVbdiByFieldsContainsMember(
-            String dbType, String member, List<String> fieldNames, String status, String extraPredicateSql,
+            String dbType, VbdiDocumentOutFilter search, String member, List<String> fieldNames, String status, String extraPredicateSql,
             String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (member == null || member.isBlank()) {
             return emptyPage(pageable);
@@ -2772,7 +3174,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findByAnyFieldContainsMember(
-            dbType, status, fieldNames, member.trim(), filter, pageable);
+            dbType, status, fieldNames, member.trim(), withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2783,19 +3185,68 @@ public class ViewQueryService {
      * 29/08/2026: {@code "$username$"} là MACRO THẬT của Domino (xem javadoc
      * {@link VbdiDocumentRepository#findByAnyFieldContainsMember}) — server LUÔN tự thay bằng
      * username phiên đăng nhập hiện tại ({@link CurrentUserProvider}, SERVER-AUTHORITATIVE), KHÔNG
-     * BAO GIỜ dùng chuỗi này làm giá trị thật dù client gửi lên y hệt. Giá trị khác "$username$" giữ
-     * nguyên (vd {@code cn_toanbo} gửi thẳng username thật, cùng mức tin cậy các view cá nhân khác
-     * của {@code ChoBanHanh}/{@code ItemsList.jsx} đã dùng từ trước — không siết chặt hơn tiền lệ).
+     * BAO GIỜ dùng chuỗi này làm giá trị thật dù client gửi lên y hệt.
+     *
+     * <p><b>Bugfix bảo mật 17/10/2026</b>: trước đây giá trị khác "$username$" được GIỮ NGUYÊN — client
+     * đổi {@code keys} thành username người khác là xem được hàng đợi/hồ sơ cá nhân của họ (mọi view cá
+     * nhân hosocv + vbdi dùng hàm này). Nay chỉ chấp nhận username của CHÍNH người đăng nhập (vd
+     * {@code cn_toanbo} gửi thẳng username thật) hoặc tài khoản kiêm nhiệm liên kết với họ
+     * ({@link #isLinkedKiemNhiemAccount}); username khác → {@code null} (mọi callsite trả trang rỗng) +
+     * log cảnh báo.</p>
      */
     private String resolveUsernameToken(String key) {
         // Bugfix 01/10/2026 (VBĐến "Thêm vào hồ sơ" → modal trống với lpha dù có hồ sơ): nhánh tìm kiếm
         // nâng cao hosocv (ItemsList.jsx, searchtype="timkiemnangcao") gửi request KHÔNG có "keys" →
         // key null → mọi hàng đợi cá nhân trả rỗng. Thiếu khoá = người đang đăng nhập (cùng ngữ nghĩa
         // macro "$username$"); trước đây null luôn ra rỗng nên không làm hỏng callsite nào.
+        String current = currentUserProvider.currentUsername().orElse(null);
         if (key == null || key.isBlank() || USERNAME_TOKEN.equals(key)) {
-            return currentUserProvider.currentUsername().orElse(null);
+            return current;
         }
-        return key;
+        String requested = key.trim();
+        if (current == null) {
+            return null;
+        }
+        if (current.equalsIgnoreCase(requested)) {
+            return current;
+        }
+        if (isLinkedKiemNhiemAccount(current, requested)) {
+            return requested;
+        }
+        log.warn("Từ chối truy vấn hàng đợi cá nhân của '{}' bởi '{}' (không phải chính mình/kiêm nhiệm)",
+            requested, current);
+        return null;
+    }
+
+    // Khoá "<username>_da"/"<username>_chua" (vwUser_Coordinated_Status): kiểm tra phần username như
+    // resolveUsernameToken rồi ghép lại hậu tố; không có hậu tố hợp lệ thì trả nguyên (hàm truy vấn tự trả rỗng).
+    private String resolveUsernameWithStatusSuffix(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        String trimmed = key.trim();
+        String lower = trimmed.toLowerCase();
+        String suffix = lower.endsWith("_da") ? "_da" : lower.endsWith("_chua") ? "_chua" : null;
+        if (suffix == null) {
+            return null;
+        }
+        String username = resolveUsernameToken(trimmed.substring(0, trimmed.length() - suffix.length()));
+        return username == null ? null : username + suffix;
+    }
+
+    // Tài khoản kiêm nhiệm (BL-112) liên kết qua AppUser.parentUserId: tài khoản chính ↔ tài khoản con, hoặc 2
+    // tài khoản con cùng 1 tài khoản chính.
+    private boolean isLinkedKiemNhiemAccount(String currentUsername, String requestedUsername) {
+        var current = appUserRepository.findByUsernameAndDeletedOnIsNull(currentUsername).orElse(null);
+        var requested = appUserRepository.findByUsernameAndDeletedOnIsNull(requestedUsername).orElse(null);
+        if (current == null || requested == null) {
+            return false;
+        }
+        java.util.UUID currentParent = current.getParentUserId();
+        java.util.UUID requestedParent = requested.getParentUserId();
+        return current.getId().equals(requestedParent)
+            || requested.getId().equals(currentParent)
+            || (currentParent != null && currentParent.equals(requestedParent));
     }
 
     /**
@@ -2807,7 +3258,7 @@ public class ViewQueryService {
      * rỗng cho tới khi có trạng thái đó, không phải bịa dữ liệu.
      */
     private PaginationResponse<Map<String, Object>> queryVbdiSendNoResponse(
-            String dbType, String identifier, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdiDocumentOutFilter search, String identifier, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
             return emptyPage(pageable);
         }
@@ -2823,7 +3274,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findByPublishOrCreatorIdentifier(
-            dbType, trimmedIdentifier, filter, pageable);
+            dbType, trimmedIdentifier, withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2839,7 +3290,7 @@ public class ViewQueryService {
      * (tái dùng CHÍNH {@code member} đã bind cho khoá CONTAINS-MEMBER chính, xem javadoc field đó).
      */
     private PaginationResponse<Map<String, Object>> queryVbdiBaoCaoChuaXem(
-            String dbType, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdiDocumentOutFilter search, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
         }
@@ -2852,7 +3303,7 @@ public class ViewQueryService {
         Page<VbdiDocument> page = vbdiDocumentRepository.findByAnyFieldContainsMember(
             dbType, VbdiStatus.ISSUED,
             List.of("unit_publish_identifier", "user_creator", "userchuyenxuly", "coordinator_hide_rtext"),
-            username.trim(), filter, pageable);
+            username.trim(), withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2870,7 +3321,7 @@ public class ViewQueryService {
      * {@code AddVbdiImportantDocumentUseCase}, nếu không sẽ không khớp lại được nữa.</p>
      */
     private PaginationResponse<Map<String, Object>> queryVbdiPrivateImportant(
-            String dbType, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdiDocumentOutFilter search, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
         }
@@ -2879,7 +3330,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findByFieldContainsMemberAnySeparator(
-            dbType, null, "markimportant", username.trim(), filter, pageable);
+            dbType, null, "markimportant", username.trim(), withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2897,7 +3348,7 @@ public class ViewQueryService {
      * siết chặt hơn.
      */
     private PaginationResponse<Map<String, Object>> queryVbdiByFieldsEqualsUnvalidated(
-            String dbType, String identifier, List<String> fieldNames, String status, String extraPredicateSql,
+            String dbType, VbdiDocumentOutFilter search, String identifier, List<String> fieldNames, String status, String extraPredicateSql,
             String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (identifier == null || identifier.isBlank()) {
             return emptyPage(pageable);
@@ -2908,7 +3359,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findByAnyFieldEqualsIdentifier(
-            dbType, status, fieldNames, identifier.trim(), filter, pageable);
+            dbType, status, fieldNames, identifier.trim(), withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -2950,7 +3401,7 @@ public class ViewQueryService {
      * của user hiện tại, không phải giá trị tuỳ ý client chọn).
      */
     private PaginationResponse<Map<String, Object>> queryVbdiFieldContainsNoStatus(
-            String dbType, String fieldName, String value, String items,
+            String dbType, VbdiDocumentOutFilter search, String fieldName, String value, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         if (value == null || value.isBlank()) {
             return emptyPage(pageable);
@@ -2960,7 +3411,7 @@ public class ViewQueryService {
             .keywordColumns(keywordColumns)
             .build();
         Page<VbdiDocument> page = vbdiDocumentRepository.findByFieldContainsMemberAnySeparator(
-            dbType, null, fieldName, value.trim(), filter, pageable);
+            dbType, null, fieldName, value.trim(), withVbdiSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3059,7 +3510,11 @@ public class ViewQueryService {
         VbdenOrgViewFilter filter = VbdenOrgViewFilter.builder()
             .orgFieldNames(List.of(DOCUMENT_PROFILES_ID_FIELD))
             .orgValue(hosocvId.trim().toLowerCase(Locale.ROOT))
-            .newestCreatedFirst(true)
+            // Danh sach "Van ban, tai lieu lien quan khac": ngay ban hanh gan nhat len tren.
+            // Sap xep tai DB truoc khi phan trang, tranh moi trang tu sap xep rieng o FE.
+            .primarySortField("promulgation_date")
+            .primarySortType("date")
+            .sortDescending(true)
             .build();
         Page<HoSoCVDocument> page = hoSoCVDocumentRepository.findByVbdenOrgView(
             LuuVanBanKhacUseCase.DOCUMENT_TYPE, filter, pageable);
@@ -3109,11 +3564,11 @@ public class ViewQueryService {
             String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         String flagSql = "COALESCE(d.dynamic_fields->>'" + flagField + "', '') IN ('true', '1')";
         if (viewname.endsWith("_by_draftor")) {
-            return queryVbdiByFieldsEqualsUnvalidated(dbType, key, List.of("user_draft"), VbdiStatus.ISSUED,
+            return queryVbdiByFieldsEqualsUnvalidated(dbType, buildVbdiAdvancedSearchFilter(search), key, List.of("user_draft"), VbdiStatus.ISSUED,
                 flagSql, items, keyword, keywordColumns, pageable);
         }
         // "search" (vd promulgation_date khoảng ngày - InBaoCaoLayKienThanhVien.jsx) dùng chung bộ lọc nâng cao vbdi.
-        return queryVbdiByFieldsEquals(dbType, key, List.of("unit_publish_identifier", "unit_publish_identifier_other"),
+        return queryVbdiByFieldsEquals(dbType, null, key, List.of("unit_publish_identifier", "unit_publish_identifier_other"),
             VbdiStatus.ISSUED, flagSql, buildVbdiAdvancedSearchFilter(search), items, keyword, keywordColumns, pageable);
     }
 
@@ -3165,9 +3620,35 @@ public class ViewQueryService {
      * {@code KiemTrungSoDenUseCase} — an toàn hơn (không cho spoof identifier) dù đơn giản hơn (chỉ
      * 1 identifier phẳng, chưa có ancestor chain như Domino's {@code GetKeyValue()}).
      */
+    // 17/10/2026: "toanbovanban" = tìm kiếm nâng cao VB đến — có từ khoá/điều kiện thì đọc index tìm kiếm trước
+    // (docs/analysis/27), không dùng được thì SQL như cũ. Không tìm kiếm (chỉ mở danh sách) → SQL.
+    private PaginationResponse<Map<String, Object>> queryVbdenToanBoVanBan(
+            String dbType, ViewQueryRequest request, String keyword, List<String> keywordColumns, Pageable pageable) {
+        VbdenOrgViewFilter filter = toanbovanbanFilter(request);
+        boolean hasDateFallback = parseDdMmYyyy(request.getReceivedDateFrom()) != null
+            || parseDdMmYyyy(request.getReceivedDateTo()) != null;
+        if (isSearchRequest(keyword, hasDateFallback ? Boolean.TRUE : buildAdvancedSearchFilter(request.getSearch()))) {
+            String identifier = resolveCurrentIdentifier();
+            if (identifier == null) {
+                return emptyPage(pageable);
+            }
+            VbdenOrgViewFilter indexFilter = filter.toBuilder()
+                .orgValue(identifier).keyword(keyword).keywordColumns(keywordColumns).build();
+            PaginationResponse<Map<String, Object>> fromIndex = searchViaIndex("vbden", "documents",
+                com.td.application.search.AdvancedSearchTranslator.fromOrgView(indexFilter, dbType, true), pageable,
+                ids -> documentRepository.findByIds(dbType, ids, null, null, PageRequest.of(0, ids.size())).getContent(),
+                BusinessDocument::getId, document -> toFilteredDocumentFields(document, request.getItems()));
+            if (fromIndex != null) {
+                return fromIndex;
+            }
+        }
+        // toanbovanbanFilter(request) đã chứa sẵn bộ lọc nâng cao -> không gộp lại lần nữa.
+        return queryVbdenOrgView(dbType, null, filter, request.getItems(), keyword, keywordColumns, pageable);
+    }
+
     private PaginationResponse<Map<String, Object>> queryVbdenOrgView(
-            String dbType, VbdenOrgViewFilter filter, String items, String keyword, List<String> keywordColumns,
-            Pageable pageable) {
+            String dbType, VbdenOrgViewFilter search, VbdenOrgViewFilter filter, String items, String keyword,
+            List<String> keywordColumns, Pageable pageable) {
         String identifier = resolveCurrentIdentifier();
         if (identifier == null) {
             return emptyPage(pageable);
@@ -3178,7 +3659,7 @@ public class ViewQueryService {
         filter.setKeyword(keyword);
         filter.setKeywordColumns(keywordColumns);
 
-        Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(dbType, filter, pageable);
+        Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(dbType, withAdvancedSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3316,18 +3797,26 @@ public class ViewQueryService {
     private PaginationResponse<Map<String, Object>> queryVbdenPersonalQueue(
             String dbType, String fieldName, String username, String items, String keyword,
             List<String> keywordColumns, VbdenOrgViewFilter advancedFilter, Pageable pageable) {
+        return queryVbdenPersonalQueue(
+            dbType, List.of(fieldName), username, items, keyword, keywordColumns, advancedFilter, pageable);
+    }
+
+    // 19/10/2026: bản nhiều field (vd cuacanhan) - mọi hàng đợi cá nhân vbden đi qua đây khi có bộ lọc.
+    private PaginationResponse<Map<String, Object>> queryVbdenPersonalQueue(
+            String dbType, List<String> fieldNames, String username, String items, String keyword,
+            List<String> keywordColumns, VbdenOrgViewFilter advancedFilter, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
         }
         if (advancedFilter == null) {
-            return queryVbdenPersonalQueue(dbType, List.of(fieldName), username, items, keyword, keywordColumns, pageable);
+            return queryVbdenPersonalQueue(dbType, fieldNames, username, items, keyword, keywordColumns, pageable);
         }
         VbdenOrgViewFilter effectiveFilter = advancedFilter.toBuilder()
             .keyword(keyword)
             .keywordColumns(keywordColumns)
             .build();
         Page<BusinessDocument> page = documentRepository.findByAnyFieldContains(
-            dbType, List.of(fieldName), username.trim(), effectiveFilter, pageable);
+            dbType, fieldNames, username.trim(), effectiveFilter, pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3384,7 +3873,20 @@ public class ViewQueryService {
         putIfNonBlank(includeFieldValues, "document_type", asString(search.get("document_type")));
         putIfNonBlank(includeFieldValues, "priority", asString(search.get("priority")));
         putIfNonBlank(includeFieldValues, "sector", asString(search.get("sector")));
-        putIfNonBlank(containsAnyFieldValues, "unit_in_charge", asString(search.get("unit_in_charge")));
+        // 19/10/2026: "Cơ quan ban hành" là ô nhập tự do -> khớp chứa chuỗi (trước đây phải gõ đúng nguyên tên).
+        Map<String, String> textContains = new LinkedHashMap<>();
+        String unitInCharge = asString(search.get("unit_in_charge"));
+        if (unitInCharge != null && !unitInCharge.isBlank()) {
+            textContains.put("unit_in_charge", unitInCharge.trim());
+        }
+        // 19/10/2026: 2 tiêu chí báo cáo (baocaoinso/baocaotonghop) trước đây bị bỏ qua.
+        // "Trong tỉnh"/"Ngoài tỉnh" = document_internet "1"/"2", gồm cả "3" (cả hai) — cùng quy ước In sổ vbdi.
+        String documentInternet = asString(search.get("document_internet"));
+        if ("1".equals(documentInternet) || "2".equals(documentInternet)) {
+            includeFieldValues.put("document_internet", List.of(documentInternet, "3"));
+        }
+        // "Phương thức nhận": form tiếp nhận vbden lưu ở field "method" (tên danh mục), không phải delivery_method.
+        putIfNonBlank(includeFieldValues, "method", asString(search.get("delivery_method")));
         putIfNonBlank(containsAnyFieldValues, "unit_process", asString(search.get("unit_process")));
         String userProcess = asString(search.get("user_process"));
         if (userProcess != null && !userProcess.isBlank()) {
@@ -3398,7 +3900,7 @@ public class ViewQueryService {
         }
 
         if (minReceivedDate == null && maxReceivedDate == null
-                && includeFieldValues.isEmpty() && containsAnyFieldValues.isEmpty()) {
+                && includeFieldValues.isEmpty() && containsAnyFieldValues.isEmpty() && textContains.isEmpty()) {
             return null;
         }
         return VbdenOrgViewFilter.builder()
@@ -3406,6 +3908,7 @@ public class ViewQueryService {
             .maxReceivedDate(maxReceivedDate)
             .includeFieldValues(includeFieldValues.isEmpty() ? null : includeFieldValues)
             .containsAnyFieldValues(containsAnyFieldValues.isEmpty() ? null : containsAnyFieldValues)
+            .textContainsFieldValues(textContains.isEmpty() ? null : textContains)
             .build();
     }
 
@@ -3471,7 +3974,7 @@ public class ViewQueryService {
     // khong phai identifier to chuc tu resolve nhu queryVbdenOrgView - nen khong tai dung duoc thang
     // method do, phai tu build VbdenOrgViewFilter (cung khuon mau queryVbdenPersonalQueueWithStatus).
     private PaginationResponse<Map<String, Object>> querySapDenHanCuaCaNhan(
-            String dbType, String username, String items, String keyword, List<String> keywordColumns,
+            String dbType, VbdenOrgViewFilter search, String username, String items, String keyword, List<String> keywordColumns,
             Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
@@ -3487,7 +3990,7 @@ public class ViewQueryService {
             .keyword(keyword)
             .keywordColumns(keywordColumns)
             .build();
-        Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(dbType, filter, pageable);
+        Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(dbType, withAdvancedSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3502,7 +4005,7 @@ public class ViewQueryService {
     // vbden_xinykien_documents) - KHONG con dung dbType tham so nua (bang moi CHI co 2
     // document_type, khong can cach ly bang discriminator nhu truoc).
     private PaginationResponse<Map<String, Object>> queryXinYkienQueue(
-            String fieldName, String opinionFlagField, String username, String items, String keyword,
+            VbdenOrgViewFilter search, String fieldName, String opinionFlagField, String username, String items, String keyword,
             List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
@@ -3516,7 +4019,7 @@ public class ViewQueryService {
             filterBuilder.includeFieldValues(Map.of(opinionFlagField, OPINION_FLAG_TRUE_VALUES));
         }
         Page<XinYKienDocument> page =
-            xinYKienDocumentRepository.findByVbdenOrgView(XINYKIEN_DOCUMENT_TYPE, filterBuilder.build(), pageable);
+            xinYKienDocumentRepository.findByVbdenOrgView(XINYKIEN_DOCUMENT_TYPE, withAdvancedSearch(filterBuilder.build(), search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3530,7 +4033,7 @@ public class ViewQueryService {
      * identifier hay username, chỉ là 1 chuỗi containment, nên tái dùng được nguyên vẹn.
      */
     private PaginationResponse<Map<String, Object>> queryVbdenPersonalQueueWithStatus(
-            String dbType, String fieldName, List<String> statuses, String username, String items,
+            String dbType, VbdenOrgViewFilter search, String fieldName, List<String> statuses, String username, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
@@ -3542,7 +4045,7 @@ public class ViewQueryService {
             .keyword(keyword)
             .keywordColumns(keywordColumns)
             .build();
-        Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(dbType, filter, pageable);
+        Page<BusinessDocument> page = documentRepository.findByVbdenOrgView(dbType, withAdvancedSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3555,10 +4058,20 @@ public class ViewQueryService {
     // "documents" dung chung). dbType van can truyen (duthao_documents chua CA "duthao" VA
     // "draft_process" - phai loc dung document_type, khong phai suy dien tu ten bang).
     private PaginationResponse<Map<String, Object>> queryDuThaoPersonalQueue(
-            String dbType, String fieldName, String username, String items, String keyword,
+            String dbType, VbdenOrgViewFilter search, String fieldName, String username, String items, String keyword,
             List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
+        }
+        if (search != null) {
+            // 19/10/2026: có bộ lọc → findByVbdenOrgView (orgFieldNames dùng CÙNG predicate khoá với
+            // findByAnyFieldContains) để áp được tiêu chí lọc.
+            return queryDuThaoQueueByFilter(dbType, withAdvancedSearch(VbdenOrgViewFilter.builder()
+                .orgFieldNames(List.of(fieldName))
+                .orgValue(username.trim())
+                .keyword(keyword)
+                .keywordColumns(keywordColumns)
+                .build(), search), items, pageable);
         }
         Page<DuThaoDocument> page = hasKeyword(keyword, keywordColumns)
             ? duThaoDocumentRepository.findByAnyFieldContains(
@@ -3574,17 +4087,17 @@ public class ViewQueryService {
     // Overload 1 field - giu tuong thich nguoc voi cac case da co (vd VIEW_DUTHAO_CREATOR_DRAFTING),
     // tai dung ban List<String> ben duoi (cung khuon single/multi cua queryVbdenPersonalQueue).
     private PaginationResponse<Map<String, Object>> queryDuThaoPersonalQueueWithStatus(
-            String dbType, String fieldName, List<String> statuses, String username, String items,
+            String dbType, VbdenOrgViewFilter search, String fieldName, List<String> statuses, String username, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         return queryDuThaoPersonalQueueWithStatus(
-            dbType, List.of(fieldName), statuses, username, items, keyword, keywordColumns, pageable);
+            dbType, search, List.of(fieldName), statuses, username, items, keyword, keywordColumns, pageable);
     }
 
     // "vwUserCreator_Process_Handler_Submit" (25/08/2026): khoa la UNION 2 field
     // (user_process_handler/user_other_process_handler, xem javadoc VIEW_DUTHAO_CREATOR_PROCESS_HANDLER_SUBMIT)
     // - overload nhan List<String> thay vi 1 fieldName.
     private PaginationResponse<Map<String, Object>> queryDuThaoPersonalQueueWithStatus(
-            String dbType, List<String> fieldNames, List<String> statuses, String username, String items,
+            String dbType, VbdenOrgViewFilter search, List<String> fieldNames, List<String> statuses, String username, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
@@ -3596,12 +4109,108 @@ public class ViewQueryService {
             .keyword(keyword)
             .keywordColumns(keywordColumns)
             .build();
-        Page<DuThaoDocument> page = duThaoDocumentRepository.findByVbdenOrgView(dbType, filter, pageable);
+        Page<DuThaoDocument> page = duThaoDocumentRepository.findByVbdenOrgView(
+            dbType, withAdvancedSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
         return toPaginationResponse(content, page);
     }
+
+    /**
+     * 19/10/2026: gộp bộ lọc người dùng ({@link #buildDuThaoAdvancedSearchFilter},
+     * {@link #buildAdvancedSearchFilter} vbden, {@link #buildHoSoCVAdvancedSearchFilter}...) vào filter CỦA VIEW.
+     * Điều kiện view luôn giữ nguyên (khoá cá nhân, exclude, require*…). Cùng 1 field ở cả 2 bên (vd
+     * status) → lấy GIAO, không để lựa chọn người dùng ghi đè điều kiện view (lọt dự thảo ngoài hàng
+     * đợi) cũng không lặng lẽ bỏ lựa chọn người dùng; giao rỗng → không khớp bản ghi nào.
+     */
+    static VbdenOrgViewFilter withAdvancedSearch(VbdenOrgViewFilter viewFilter, VbdenOrgViewFilter search) {
+        if (search == null) {
+            return viewFilter;
+        }
+        Map<String, List<String>> include = new LinkedHashMap<>();
+        if (viewFilter.getIncludeFieldValues() != null) {
+            include.putAll(viewFilter.getIncludeFieldValues());
+        }
+        if (search.getIncludeFieldValues() != null) {
+            search.getIncludeFieldValues().forEach((field, values) -> {
+                List<String> viewValues = include.get(field);
+                if (viewValues == null) {
+                    include.put(field, values);
+                    return;
+                }
+                List<String> common = viewValues.stream()
+                    .filter(v -> values.stream().anyMatch(u -> u != null && v != null && u.trim().equalsIgnoreCase(v.trim())))
+                    .toList();
+                include.put(field, common.isEmpty() ? List.of(ADVANCED_SEARCH_NO_MATCH) : common);
+            });
+        }
+        // containsAny (field text tự do/mảng, vd unit_in_charge/user_process vbden): cùng quy tắc giao.
+        Map<String, List<String>> containsAny = new LinkedHashMap<>();
+        if (viewFilter.getContainsAnyFieldValues() != null) {
+            containsAny.putAll(viewFilter.getContainsAnyFieldValues());
+        }
+        if (search.getContainsAnyFieldValues() != null) {
+            search.getContainsAnyFieldValues().forEach((field, values) -> {
+                List<String> viewValues = containsAny.get(field);
+                if (viewValues == null) {
+                    containsAny.put(field, values);
+                    return;
+                }
+                List<String> common = viewValues.stream()
+                    .filter(v -> values.stream().anyMatch(u -> u != null && v != null && u.trim().equalsIgnoreCase(v.trim())))
+                    .toList();
+                containsAny.put(field, common.isEmpty() ? List.of(ADVANCED_SEARCH_NO_MATCH) : common);
+            });
+        }
+        return viewFilter.toBuilder()
+            .includeFieldValues(include.isEmpty() ? null : include)
+            .containsAnyFieldValues(containsAny.isEmpty() ? null : containsAny)
+            .textContainsFieldValues(mergeTextContains(viewFilter.getTextContainsFieldValues(), search.getTextContainsFieldValues()))
+            .minCreatedOn(search.getMinCreatedOn() != null ? search.getMinCreatedOn() : viewFilter.getMinCreatedOn())
+            .maxCreatedOn(search.getMaxCreatedOn() != null ? search.getMaxCreatedOn() : viewFilter.getMaxCreatedOn())
+            .minReceivedDate(search.getMinReceivedDate() != null ? search.getMinReceivedDate() : viewFilter.getMinReceivedDate())
+            .maxReceivedDate(search.getMaxReceivedDate() != null ? search.getMaxReceivedDate() : viewFilter.getMaxReceivedDate())
+            // hosocv: Ngày kết thúc / Ngày nộp lưu trữ / "Chưa phối hợp" (loại trừ thành viên — AND nên gộp hợp).
+            .minEndDate(search.getMinEndDate() != null ? search.getMinEndDate() : viewFilter.getMinEndDate())
+            .maxEndDate(search.getMaxEndDate() != null ? search.getMaxEndDate() : viewFilter.getMaxEndDate())
+            .minStoragedDate(search.getMinStoragedDate() != null ? search.getMinStoragedDate() : viewFilter.getMinStoragedDate())
+            .maxStoragedDate(search.getMaxStoragedDate() != null ? search.getMaxStoragedDate() : viewFilter.getMaxStoragedDate())
+            .excludeMemberFieldValues(mergeUnion(viewFilter.getExcludeMemberFieldValues(), search.getExcludeMemberFieldValues()))
+            .build();
+    }
+
+    // Chuỗi con: AND nên gộp hợp; cùng field -> giữ giá trị bộ lọc người dùng (view hiện không đặt field này).
+    private static Map<String, String> mergeTextContains(Map<String, String> view, Map<String, String> search) {
+        if (search == null || search.isEmpty()) {
+            return view;
+        }
+        if (view == null || view.isEmpty()) {
+            return search;
+        }
+        Map<String, String> merged = new LinkedHashMap<>(view);
+        merged.putAll(search);
+        return merged;
+    }
+
+    private static Map<String, List<String>> mergeUnion(Map<String, List<String>> a, Map<String, List<String>> b) {
+        if (a == null || a.isEmpty()) {
+            return b;
+        }
+        if (b == null || b.isEmpty()) {
+            return a;
+        }
+        Map<String, List<String>> merged = new LinkedHashMap<>(a);
+        b.forEach((field, values) -> merged.merge(field, values, (x, y) -> {
+            List<String> union = new ArrayList<>(x);
+            y.stream().filter(v -> !union.contains(v)).forEach(union::add);
+            return union;
+        }));
+        return merged;
+    }
+
+    // Giá trị không bao giờ có thật - dùng khi giao (điều kiện view ∩ bộ lọc) rỗng.
+    static final String ADVANCED_SEARCH_NO_MATCH = "__duthao_search_no_match__";
 
     // Executor chung cho cac view hang doi du thao (DT-002 loat 2): nhan filter da build san,
     // goi repository + chieu field + dong goi phan trang - dung lai nguyen khuon cua cac method
@@ -3618,7 +4227,7 @@ public class ViewQueryService {
     // Wrapper co guard key rong (dong nhat voi cac helper queryDuThao* da co: khong co username thi
     // tra trang KHONG query) + gan orgValue/keyword vao filter dac thu cua tung case.
     private PaginationResponse<Map<String, Object>> queryDuThaoPersonalQueueByFilter(
-            String dbType, VbdenOrgViewFilter partialFilter, String username, String items,
+            String dbType, VbdenOrgViewFilter search, VbdenOrgViewFilter partialFilter, String username, String items,
             String keyword, List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
@@ -3628,7 +4237,7 @@ public class ViewQueryService {
             .keyword(keyword)
             .keywordColumns(keywordColumns)
             .build();
-        return queryDuThaoQueueByFilter(dbType, filter, items, pageable);
+        return queryDuThaoQueueByFilter(dbType, withAdvancedSearch(filter, search), items, pageable);
     }
 
     // "vwUserCreator_Process_Handler_Submit" (port lai 25/08/2026 theo XML export moi - xem javadoc
@@ -3636,7 +4245,7 @@ public class ViewQueryService {
     // user_other_processed_handler -> di qua capability orgListFieldNames, KHONG dung orgFieldNames
     // (containment/equality khong khop thanh vien trong chuoi scalar).
     private PaginationResponse<Map<String, Object>> queryDuThaoCreatorProcessHandlerSubmit(
-            String dbType, String username, String items, String keyword,
+            String dbType, VbdenOrgViewFilter search, String username, String items, String keyword,
             List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
@@ -3648,21 +4257,67 @@ public class ViewQueryService {
             .keyword(keyword)
             .keywordColumns(keywordColumns)
             .build();
-        return queryDuThaoQueueByFilter(dbType, filter, items, pageable);
+        return queryDuThaoQueueByFilter(dbType, withAdvancedSearch(filter, search), items, pageable);
     }
 
     // "vwUser_Coordinated" (DT-002, 26/08/2026): OR-group giua 2 field/2 dieu kien status khac nhau
     // - VbdenOrgViewFilter khong bieu dien duoc, phai goi thang method repository rieng
     // (findByFieldOrFieldWithStatus) thay vi di qua queryDuThaoQueueByFilter/findByVbdenOrgView.
     private PaginationResponse<Map<String, Object>> queryDuThaoCoordinatedQueue(
-            String dbType, String username, String items, String keyword,
+            String dbType, VbdenOrgViewFilter search, String username, String items, String keyword,
             List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
         }
         Page<DuThaoDocument> page = duThaoDocumentRepository.findByFieldOrFieldWithStatus(
             dbType, DUTHAO_USER_COORDINATED_FIELD, DUTHAO_USER_COORDINATOR_FIELD,
-            DUTHAO_COORDINATOR_DONE_STATUSES, username.trim(), keyword, keywordColumns, pageable);
+            DUTHAO_COORDINATOR_DONE_STATUSES, username.trim(), keyword, keywordColumns, search, pageable);
+        List<Map<String, Object>> content = page.getContent().stream()
+            .map(document -> toFilteredDocumentFields(document, items))
+            .toList();
+        return toPaginationResponse(content, page);
+    }
+
+    /**
+     * 22/10/2026 (tra cứu nhóm / thống kê dự thảo — {@code DuThaoGroupViewQuery}): dự thảo của TỔ CHỨC người
+     * đang đăng nhập (cùng phạm vi {@link #VIEW_DUTHAO_TOANBO_TOCHUC}) + bộ lọc CollapseVBduthao ({@code search},
+     * cùng {@link #buildDuThaoAdvancedSearchFilter}), tối đa {@code limit} bản, mới tạo trước. Không xác định
+     * được tổ chức → rỗng.
+     */
+    public List<DuThaoDocument> findDuThaoOrgDocuments(Map<String, Object> search, int limit) {
+        String identifier = resolveCurrentIdentifier();
+        if (identifier == null || identifier.isBlank()) {
+            return List.of();
+        }
+        VbdenOrgViewFilter advancedFilter = buildDuThaoAdvancedSearchFilter(search);
+        VbdenOrgViewFilter filter = (advancedFilter != null ? advancedFilter.toBuilder() : VbdenOrgViewFilter.builder())
+            .orgFieldNames(DUTHAO_TOANBO_TOCHUC_ORG_FIELDS)
+            .orgValue(identifier)
+            .build();
+        return duThaoDocumentRepository.findByVbdenOrgView(
+            com.td.application.duthao.GetDuThaoDetailUseCase.DOCUMENT_TYPE, filter, PageRequest.of(0, Math.max(1, limit))).getContent();
+    }
+
+    /** 22/10/2026: cùng shape 1 dòng danh sách dự thảo của GetView (items lọc field, "files" khi được xin). */
+    public Map<String, Object> toDuThaoListFields(DuThaoDocument document, String items) {
+        return toFilteredDocumentFields(document, items);
+    }
+
+    // 22/10/2026 - xem javadoc VIEW_DUTHAO_CHODUYETKYBANHANH: nhánh người ký (status 1/3) OR nhánh người xử lý
+    // khác (status 9); mc = true chỉ dự thảo có mc_mahs (một cửa), false chỉ dự thảo không có.
+    private PaginationResponse<Map<String, Object>> queryDuThaoChoDuyetKyBanHanh(
+            String dbType, VbdenOrgViewFilter search, boolean mc, String username, String items, String keyword,
+            List<String> keywordColumns, Pageable pageable) {
+        if (username == null || username.isBlank()) {
+            return emptyPage(pageable);
+        }
+        Map<String, List<String>> statusesByField = new LinkedHashMap<>();
+        statusesByField.put(DUTHAO_USER_SIGNER_FIELD, DUTHAO_STATUS_SIGNER_WAITING);
+        statusesByField.put(DUTHAO_USER_OTHER_PROCESS_HANDLER_FIELD, List.of(DUTHAO_STATUS_OTHER_HANDLER_SUBMIT));
+        Page<DuThaoDocument> page = duThaoDocumentRepository.findByFieldStatusBranches(
+            dbType, statusesByField, username.trim(),
+            mc ? null : DUTHAO_MC_MAHS_FIELD, mc ? DUTHAO_MC_MAHS_FIELD : null,
+            keyword, keywordColumns, search, pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3671,13 +4326,13 @@ public class ViewQueryService {
 
     // 01/10/2026 - xem javadoc VIEW_DUTHAO_VANTHU_TRALAI.
     private PaginationResponse<Map<String, Object>> queryDuThaoVanThuTraLai(
-            String dbType, String username, String items, String keyword,
+            String dbType, VbdenOrgViewFilter search, String username, String items, String keyword,
             List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
         }
         Page<DuThaoDocument> page = duThaoDocumentRepository.findReturnedByClerkForUser(
-            dbType, DUTHAO_VANTHU_TRALAI_STATUS_BY_RETURN_FOR, username.trim(), keyword, keywordColumns, pageable);
+            dbType, DUTHAO_VANTHU_TRALAI_STATUS_BY_RETURN_FOR, username.trim(), keyword, keywordColumns, search, pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3818,10 +4473,23 @@ public class ViewQueryService {
                 "trinhlanhdaoduyet", "storaged", "category")) {
             putIfNonBlank(includeFieldValues, field, asString(search.get(field)));
         }
+        // 19/10/2026: "Chưa trình duyệt"/"Chưa chuyển lưu trữ" = "0" — Domino gốc là NOT(=1|2|3), tức gồm
+        // cả hồ sơ chưa từng set field (rỗng). Khớp chính xác "0" bỏ sót các hồ sơ đó.
+        for (String field : List.of("trinhlanhdaoduyet", "storaged")) {
+            if (List.of("0").equals(includeFieldValues.get(field))) {
+                includeFieldValues.put(field, List.of("0", ""));
+            }
+        }
         Map<String, List<String>> containsAnyFieldValues = new LinkedHashMap<>();
         // coordinator (Người phối hợp) có thể nhiều người (mảng JSON) — containment/scalar-equality.
-        for (String field : List.of("name", "title", "first_topic", "second_topic", "coordinator")) {
-            putIfNonBlank(containsAnyFieldValues, field, asString(search.get(field)));
+        putIfNonBlank(containsAnyFieldValues, "coordinator", asString(search.get("coordinator")));
+        // 19/10/2026: Ký hiệu/Tiêu đề/Đề mục là ô nhập tự do -> khớp chứa chuỗi (trước đây phải gõ nguyên giá trị).
+        Map<String, String> hoSoTextContains = new LinkedHashMap<>();
+        for (String field : List.of("name", "title", "first_topic", "second_topic")) {
+            String value = asString(search.get(field));
+            if (value != null && !value.isBlank()) {
+                hoSoTextContains.put(field, value.trim());
+            }
         }
         // 01/10/2026: "Trạng thái phối hợp" (coordinated_status) — FE gửi TÀI KHOẢN người phối hợp đã
         // chọn: "Đã phối hợp" → user_coordinated chứa; "Chưa phối hợp" → fieldnot_user_coordinated
@@ -3833,7 +4501,7 @@ public class ViewQueryService {
         if (minCreatedOn == null && maxCreatedOn == null && minEndDate == null && maxEndDate == null
                 && minStoragedDate == null && maxStoragedDate == null
                 && includeFieldValues.isEmpty() && containsAnyFieldValues.isEmpty()
-                && excludeMemberFieldValues.isEmpty()) {
+                && excludeMemberFieldValues.isEmpty() && hoSoTextContains.isEmpty()) {
             return null;
         }
         return VbdenOrgViewFilter.builder()
@@ -3846,6 +4514,7 @@ public class ViewQueryService {
             .includeFieldValues(includeFieldValues.isEmpty() ? null : includeFieldValues)
             .containsAnyFieldValues(containsAnyFieldValues.isEmpty() ? null : containsAnyFieldValues)
             .excludeMemberFieldValues(excludeMemberFieldValues.isEmpty() ? null : excludeMemberFieldValues)
+            .textContainsFieldValues(hoSoTextContains.isEmpty() ? null : hoSoTextContains)
             .build();
     }
 
@@ -3931,7 +4600,7 @@ public class ViewQueryService {
     // array) - phai so khop THEO THANH VIEN (LIKE neo ";"), khac containment/scalar-equality cua
     // queryHoSoCVPersonalQueue.
     private PaginationResponse<Map<String, Object>> queryHoSoCVListMember(
-            String dbType, String fieldName, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdenOrgViewFilter search, String fieldName, String username, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         if (username == null || username.isBlank()) {
             return emptyPage(pageable);
         }
@@ -3941,7 +4610,7 @@ public class ViewQueryService {
             .keyword(keyword)
             .keywordColumns(hoSoCVKeywordColumns(keywordColumns))
             .build();
-        Page<HoSoCVDocument> page = hoSoCVDocumentRepository.findByVbdenOrgView(dbType, filter, pageable);
+        Page<HoSoCVDocument> page = hoSoCVDocumentRepository.findByVbdenOrgView(dbType, withAdvancedSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();
@@ -3997,12 +4666,16 @@ public class ViewQueryService {
     // khoa ca nhan (bien the "toan co quan"). KHONG guard blank-key tra empty page (khac cac helper
     // ca nhan khac) vi bien the thong ke hop le khi khong co khoa.
     private PaginationResponse<Map<String, Object>> queryHoSoCVDueDate(
-            String dbType, String keyFieldName, String keyValue, String dateFieldName,
+            String dbType, VbdenOrgViewFilter search, String keyFieldName, String keyValue, String dateFieldName,
             boolean strictlyBefore, Map<String, String> extraEquals, String items, String keyword,
             List<String> keywordColumns, Pageable pageable) {
-        Page<HoSoCVDocument> page = hasKeyword(keyword)
+        if (keyValue == null || keyValue.isBlank()) {
+            return emptyPage(pageable); // resolveUsernameToken từ chối (17/10/2026) hoặc thiếu người dùng
+        }
+        // 19/10/2026: + bộ lọc nâng cao (trước đây 3 view hạn nộp/quá hạn bỏ qua "search").
+        Page<HoSoCVDocument> page = hasKeyword(keyword) || search != null
             ? hoSoCVDocumentRepository.findByFieldValueDueDate(dbType, keyFieldName, keyValue, dateFieldName,
-                strictlyBefore, extraEquals, keyword, hoSoCVKeywordColumns(keywordColumns), pageable)
+                strictlyBefore, extraEquals, keyword, hoSoCVKeywordColumns(keywordColumns), search, pageable)
             : hoSoCVDocumentRepository.findByFieldValueDueDate(
                 dbType, keyFieldName, keyValue, dateFieldName, strictlyBefore, extraEquals, pageable);
         List<Map<String, Object>> content = page.getContent().stream()
@@ -4295,13 +4968,18 @@ public class ViewQueryService {
      * {@link #CHUTRI_GROUP_MAX_DOCUMENTS} — hàng đợi cá nhân, không phải toàn hệ thống).
      */
     private PaginationResponse<Map<String, Object>> queryChuTriGroup(
-            String dbType, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+            String dbType, VbdenOrgViewFilter search, String items, String keyword, List<String> keywordColumns, Pageable pageable) {
         Optional<String> username = currentUserProvider.currentUsername();
         if (username.isEmpty()) {
             return emptyPage(pageable);
         }
 
-        Page<BusinessDocument> allPending = hasKeyword(keyword, keywordColumns)
+        // 19/10/2026: có bộ lọc -> findByAnyFieldContains(user_process, filter), xem queryDocumentsChoXuLy.
+        Page<BusinessDocument> allPending = search != null
+            ? documentRepository.findByAnyFieldContains(dbType, List.of("user_process"), username.get().trim(),
+                search.toBuilder().keyword(keyword).keywordColumns(keywordColumns).build(),
+                PageRequest.of(0, CHUTRI_GROUP_MAX_DOCUMENTS))
+            : hasKeyword(keyword, keywordColumns)
             ? documentRepository.findPendingForUser(
                 dbType, username.get().trim(), keyword.trim(), keywordColumns,
                 PageRequest.of(0, CHUTRI_GROUP_MAX_DOCUMENTS))
@@ -4618,8 +5296,16 @@ public class ViewQueryService {
             searchRequest.setKeyword(keyword.trim());
         }
         Page<AppUser> page = appUserRepository.search(searchRequest, pageable);
+        // 19/10/2026: + delegation_obj (ủy quyền đang hiệu lực) — modal chọn người Chuyển xử lý/Phối hợp
+        // của dự thảo hiển thị "(Ủy quyền: ...)" như cây Chuyển xử lý vbden. 1 truy vấn cho cả trang.
+        Map<String, Map<String, Object>> activeDelegations = userDelegationResolver.activeByDelegator(
+            page.getContent().stream().map(AppUser::getUsername).toList());
         List<Map<String, Object>> content = page.getContent().stream()
-            .map(user -> ItemsFilter.filter(toUserFieldsWithOrgProfile(user), items))
+            .map(user -> {
+                Map<String, Object> fields = toUserFieldsWithOrgProfile(user);
+                fields.put("delegation_obj", userDelegationResolver.activeObjOrEmpty(activeDelegations, user.getUsername()));
+                return ItemsFilter.filter(fields, items);
+            })
             .toList();
         return toPaginationResponse(content, page);
     }
@@ -5096,6 +5782,44 @@ public class ViewQueryService {
             page.isFirst(),
             page.isLast()
         );
+    }
+
+    /**
+     * 17/10/2026 — tìm kiếm nâng cao qua index tìm kiếm (docs/analysis/27): index trả id (đúng thứ tự) + tổng số,
+     * bản ghi nạp lại từ DB và đi qua CHÍNH mapper của SQL → kết quả trả về y hệt cấu trúc cũ, dữ liệu luôn mới.
+     * {@code null} = không dùng được index (tắt, chưa sẵn sàng, lỗi, bộ lọc chưa hỗ trợ) → người gọi chạy SQL.
+     */
+    private <T> PaginationResponse<Map<String, Object>> searchViaIndex(
+            String module, String entity, com.td.application.search.AdvancedSearchQuery query, Pageable pageable,
+            java.util.function.Function<List<java.util.UUID>, List<T>> loader,
+            java.util.function.Function<T, java.util.UUID> idOf,
+            java.util.function.Function<T, Map<String, Object>> mapper) {
+        if (query == null) {
+            return null;
+        }
+        var hits = advancedSearchIndex.search(module, entity, query, pageable.getPageNumber(), pageable.getPageSize())
+            .orElse(null);
+        if (hits == null) {
+            return null;
+        }
+        Map<java.util.UUID, T> byId = new HashMap<>();
+        if (!hits.ids().isEmpty()) {
+            for (T document : loader.apply(hits.ids())) {
+                byId.put(idOf.apply(document), document);
+            }
+        }
+        // Bản ghi vừa bị xoá giữa lúc index trả id và lúc nạp DB thì bỏ qua.
+        List<Map<String, Object>> content = hits.ids().stream()
+            .map(byId::get)
+            .filter(java.util.Objects::nonNull)
+            .map(mapper)
+            .toList();
+        return toPaginationResponse(content, new PageImpl<>(content, pageable, hits.total()));
+    }
+
+    /** Request là TÌM KIẾM (có từ khoá hoặc điều kiện nâng cao) — chỉ khi đó mới đọc index. */
+    private static boolean isSearchRequest(String keyword, Object advancedFilter) {
+        return (keyword != null && !keyword.isBlank()) || advancedFilter != null;
     }
 
     private <T> PaginationResponse<T> emptyPage(Pageable pageable) {

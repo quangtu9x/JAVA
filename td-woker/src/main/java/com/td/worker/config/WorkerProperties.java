@@ -30,6 +30,7 @@ public class WorkerProperties {
     private Rabbit rabbit = new Rabbit();
     private Kafka kafka = new Kafka();
     private Tasks tasks = new Tasks();
+    private FileRegistry fileRegistry = new FileRegistry();
 
     public String resolveInstanceId() {
         return (instanceId == null || instanceId.isBlank())
@@ -130,6 +131,28 @@ public class WorkerProperties {
         private String accessKey = "";
         private String secretKey = "";
         private String bucketName = "td-webapi-files";
+    }
+
+    /**
+     * Sổ đăng ký tệp đính kèm dùng chung (yêu cầu người dùng 22/10/2026) — database RIÊNG, CÙNG database với
+     * {@code app.file-registry} của td-web (td-web sở hữu migration). Xem {@code SharedFileRegistry}/
+     * {@code SharedFileGcJob}.
+     */
+    @Data
+    public static class FileRegistry {
+        private boolean enabled = true;
+        private String url = "jdbc:postgresql://localhost:5432/tdfileregistry";
+        private String username = "postgres";
+        private String password = "postgres";
+        private String driverClassName = "org.postgresql.Driver";
+        private int maximumPoolSize = 4;
+        /** Job dọn dẹp object MinIO hết tham chiếu (+ quét dữ liệu cũ 1 lần/tenant). */
+        private boolean gcEnabled = true;
+        private String gcCron = "0 30 2 * * *";
+        /** Object hết tham chiếu phải chờ bấy lâu mới bị xóa (yêu cầu người dùng: 7 ngày). */
+        private Duration gracePeriod = Duration.ofDays(7);
+        private int gcBatchSize = 200;
+        private int gcMaxBatchesPerRun = 50;
     }
 
     /** RabbitMQ topology. */

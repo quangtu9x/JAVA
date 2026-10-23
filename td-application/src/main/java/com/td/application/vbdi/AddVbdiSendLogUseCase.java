@@ -206,6 +206,14 @@ public class AddVbdiSendLogUseCase {
      */
     private void publishDeliveryMessage(VbdiSendLogDocument saved, VbdiDocument parent,
             List<com.td.application.documents.VbdiDeliveryFileRef> files) {
+        // 14/10/2026: nơi nhận NGOÀI TỈNH đi qua Trục liên thông quốc gia — SendVbdiDocumentUseCase gom cả lượt thành
+        // 1 task guinhanquocgia.send (PublishNationalExchangeSendUseCase), KHÔNG phát vbdi.delivery/vbdi.revoke:
+        // - vbdi.delivery cho external_unit chỉ bị td-woker treo WAITING_DEPENDENCY vĩnh viễn;
+        // - vbdi.revoke chạy trong tenant ĐƠN VỊ GỬI (tenant giả định cho external) và lọc theo parentid_send — đánh
+        //   dấu NHẦM các văn bản đến nội bộ cùng văn bản gốc là đã thu hồi (lỗi thật khi thu hồi nơi nhận ngoài tỉnh).
+        if (VbdiSendRecipientGroup.EXTERNAL_UNIT.equals(saved.getRecipientGroup())) {
+            return;
+        }
         try {
             String senderTenantId = currentTenantProvider.currentTenantId().orElse(null);
             String targetTenantId = resolveTargetTenantId(saved.getRecipientGroup(),
@@ -313,9 +321,10 @@ public class AddVbdiSendLogUseCase {
         boolean hasRealTenantGroup = VbdiSendRecipientGroup.COORDINATOR.equals(recipientGroup)
             || VbdiSendRecipientGroup.CONTACT_UNIT.equals(recipientGroup);
         if (hasRealTenantGroup && recipientIdentifier != null) {
-            var linked = organizationRepository.findByIdentifierAndDeletedOnIsNull(recipientIdentifier)
-                .map(org -> org.getLinkedTenantId())
-                .filter(id -> id != null && !id.isBlank());
+            // 12/10/2026: đơn vị/phòng con không khai báo linked_tenant_id -> lấy của tổ tiên gần nhất
+            // (trước đây rơi về tenant bên gửi -> VB đến tạo nhầm ở bên gửi). Xem OrganizationTenantLookup.
+            var linked = com.td.application.sharedcore.OrganizationTenantLookup
+                .resolveLinkedTenantId(organizationRepository, recipientIdentifier);
             if (linked.isPresent()) {
                 return linked.get();
             }

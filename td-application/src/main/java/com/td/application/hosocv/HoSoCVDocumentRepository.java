@@ -31,6 +31,9 @@ public interface HoSoCVDocumentRepository extends IRepository<HoSoCVDocument> {
     /** Cùng ngữ nghĩa {@code DuThaoDocumentRepository#findByVbdenOrgView} — tổ hợp khoá + status/field IN-NOT_IN. */
     Page<HoSoCVDocument> findByVbdenOrgView(String documentType, VbdenOrgViewFilter filter, Pageable pageable);
 
+    /** 17/10/2026 (tìm kiếm nâng cao đọc index tìm kiếm): nạp hồ sơ theo tập id (không lọc, không sắp xếp). */
+    java.util.List<HoSoCVDocument> findAllByIds(java.util.Collection<java.util.UUID> ids);
+
     /**
      * {@code vwUser_Coordinated_Status} (khoá FE {@code <username>_chua}/{@code <username>_da}):
      * field {@code user_coordinator}/{@code user_coordinated} lưu dạng chuỗi {@code ";"}-joined
@@ -68,10 +71,13 @@ public interface HoSoCVDocumentRepository extends IRepository<HoSoCVDocument> {
             String dateFieldName, boolean strictlyBefore,
             Map<String, String> extraDynamicFieldEquals, Pageable pageable);
 
-    /** 01/10/2026: như trên + lọc từ khoá "tìm trong danh sách". */
+    /**
+     * 01/10/2026: như trên + lọc từ khoá "tìm trong danh sách". 19/10/2026: + {@code search} (bộ lọc
+     * nâng cao CollapseHoSoCV, {@code null} = không lọc thêm).
+     */
     Page<HoSoCVDocument> findByFieldValueDueDate(
             String documentType, String keyFieldName, String keyValue,
             String dateFieldName, boolean strictlyBefore,
             Map<String, String> extraDynamicFieldEquals, String keyword, List<String> keywordColumns,
-            Pageable pageable);
+            com.td.application.documents.VbdenOrgViewFilter search, Pageable pageable);
 }

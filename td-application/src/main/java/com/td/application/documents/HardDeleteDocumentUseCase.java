@@ -16,8 +16,8 @@ public class HardDeleteDocumentUseCase {
 
     private final DocumentRepository documentRepository;
     private final DocumentCacheService documentCacheService;
-    private final DocumentSearchService documentSearchService;
     private final DocumentLogService documentLogService;
+    private final SharedDocumentFilesReleaser sharedDocumentFilesReleaser;
 
     public Result<UUID> execute(UUID documentId) {
         try {
@@ -28,8 +28,10 @@ public class HardDeleteDocumentUseCase {
 
             var before = DocumentDtoMapper.map(documentOptional.get());
 
+            // Truoc hardDelete, CUNG transaction: dong file_metadata dung chung (van ban den / chuyen xu ly)
+            // khong con van ban nao chua -> go va nha tham chieu (xem javadoc SharedDocumentFilesReleaser).
+            sharedDocumentFilesReleaser.releaseSharedFiles(documentId);
             documentRepository.hardDelete(documentOptional.get());
-            documentSearchService.delete(documentId);
             documentCacheService.evict(documentId);
             documentCacheService.evictAllListCaches();
             // Ghi log SAU KHI hard-delete: document_logs không có FK tới documents(id) (xem V1.0.13),

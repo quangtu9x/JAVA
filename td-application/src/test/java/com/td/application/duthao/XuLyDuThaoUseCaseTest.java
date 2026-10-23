@@ -55,7 +55,8 @@ class XuLyDuThaoUseCaseTest {
             duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider,
             documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
             new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
-            DuThaoSignSubmissionInspectorTest.emptyInspector());
+            DuThaoSignSubmissionInspectorTest.emptyInspector(),
+            com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver());
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
         lenient().when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         // DT-007: mac dinh tao draft_process thanh cong - cac test khong quan tam ket qua nay chi
@@ -144,6 +145,120 @@ class XuLyDuThaoUseCaseTest {
         verify(documentLogService).logUpdate(any(), any(), any());
         verify(documentCacheService).evict(document.getId());
         verify(documentCacheService).evictAllListCaches();
+    }
+
+    // 19/10/2026 (ủy quyền, cùng cách Chuyển xử lý vbden): A ủy quyền phạm vi Dự thảo cho B, FE giao cho
+    // B kèm delegatedFromUsername=A -> server xác minh rồi ghi A vào user_delivered.
+    @Test
+    void execute_chuyenduyet_withVerifiedDelegation_shouldRecordDelegatorInUserDelivered() {
+        XuLyDuThaoUseCase delegationUseCase = useCaseWithDelegation("duthao");
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.DRAFTING, "{\"user_delivered\":\"cu\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("chuyenduyet");
+        request.setReceiver("Truong phong A");
+        request.setReceiverUsername("phophongb");
+        request.setDelegatedFromUsername("truongphonga");
+
+        assertThat(delegationUseCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> fields = fieldsOf(document);
+        assertThat(fields).containsEntry("user_process_handler", "phophongb");
+        assertThat(fields).containsEntry("user_delivered", "cu;truongphonga");
+        assertThat(fields).containsEntry("process_handler_delegated_from", "truongphonga");
+    }
+
+    @Test
+    void execute_chuyenduyet_withDelegationOutsideDuThaoScope_shouldIgnoreDelegator() {
+        XuLyDuThaoUseCase delegationUseCase = useCaseWithDelegation("vbden");
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.DRAFTING, "{}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("chuyenduyet");
+        request.setReceiver("Truong phong A");
+        request.setReceiverUsername("phophongb");
+        request.setDelegatedFromUsername("truongphonga");
+
+        assertThat(delegationUseCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> fields = fieldsOf(document);
+        assertThat(fields).doesNotContainKey("user_delivered");
+        assertThat(fields).doesNotContainKey("process_handler_delegated_from");
+    }
+
+    // 19/10/2026 ("Kết thúc" nhầm -> "Thu hồi", chỉ người kết thúc).
+    @Test
+    void execute_ketthuc_shouldRememberEnderAndPreviousStatusPre() {
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.FORWARDED_FOR_APPROVAL,
+            "{\"status_pre\":\"0\",\"user_process_handler\":\"truongphong\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("ketthuc");
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> fields = fieldsOf(document);
+        assertThat(document.getStatus()).isEqualTo(DuThaoStatus.ENDED);
+        assertThat(fields).containsEntry("user_ended", "nguyenvana");
+        assertThat(fields).containsEntry("ended_status_pre", "0");
+        assertThat(fields).containsEntry("status_pre", DuThaoStatus.FORWARDED_FOR_APPROVAL);
+    }
+
+    @Test
+    void execute_thuhoi_onEndedByEnder_shouldRestorePreviousStateWithoutTouchingHandler() {
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.ENDED,
+            "{\"status_pre\":\"" + DuThaoStatus.FORWARDED_FOR_APPROVAL + "\",\"ended_status_pre\":\"0\","
+                + "\"user_ended\":\"nguyenvana\",\"draft_end\":\"1\",\"draft_end_date\":\"19/10/2026\","
+                + "\"process_handler\":\"Truong phong\",\"user_process_handler\":\"truongphong\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("thuhoi");
+        request.setReceiver("Nguyen Van A");
+        request.setReceiverUsername("nguyenvana");
+
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        Map<String, Object> fields = fieldsOf(document);
+        assertThat(document.getStatus()).isEqualTo(DuThaoStatus.FORWARDED_FOR_APPROVAL);
+        assertThat(fields).containsEntry("status_pre", "0");
+        assertThat(fields).containsEntry("user_process_handler", "truongphong");
+        assertThat(fields).doesNotContainKeys("draft_end", "draft_end_date", "user_ended", "ended_status_pre");
+        verify(addDraftProcessDocumentUseCase).execute(any());
+    }
+
+    @Test
+    void execute_thuhoi_onEndedByAnotherUser_shouldFail() {
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.ENDED,
+            "{\"status_pre\":\"0\",\"user_ended\":\"nguoikhac\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("thuhoi");
+
+        assertThat(useCase.execute(request).isSuccess()).isFalse();
+        assertThat(document.getStatus()).isEqualTo(DuThaoStatus.ENDED);
+        verify(duThaoDocumentRepository, org.mockito.Mockito.never()).save(any());
+    }
+
+    private XuLyDuThaoUseCase useCaseWithDelegation(String scopes) {
+        var delegation = new com.td.domain.sharedcore.UserDelegation(
+            UUID.randomUUID(), "truongphonga", UUID.randomUUID(), "phophongb", "Pho phong B", "Phó Trưởng phòng",
+            java.time.LocalDate.now().minusDays(1), java.time.LocalDate.now().plusDays(1), scopes, "Đi công tác");
+        return new XuLyDuThaoUseCase(
+            duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider,
+            documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
+            DuThaoSignSubmissionInspectorTest.emptyInspector(),
+            com.td.application.sharedcore.UserDelegationTestSupport.resolverWith(new java.util.ArrayList<>(java.util.List.of(delegation))));
     }
 
     // DT-007 (24/08/2026, cap nhat 25/08 tach bang): tao document con draft_process qua

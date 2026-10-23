@@ -55,6 +55,10 @@ public class VbdiDeliveryPayload {
     private String statusLabel;
 
     private String opinion;
+    /** Gói do TD Gateway nhận từ Trục; ACK quay về gateway sau commit thay vì vbdi.reply. */
+    private boolean nationalIncoming;
+    /** Mã văn bản eDXML gốc (gói Trục) — Java BE dựng ResponseFor khi phản hồi trạng thái về đơn vị gửi. */
+    private String nationalDocumentId;
 
     /** Ảnh tệp (message nhẹ — chỉ tham chiếu, không nhúng nhị phân). */
     private VbdiDocumentSnapshot documentSnapshot = new VbdiDocumentSnapshot();

@@ -7,7 +7,7 @@ import java.util.Map;
  * {@link FlowResult#statusCounts()} (vốn chỉ đếm tổng hợp theo trạng thái, không biết unit nào
  * trả về gì). Cho phép transport (vd HTTP debug endpoint,
  * {@code com.td.worker.transport.http.DebugTriggerController}) trả nguyên payload nghiệp vụ do
- * TaskHandler sinh ra (vd transId/verificationCode/errorCode của {@code simpki.sign}) mà KHÔNG
+ * TaskHandler sinh ra mà KHÔNG
  * cần Worker Core biết gì về module cụ thể — {@code detail} là {@code Map} tự do do
  * {@link com.td.worker.core.task.UnitResult#detail()} truyền lên, TaskHandler nào không set thì
  * {@code detail} là {@code null} (không đổi hành vi handler cũ).

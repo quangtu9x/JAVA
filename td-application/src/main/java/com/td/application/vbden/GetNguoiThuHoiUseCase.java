@@ -62,11 +62,18 @@ public class GetNguoiThuHoiUseCase {
     private static final String NGUOI_THUC_HIEN_FIELD = "nguoi_thuc_hien";
     private static final String ACTION_FIELD = "action";
     private static final int MAX_HISTORY_RECORDS = 1000;
+    private static final List<String> SNAPSHOT_FIELDS = List.of(ChuyenXuLyVbdenUseCase.USER_PROCESS_OBJ_FIELD_RAW,
+        ChuyenXuLyVbdenUseCase.USER_COORDINATE_OBJ_FIELD_RAW, ChuyenXuLyVbdenUseCase.USER_TO_READ_OBJ_FIELD_RAW);
+    static final String REASON_PROCESSED = "đã xử lý";
+    static final String REASON_PROCESSING = "đã bắt đầu xử lý";
+    static final String REASON_REVOKED = "bạn đã thu hồi";
+    static final String REASON_FORWARDED = "đã chuyển tiếp cho người khác";
 
     private final DocumentRepository documentRepository;
     private final VbdenResDocumentRepository vbdenResDocumentRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final CurrentUserProvider currentUserProvider;
+    private final VbdenRevokeRecipientMatcher recipientMatcher;
 
     public Result<Map<String, List<Map<String, Object>>>> execute(GetNguoiThuHoiRequest request) {
         var parentOptional = documentRepository.findById(request.getId());
@@ -91,6 +98,11 @@ public class GetNguoiThuHoiUseCase {
         List<String> pendingUserToRead = toStringList(fields.get(USER_TO_READ_FIELD));
         List<String> pendingUnitToRead = toStringList(fields.get(UNIT_TO_READ_FIELD));
         List<String> pendingUserTrack = toStringList(fields.get(USER_TRACK_FIELD));
+        List<String> processedUsers = toStringList(fields.get("user_processed"));
+        List<String> processedUnits = toStringList(fields.get("unit_processed"));
+        List<String> processingUsers = toStringList(fields.get("user_processing"));
+        Map<String, Map<String, Object>> notRevocable = new LinkedHashMap<>();
+        Map<String, Set<String>> memberCache = recipientMatcher.newMemberCache();
 
         List<Map<String, Object>> chutri = new ArrayList<>();
         List<Map<String, Object>> phoihop = new ArrayList<>();
@@ -103,6 +115,39 @@ public class GetNguoiThuHoiUseCase {
 
         var historyPage = vbdenResDocumentRepository.findByParentId(
             request.getId().toString(), PageRequest.of(0, MAX_HISTORY_RECORDS));
+        // 12/10/2026 (báo lỗi demo11 — "đã chuyển tiếp hoặc đã được thu hồi" gây nhầm): thời điểm gần nhất
+        // CHÍNH người thao tác chuyển cho / thu hồi từng người — để nói rõ "bạn đã thu hồi" hay "đã chuyển tiếp".
+        Map<String, java.time.LocalDateTime> lastTransferAt = new java.util.HashMap<>();
+        Map<String, java.time.LocalDateTime> lastRevokeAt = new java.util.HashMap<>();
+        for (VbdenResDocument historyRecord : historyPage.getContent()) {
+            Map<String, Object> historyFields = dynamicDocumentFieldsService.parseDynamicFields(
+                historyRecord.getDynamicFieldsJson());
+            if (!actingUsername.equals(asString(historyFields.get(NGUOI_THUC_HIEN_FIELD)))) {
+                continue;
+            }
+            String action = asString(historyFields.get(ACTION_FIELD));
+            Map<String, java.time.LocalDateTime> target = ThuHoiVanBanUseCase.ACTION_THU_HOI.equals(action) ? lastRevokeAt
+                : ThuHoiVanBanUseCase.REVOCABLE_ACTIONS.contains(action) ? lastTransferAt : null;
+            if (target == null || historyRecord.getCreatedOn() == null) {
+                continue;
+            }
+            for (String rawField : SNAPSHOT_FIELDS) {
+                for (JsonNode node : VbdenObjSnapshotFields.readJsonArray(historyFields.get(rawField))) {
+                    String key = recipientKey(node);
+                    if (key != null) {
+                        target.merge(key, historyRecord.getCreatedOn(), (a, b) -> a.isAfter(b) ? a : b);
+                    }
+                }
+            }
+        }
+        Set<String> revokedByMe = new LinkedHashSet<>();
+        lastRevokeAt.forEach((key, revokedAt) -> {
+            java.time.LocalDateTime transferredAt = lastTransferAt.get(key);
+            if (transferredAt == null || !revokedAt.isBefore(transferredAt)) {
+                revokedByMe.add(key);
+            }
+        });
+
         for (VbdenResDocument historyRecord : historyPage.getContent()) {
             Map<String, Object> historyFields = dynamicDocumentFieldsService.parseDynamicFields(
                 historyRecord.getDynamicFieldsJson());
@@ -114,13 +159,17 @@ public class GetNguoiThuHoiUseCase {
             }
 
             collectPending(historyFields.get(ChuyenXuLyVbdenUseCase.USER_PROCESS_OBJ_FIELD_RAW),
-                pendingUserProcess, pendingUnitProcess, seenChutri, chutri);
+                pendingUserProcess, pendingUnitProcess, seenChutri, chutri, memberCache);
+            for (String rawField : List.of(ChuyenXuLyVbdenUseCase.USER_PROCESS_OBJ_FIELD_RAW,
+                    ChuyenXuLyVbdenUseCase.USER_COORDINATE_OBJ_FIELD_RAW, ChuyenXuLyVbdenUseCase.USER_TO_READ_OBJ_FIELD_RAW)) {
+                collectNotRevocable(historyFields.get(rawField), processedUsers, processedUnits, processingUsers, revokedByMe, notRevocable);
+            }
             collectPending(historyFields.get(ChuyenXuLyVbdenUseCase.USER_COORDINATE_OBJ_FIELD_RAW),
-                pendingUserCoordinate, pendingUnitCoordinate, seenPhoihop, phoihop);
+                pendingUserCoordinate, pendingUnitCoordinate, seenPhoihop, phoihop, memberCache);
             collectPending(historyFields.get(ChuyenXuLyVbdenUseCase.USER_TO_READ_OBJ_FIELD_RAW),
-                pendingUserToRead, pendingUnitToRead, seenXemdebiet, xemdebiet);
+                pendingUserToRead, pendingUnitToRead, seenXemdebiet, xemdebiet, memberCache);
             collectPending(historyFields.get("user_track_obj"),
-                pendingUserTrack, List.of(), seenTheodoi, theodoi);
+                pendingUserTrack, List.of(), seenTheodoi, theodoi, memberCache);
         }
 
         Map<String, List<Map<String, Object>>> result = new LinkedHashMap<>();
@@ -128,6 +177,16 @@ public class GetNguoiThuHoiUseCase {
         result.put("phoihop", phoihop);
         result.put("xemdebiet", xemdebiet);
         result.put("theodoi", theodoi);
+        // 11/10/2026: người/đơn vị ĐÃ nhận từ chính người thao tác nhưng KHÔNG còn thu hồi được (đã xử lý,
+        // đã chuyển tiếp hoặc đã bị thu hồi) — FE dùng để giải thích khi danh sách thu hồi rỗng.
+        Set<String> stillRevocable = new LinkedHashSet<>();
+        stillRevocable.addAll(seenChutri);
+        stillRevocable.addAll(seenPhoihop);
+        stillRevocable.addAll(seenXemdebiet);
+        result.put("khongthethuhoi", notRevocable.entrySet().stream()
+            .filter(entry -> !stillRevocable.contains(entry.getKey()))
+            .map(Map.Entry::getValue)
+            .toList());
         return Result.success(result);
     }
 
@@ -137,16 +196,14 @@ public class GetNguoiThuHoiUseCase {
     // ThuHoiVanBanUseCase#revokeFromSnapshot, use case NAY chi DOC, khong thu hoi that).
     private void collectPending(
             Object rawValue, List<String> pendingUsers, List<String> pendingUnits,
-            Set<String> seen, List<Map<String, Object>> out) {
+            Set<String> seen, List<Map<String, Object>> out, Map<String, Set<String>> memberCache) {
         JsonNode parsed = VbdenObjSnapshotFields.readJsonArray(rawValue);
         for (JsonNode node : parsed) {
-            String username = node.hasNonNull("username") ? node.path("username").asText()
-                : node.path("user_receiver").asText("");
+            String username = VbdenRevokeRecipientMatcher.username(node);
             String identifier = node.path("identifier").asText("");
             String name = node.path("name").asText("");
-            boolean matchByUser = !username.isBlank() && pendingUsers.contains(username);
-            boolean matchByUnit = !identifier.isBlank() && pendingUnits.contains(identifier);
-            if (!matchByUser && !matchByUnit) {
+            // 11/10/2026: don vi chi "con cho" khi con thanh vien dang giu van ban - xem VbdenRevokeRecipientMatcher.
+            if (recipientMatcher.pendingHolders(node, pendingUsers, pendingUnits, memberCache).isEmpty()) {
                 continue;
             }
             String key = !username.isBlank() ? "U:" + username : "I:" + identifier;
@@ -165,6 +222,46 @@ public class GetNguoiThuHoiUseCase {
             }
             out.add(entry);
         }
+    }
+
+    private void collectNotRevocable(
+            Object rawValue, List<String> processedUsers, List<String> processedUnits, List<String> processingUsers,
+            Set<String> revokedByMe, Map<String, Map<String, Object>> out) {
+        for (JsonNode node : VbdenObjSnapshotFields.readJsonArray(rawValue)) {
+            String username = node.hasNonNull("username") ? node.path("username").asText()
+                : node.path("user_receiver").asText("");
+            String identifier = node.path("identifier").asText("");
+            if (username.isBlank() && identifier.isBlank()) {
+                continue;
+            }
+            String key = !username.isBlank() ? "U:" + username : "I:" + identifier;
+            boolean processed = (!username.isBlank() && processedUsers.contains(username))
+                || (!identifier.isBlank() && processedUnits.contains(identifier));
+            Map<String, Object> entry = new LinkedHashMap<>();
+            String name = node.path("name").asText("");
+            entry.put("name", name.isBlank() ? (!username.isBlank() ? username : identifier) : name);
+            boolean processing = !username.isBlank() && processingUsers.contains(username);
+            entry.put("ly_do", processed ? REASON_PROCESSED
+                : processing ? REASON_PROCESSING
+                : revokedByMe.contains(key) ? REASON_REVOKED : REASON_FORWARDED);
+            out.merge(key, entry, (existing, incoming) -> reasonRank(incoming) > reasonRank(existing) ? incoming : existing);
+        }
+    }
+
+    // Lý do cụ thể hơn thắng khi 1 người xuất hiện ở nhiều lần chuyển.
+    private int reasonRank(Map<String, Object> entry) {
+        Object reason = entry.get("ly_do");
+        return REASON_PROCESSED.equals(reason) ? 3 : REASON_PROCESSING.equals(reason) ? 2
+            : REASON_REVOKED.equals(reason) ? 1 : 0;
+    }
+
+    private static String recipientKey(JsonNode node) {
+        String username = VbdenRevokeRecipientMatcher.username(node);
+        String identifier = node.path("identifier").asText("");
+        if (!username.isBlank()) {
+            return "U:" + username;
+        }
+        return identifier.isBlank() ? null : "I:" + identifier;
     }
 
     private List<String> toStringList(Object value) {

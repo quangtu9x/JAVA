@@ -16,21 +16,18 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * Endpoint HTTP debug/test — bổ sung để TEST ĐỘC LẬP module bất kỳ (vd {@code simpki.sign}) mà
- * KHÔNG cần dựng RabbitMQ/Kafka thật (docs/18-trien-khai-test-simpki.md mục "Test độc lập không cần
- * RabbitMQ"). CHỈ active khi {@code worker.debug-endpoint.enabled=true} (mặc định {@code false}).
+ * Endpoint HTTP debug/test — dùng để test độc lập module bất kỳ mà không cần dựng RabbitMQ/Kafka
+ * thật. CHỈ active khi {@code worker.debug-endpoint.enabled=true} (mặc định {@code false}).
  *
  * <p>Gọi thẳng {@link InboundMessageRouter#route} — ĐÚNG biên giới transport-agnostic đã có sẵn
  * (docs/04-rabbitmq-kafka-flow.md §1: "Envelope là lớp trừu tượng — đổi broker không đổi code
  * nghiệp vụ"), HTTP ở đây chỉ là 1 "transport" THỨ 3 bên cạnh RabbitMQ/Kafka, dùng CHUNG toàn bộ
  * {@code EnvelopeParser}/{@code MessageFlowRunner}/checkpoint/idempotency — KHÔNG viết lại logic
  * dispatch. Body request = ĐÚNG format envelope JSON (messageId/taskType/correlationId/source/
- * createdAt/headers/units[]) như khi publish qua broker — xem
- * {@code deploy/simpki/publish-test-signal.sh} để tự sinh envelope mẫu.</p>
+ * createdAt/headers/units[]) như khi publish qua broker.</p>
  *
- * <p>Request xử lý ĐỒNG BỘ (giống hệt 1 Rabbit consumer thread) — với task đồng bộ dài (vd
- * {@code simpki.sign}, chờ SIM xác nhận tới 300s), HTTP client PHẢI chấp nhận chờ tương ứng (không
- * có giới hạn timeout riêng ở tầng HTTP ngoài cấu hình client gọi).</p>
+ * <p>Request xử lý ĐỒNG BỘ (giống hệt 1 Rabbit consumer thread), vì vậy HTTP client phải chấp nhận
+ * thời gian chờ tương ứng với task được kích hoạt.</p>
  *
  * <p>⚠️ CHỈ dùng dev/test — KHÔNG bật ở production/expose port này ra Internet: endpoint KHÔNG có
  * xác thực riêng (tương đương quyền 1 producer hợp lệ, cùng mô hình tin cậy {@code /actuator}).</p>
@@ -67,10 +64,8 @@ public class DebugTriggerController {
     }
 
     /**
-     * @param units chi tiết từng unit (vd 1 lần ký simpki.sign) — {@code detail} bên trong mỗi
-     *              phần tử là payload nghiệp vụ thật do TaskHandler trả về (vd transId/
-     *              verificationCode/statusCode khi ký thành công, hoặc errorCode/errorDesc khi
-     *              thất bại — xem {@code SimPkiSignTaskHandler}), KHÔNG phải suy diễn từ
+     * @param units chi tiết từng unit — {@code detail} bên trong mỗi phần tử là payload nghiệp vụ
+     *              thật do TaskHandler trả về, KHÔNG phải suy diễn từ
      *              {@code type}/{@code canAck} chung của cả message như trước.
      */
     public record DebugPublishResponse(String type, boolean canAck, String detail, List<UnitOutcome> units) {

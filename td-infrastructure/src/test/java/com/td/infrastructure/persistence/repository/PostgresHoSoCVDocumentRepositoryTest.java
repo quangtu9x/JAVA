@@ -1,5 +1,6 @@
 package com.td.infrastructure.persistence.repository;
 
+import com.td.application.documents.VbdenOrgViewFilter;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -119,5 +120,20 @@ class PostgresHoSoCVDocumentRepositoryTest {
         StringBuilder sql = new StringBuilder();
         repository.appendExcludeMemberFieldValuePredicates(sql, new LinkedHashMap<>(), null);
         assertThat(sql.toString()).isEmpty();
+    }
+
+    @Test
+    void resolveOrderBy_withPromulgationDate_shouldSortNewestDateFirstBeforePagination() {
+        String orderBy = repository.resolveOrderBy(VbdenOrgViewFilter.builder()
+            .primarySortField("promulgation_date")
+            .primarySortType("date")
+            .sortDescending(true)
+            .build());
+
+        assertThat(orderBy)
+            .contains("dynamic_fields->>'promulgation_date'")
+            .contains("TO_DATE")
+            .contains("DESC NULLS LAST")
+            .endsWith(PostgresHoSoCVDocumentRepository.NEWEST_CREATED_FIRST);
     }
 }

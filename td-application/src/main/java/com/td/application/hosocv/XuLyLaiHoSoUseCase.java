@@ -51,19 +51,25 @@ public class XuLyLaiHoSoUseCase {
                 if (document.isDeleted() || !DOCUMENT_TYPE.equalsIgnoreCase(document.getDocumentType())) {
                     return;
                 }
+                if (!HoSoCVStatus.DA_KET_THUC.equals(document.getStatus())) {
+                    return;
+                }
                 Map<String, Object> fields = new LinkedHashMap<>(
                     dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
                 Object currentTrinh = fields.get(HoSoCVLifecycleStatus.FIELD_TRINHLANHDAODUYET);
-                if (!HoSoCVLifecycleStatus.TRINH_KHONG_DUOC_DUYET.equals(String.valueOf(currentTrinh))) {
-                    return;
-                }
 
                 var before = buildSnapshot(document);
-                fields.put(HoSoCVLifecycleStatus.FIELD_TRINHLANHDAODUYET, HoSoCVLifecycleStatus.TRINH_CHUA_TRINH);
+                fields.remove(HoSoCVLifecycleStatus.FIELD_END_DATE);
+                fields.remove(HoSoCVLifecycleStatus.FIELD_SUMMARY);
+                if (HoSoCVLifecycleStatus.TRINH_KHONG_DUOC_DUYET.equals(String.valueOf(currentTrinh))) {
+                    fields.put(HoSoCVLifecycleStatus.FIELD_TRINHLANHDAODUYET,
+                        HoSoCVLifecycleStatus.TRINH_CHUA_TRINH);
+                }
                 if (request.getLyDo() != null && !request.getLyDo().isBlank()) {
                     fields.put("xulylai_lydo", request.getLyDo());
                 }
                 document.replaceDynamicFields(toJson(fields));
+                document.update(null, null, HoSoCVStatus.DANG_XU_LY, null, null, null, null);
 
                 var saved = hoSoCVDocumentRepository.save(document);
                 documentCacheService.evict(saved.getId());
@@ -73,7 +79,7 @@ public class XuLyLaiHoSoUseCase {
         }
 
         if (updated.isEmpty()) {
-            return Result.failure("Không có hồ sơ nào đủ điều kiện xử lý lại (phải đang ở trạng thái không được duyệt)");
+            return Result.failure("Không có hồ sơ đã kết thúc nào đủ điều kiện xử lý lại");
         }
         if (updated.size() < request.getHosocvIds().size()) {
             log.warn("Xử lý lại hồ sơ công việc: chỉ {}/{} id đủ điều kiện", updated.size(), request.getHosocvIds().size());

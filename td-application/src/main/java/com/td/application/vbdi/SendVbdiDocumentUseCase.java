@@ -190,6 +190,7 @@ public class SendVbdiDocumentUseCase {
     private final OrganizationAgencyResolver organizationAgencyResolver;
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
     private final com.td.application.documents.ListDocumentFilesUseCase listDocumentFilesUseCase;
+    private final PublishNationalExchangeSendUseCase publishNationalExchangeSendUseCase;
 
     public Result<Integer> execute(SendVbdiDocumentRequest request) {
         if (request == null || request.getDocumentId() == null) {
@@ -226,8 +227,14 @@ public class SendVbdiDocumentUseCase {
         // van ban den that (xem VbdiDeliveryTaskHandler#createDocument) - gui CHI internal_unit (khong
         // co contact_unit) truoc ban vay se KHONG chuan bi file nao, van ban den tao ra cho internal_unit
         // se LUON THIEU tep dinh kem du van ban di co tep - mo rong dieu kien sang ca internal_unit.
-        List<VbdiDeliveryFileRef> deliveryFiles = (isEmpty(request.getContactUnit()) && isEmpty(request.getInternalUnit()))
-            ? List.of() : prepareDeliveryFiles(document);
+        // 14/10/2026: nơi nhận ngoài tỉnh (Trục quốc gia) cũng cần tệp — gateway đóng gói tệp vào eDXML. Thu hồi/lấy
+        // lại không gửi tệp.
+        boolean externalNeedsFiles = !isEmpty(request.getExternalUnit()) && publishNationalExchangeSendUseCase.isEnabled()
+            && !REVOKE_FAMILY_TYPES.contains(sendType);
+        List<VbdiDeliveryFileRef> deliveryFiles =
+            (isEmpty(request.getContactUnit()) && isEmpty(request.getInternalUnit()) && !externalNeedsFiles)
+                ? List.of() : prepareDeliveryFiles(document);
+        List<PublishNationalExchangeSendUseCase.ExternalRecipient> externalSent = new java.util.ArrayList<>();
 
         // Bo sung 21/09/2026 (nguoi dung bao "Gui bo sung xong, tab Phat hanh khong thay thong tin
         // don vi vua gui bo sung"): NGUYEN NHAN - tab "Phat hanh" (ChiTietModal.jsx, nhanh daSent=true)
@@ -249,7 +256,10 @@ public class SendVbdiDocumentUseCase {
         written += sendToGroup(request.getDocumentId(), VbdiSendRecipientGroup.CONTACT_UNIT,
             request.getContactUnit(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup);
         written += sendToGroup(request.getDocumentId(), VbdiSendRecipientGroup.EXTERNAL_UNIT,
-            request.getExternalUnit(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup);
+            request.getExternalUnit(), sendType, statusLabel, content, deliveryFiles, writtenRecipientsByGroup,
+            externalSent);
+        // 1 gói eDXML cho MỌI nơi nhận ngoài tỉnh của lượt này (xem PublishNationalExchangeSendUseCase).
+        publishNationalExchangeSendUseCase.execute(document, sendType, externalSent, deliveryFiles);
 
         if (written == 0 && isEveryGroupEmpty(request)) {
             return Result.failure(NO_RECIPIENT_MESSAGE);
@@ -538,6 +548,15 @@ public class SendVbdiDocumentUseCase {
     private int sendToGroup(java.util.UUID documentId, String group, List<VbdiSendRecipientRequest> recipients,
             String sendType, String statusLabel, String content, List<VbdiDeliveryFileRef> deliveryFiles,
             Map<String, List<VbdiSendRecipientRequest>> writtenRecipientsByGroup) {
+        return sendToGroup(documentId, group, recipients, sendType, statusLabel, content, deliveryFiles,
+            writtenRecipientsByGroup, null);
+    }
+
+    /** @param externalSent khác null: thu thập nơi nhận ngoài tỉnh đã ghi nhật ký (kèm id dòng) để gửi lên Trục. */
+    private int sendToGroup(java.util.UUID documentId, String group, List<VbdiSendRecipientRequest> recipients,
+            String sendType, String statusLabel, String content, List<VbdiDeliveryFileRef> deliveryFiles,
+            Map<String, List<VbdiSendRecipientRequest>> writtenRecipientsByGroup,
+            List<PublishNationalExchangeSendUseCase.ExternalRecipient> externalSent) {
         if (recipients == null || recipients.isEmpty()) {
             return 0;
         }
@@ -581,6 +600,10 @@ public class SendVbdiDocumentUseCase {
                 written++;
                 writtenRecipientsByGroup.computeIfAbsent(effectiveGroup, key -> new java.util.ArrayList<>())
                     .add(recipient);
+                if (externalSent != null && VbdiSendRecipientGroup.EXTERNAL_UNIT.equals(effectiveGroup)) {
+                    externalSent.add(new PublishNationalExchangeSendUseCase.ExternalRecipient(
+                        result.getData(), identifier, recipient.getName()));
+                }
             } else {
                 log.warn("Ghi vet gui nhan that bai (group={}, identifier={}): {}", effectiveGroup, identifier, result.getError());
             }

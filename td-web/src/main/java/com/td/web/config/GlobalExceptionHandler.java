@@ -157,8 +157,14 @@ public class GlobalExceptionHandler {
             DataIntegrityViolationException ex, HttpServletRequest request) {
         log.warn("Data integrity violation: {}", ex.getMessage());
         String errorId = track(request, HttpStatus.CONFLICT, ex);
+        // 19/10/2026: quá độ dài cột (VARCHAR) -> câu dễ hiểu nêu số ký tự tối đa (ApiResponse#friendlyMessage).
+        String cause = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : null;
+        String friendly = ApiResponse.friendlyMessage(cause);
+        String message = friendly != null && !friendly.equals(cause)
+            ? friendly
+            : "Du lieu vi pham rang buoc, vui long kiem tra lai";
         return ResponseEntity.status(HttpStatus.CONFLICT)
-            .body(ApiResponse.error(HttpStatus.CONFLICT.value(), "Du lieu vi pham rang buoc, vui long kiem tra lai", errorId));
+            .body(ApiResponse.error(HttpStatus.CONFLICT.value(), message, errorId));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

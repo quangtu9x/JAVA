@@ -112,9 +112,13 @@ public class ThuHoiVanBanUseCase {
 
     // Bo 'private' 18/09/2026: GetNguoiThuHoiUseCase (cung package) can doc lai DUNG danh sach action
     // nay de khop chinh xac tap hop ban ghi vbden_res ma ThuHoiVanBanUseCase se xu ly (nhanh "all").
+    // 11/10/2026 (báo lỗi demo9 "thu hồi báo không còn người để thu hồi"): thêm "phanxuly" — ChuyenXuLy
+    // ghi user_delivered cho CẢ phanxuly lẫn chuyenxuly (nút "Thu hồi" hiện), nhưng tập này (chép từ
+    // Domino ThuHoiVanBan/GetNguoiThuHoi, thiếu sót gốc) bỏ phanxuly → chuyển bằng "Phân xử lý" thì
+    // danh sách thu hồi luôn rỗng dù người nhận chưa làm gì.
     static final Set<String> REVOCABLE_ACTIONS = Set.of(
         ChuyenXuLyVbdenUseCase.ACTION_CHUYEN_XU_LY, ChuyenXuLyVbdenUseCase.ACTION_PHAN_PHOI,
-        "vanthuchuyenvanban");
+        ChuyenXuLyVbdenUseCase.ACTION_PHAN_XU_LY, "vanthuchuyenvanban");
 
     // Bo sung 18/09/2026 (nhanh "select" - xem javadoc lop): field nay TRUOC DAY khong duoc
     // ThuHoiVanBanUseCase dung toi (chi GetNguoiThuHoiUseCase doc SONG qua TheoDoiVanBanDenUseCase),
@@ -163,6 +167,7 @@ public class ThuHoiVanBanUseCase {
     // Bo sung 08/09/2026 (giai doan 2 vbden.forward_unit - xem javadoc lop).
     private final PublishForwardUnitRevokeUseCase publishForwardUnitRevokeUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final VbdenRevokeRecipientMatcher recipientMatcher;
 
     public Result<UUID> execute(ThuHoiVanBanRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -181,6 +186,9 @@ public class ThuHoiVanBanUseCase {
 
         List<VbdenResDocument> history = vbdenResDocumentRepository.findByParentId(
             request.getParentid().toString(), PageRequest.of(0, MAX_HISTORY_RECORDS)).getContent();
+        if (request.isCleanupOnly()) {
+            return cleanupDeliveredMarkersOnly(parent, history, actingUsername);
+        }
         RevokeResult revoked;
         if (TYPE_SELECT.equalsIgnoreCase(request.getType())) {
             revoked = computeSelectiveRevocation(parent, request);
@@ -217,6 +225,7 @@ public class ThuHoiVanBanUseCase {
         ArrayNode phoihopRevoked = OBJECT_MAPPER.createArrayNode();
         ArrayNode xemdebietRevoked = OBJECT_MAPPER.createArrayNode();
         Set<String> revokedUsernames = new LinkedHashSet<>();
+        Map<String, Set<String>> memberCache = recipientMatcher.newMemberCache();
 
         for (VbdenResDocument historyRecord : historyRecords) {
             Map<String, Object> historyFields = dynamicDocumentFieldsService.parseDynamicFields(
@@ -229,13 +238,13 @@ public class ThuHoiVanBanUseCase {
 
             revokeFromSnapshot(
                 historyFields.get(ChuyenXuLyVbdenUseCase.USER_PROCESS_OBJ_FIELD_RAW),
-                userProcess, unitProcess, revokedUsernames, chutriRevoked);
+                userProcess, unitProcess, revokedUsernames, chutriRevoked, memberCache);
             revokeFromSnapshot(
                 historyFields.get(ChuyenXuLyVbdenUseCase.USER_COORDINATE_OBJ_FIELD_RAW),
-                userCoordinate, unitCoordinate, revokedUsernames, phoihopRevoked);
+                userCoordinate, unitCoordinate, revokedUsernames, phoihopRevoked, memberCache);
             revokeFromSnapshot(
                 historyFields.get(ChuyenXuLyVbdenUseCase.USER_TO_READ_OBJ_FIELD_RAW),
-                userToRead, unitToRead, revokedUsernames, xemdebietRevoked);
+                userToRead, unitToRead, revokedUsernames, xemdebietRevoked, memberCache);
         }
 
         fields.put(USER_PROCESS_FIELD, userProcess);
@@ -276,11 +285,12 @@ public class ThuHoiVanBanUseCase {
         ArrayNode xemdebietRevoked = OBJECT_MAPPER.createArrayNode();
         ArrayNode theodoiRevoked = OBJECT_MAPPER.createArrayNode();
         Set<String> revokedUsernames = new LinkedHashSet<>();
+        Map<String, Set<String>> memberCache = recipientMatcher.newMemberCache();
 
-        revokeFromSnapshot(request.getUserProcessObj(), userProcess, unitProcess, revokedUsernames, chutriRevoked);
-        revokeFromSnapshot(request.getUserCoordinateObj(), userCoordinate, unitCoordinate, revokedUsernames, phoihopRevoked);
-        revokeFromSnapshot(request.getUserToReadObj(), userToRead, unitToRead, revokedUsernames, xemdebietRevoked);
-        revokeFromSnapshot(request.getUserTrackObj(), userTrack, noUnitTrack, revokedUsernames, theodoiRevoked);
+        revokeFromSnapshot(request.getUserProcessObj(), userProcess, unitProcess, revokedUsernames, chutriRevoked, memberCache);
+        revokeFromSnapshot(request.getUserCoordinateObj(), userCoordinate, unitCoordinate, revokedUsernames, phoihopRevoked, memberCache);
+        revokeFromSnapshot(request.getUserToReadObj(), userToRead, unitToRead, revokedUsernames, xemdebietRevoked, memberCache);
+        revokeFromSnapshot(request.getUserTrackObj(), userTrack, noUnitTrack, revokedUsernames, theodoiRevoked, memberCache);
 
         fields.put(USER_PROCESS_FIELD, userProcess);
         fields.put(UNIT_PROCESS_FIELD, unitProcess);
@@ -363,17 +373,23 @@ public class ThuHoiVanBanUseCase {
 
     private void revokeFromSnapshot(
             Object rawValue, List<String> pendingUsers, List<String> pendingUnits,
-            Set<String> revokedUsernamesOut, ArrayNode revokedOut) {
+            Set<String> revokedUsernamesOut, ArrayNode revokedOut, Map<String, Set<String>> memberCache) {
         JsonNode parsed = VbdenObjSnapshotFields.readJsonArray(rawValue);
         for (JsonNode node : parsed) {
-            String username = node.hasNonNull("username") ? node.path("username").asText()
-                : node.path("user_receiver").asText("");
+            String username = VbdenRevokeRecipientMatcher.username(node);
             String identifier = node.path("identifier").asText("");
             String name = node.path("name").asText("");
-            boolean matchByUser = !username.isBlank() && pendingUsers.contains(username);
-            boolean matchByUnit = !identifier.isBlank() && pendingUnits.contains(identifier);
-            if (!matchByUser && !matchByUnit) {
+            // 11/10/2026: xem VbdenRevokeRecipientMatcher - don vi chi thu hoi khi con thanh vien dang giu
+            // van ban, va thu hoi don vi thi go luon cac thanh vien do (truoc day sot nguoi duoc chuyen tiep
+            // trong cung don vi).
+            Set<String> holders = recipientMatcher.pendingHolders(node, pendingUsers, pendingUnits, memberCache);
+            if (holders.isEmpty()) {
                 continue;
+            }
+            for (String holder : holders) {
+                if (!holder.isBlank() && pendingUsers.remove(holder)) {
+                    revokedUsernamesOut.add(holder);
+                }
             }
             ObjectNode entry = OBJECT_MAPPER.createObjectNode();
             if (!name.isBlank()) {
@@ -381,8 +397,6 @@ public class ThuHoiVanBanUseCase {
             }
             if (!username.isBlank()) {
                 entry.put("username", username);
-                revokedUsernamesOut.add(username);
-                pendingUsers.remove(username);
             }
             if (!identifier.isBlank()) {
                 entry.put("identifier", identifier);
@@ -419,6 +433,27 @@ public class ThuHoiVanBanUseCase {
         documentCacheService.evict(saved.getId());
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
+    }
+
+    // Xem ThuHoiVanBanRequest#cleanupOnly - chi luu khi that su go duoc dau.
+    private Result<UUID> cleanupDeliveredMarkersOnly(
+            BusinessDocument parent, List<VbdenResDocument> history, String actingUsername) {
+        Map<String, Object> fields = new LinkedHashMap<>(
+            dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson()));
+        List<String> deliveredBefore = toStringList(fields.get(USER_DELIVERED_FIELD));
+        List<String> trackBefore = toStringList(fields.get(USER_TRACK_FIELD));
+        clearDeliveredMarkersIfNothingLeft(fields, history, actingUsername);
+        if (deliveredBefore.equals(toStringList(fields.get(USER_DELIVERED_FIELD)))
+                && trackBefore.equals(toStringList(fields.get(USER_TRACK_FIELD)))) {
+            return Result.success(parent.getId());
+        }
+        var before = buildSnapshot(parent);
+        parent.replaceDynamicFields(toJson(fields));
+        var saved = documentRepository.save(parent);
+        documentCacheService.evict(saved.getId());
+        documentCacheService.evictAllListCaches();
+        documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
+        return Result.success(saved.getId());
     }
 
     private void recomputeStatus(BusinessDocument parent, Map<String, Object> fields) {

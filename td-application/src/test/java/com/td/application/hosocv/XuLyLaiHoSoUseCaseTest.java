@@ -42,8 +42,8 @@ class XuLyLaiHoSoUseCaseTest {
     }
 
     @Test
-    void execute_whenNotRejected_shouldReturnFailure() {
-        HoSoCVDocument document = newDocument(UUID.randomUUID(), "{\"trinhlanhdaoduyet\":\"2\"}");
+    void execute_whenNotEnded_shouldReturnFailure() {
+        HoSoCVDocument document = newDocument(UUID.randomUUID(), "{\"trinhlanhdaoduyet\":\"3\"}");
         when(hoSoCVDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
 
         var request = new XuLyLaiHoSoRequest();
@@ -54,7 +54,9 @@ class XuLyLaiHoSoUseCaseTest {
 
     @Test
     void execute_whenRejected_shouldResetTrinhLanhDaoDuyet() {
-        HoSoCVDocument document = newDocument(UUID.randomUUID(), "{\"trinhlanhdaoduyet\":\"3\"}");
+        HoSoCVDocument document = newDocument(UUID.randomUUID(),
+            "{\"trinhlanhdaoduyet\":\"3\",\"end_date\":\"12/10/2026\",\"summary\":\"Da xong\"}");
+        document.update(null, null, HoSoCVStatus.DA_KET_THUC, null, null, null, null);
         when(hoSoCVDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
         when(hoSoCVDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -66,8 +68,30 @@ class XuLyLaiHoSoUseCaseTest {
 
         assertThat(result.isSuccess()).isTrue();
         Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        assertThat(document.getStatus()).isEqualTo(HoSoCVStatus.DANG_XU_LY);
         assertThat(fields.get("trinhlanhdaoduyet")).isEqualTo(HoSoCVLifecycleStatus.TRINH_CHUA_TRINH);
+        assertThat(fields).doesNotContainKeys("end_date", "summary");
         assertThat(fields.get("xulylai_lydo")).isEqualTo("Bo sung chung tu");
+    }
+
+    @Test
+    void execute_whenEndedWithoutRejection_shouldReopenForProcessing() {
+        HoSoCVDocument document = newDocument(UUID.randomUUID(),
+            "{\"trinhlanhdaoduyet\":\"1\",\"end_date\":\"12/10/2026\",\"summary\":\"Da xong\"}");
+        document.update(null, null, HoSoCVStatus.DA_KET_THUC, null, null, null, null);
+        when(hoSoCVDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        when(hoSoCVDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var request = new XuLyLaiHoSoRequest();
+        request.setHosocvIds(List.of(document.getId()));
+
+        var result = useCase.execute(request);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(document.getStatus()).isEqualTo(HoSoCVStatus.DANG_XU_LY);
+        Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        assertThat(fields).containsEntry("trinhlanhdaoduyet", "1");
+        assertThat(fields).doesNotContainKeys("end_date", "summary");
     }
 
     private HoSoCVDocument newDocument(UUID id, String dynamicFieldsJson) {

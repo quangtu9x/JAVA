@@ -46,6 +46,8 @@ class SendVbdiDocumentUseCaseTest {
     private OrganizationRepository organizationRepository;
     @Mock
     private OrganizationAgencyResolver organizationAgencyResolver;
+    @Mock
+    private PublishNationalExchangeSendUseCase publishNationalExchangeSendUseCase;
 
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService = new DynamicDocumentFieldsService();
     private SendVbdiDocumentUseCase useCase;
@@ -60,7 +62,8 @@ class SendVbdiDocumentUseCaseTest {
             organizationRepository, organizationAgencyResolver,
             com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
             documentId -> new com.td.application.common.models.PaginationResponse<>(documentFiles, 1, 20,
-                documentFiles.size(), 1, true, true));
+                documentFiles.size(), 1, true, true),
+            publishNationalExchangeSendUseCase);
     }
 
     // 09/10/2026 (báo lỗi snnmt): văn bản sao chép không có tệp -> lần gửi đầu bị từ chối, không ghi log gửi.
@@ -79,6 +82,31 @@ class SendVbdiDocumentUseCaseTest {
         org.assertj.core.api.Assertions.assertThat(result.isSuccess()).isFalse();
         org.assertj.core.api.Assertions.assertThat(result.getError()).isEqualTo(SendVbdiDocumentUseCase.NO_FILE_MESSAGE);
         org.mockito.Mockito.verifyNoInteractions(addVbdiSendLogUseCase);
+    }
+
+    // 14/10/2026: mọi nơi nhận ngoài tỉnh của 1 lượt -> ĐÚNG 1 lần gửi lên Trục, kèm id dòng nhật ký từng nơi nhận.
+    @Test
+    void execute_externalRecipients_shouldPublishOneNationalSendWithAllSendLogIds() {
+        var document = issuedDocument();
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        UUID log1 = UUID.randomUUID();
+        UUID log2 = UUID.randomUUID();
+        when(addVbdiSendLogUseCase.execute(any())).thenReturn(Result.success(log1), Result.success(log2));
+
+        var request = new SendVbdiDocumentRequest();
+        request.setDocumentId(document.getId());
+        request.setExternalUnit(List.of(recipient("000.00.00.G22", "VPCP"), recipient("000.00.00.H41", "Nghệ An")));
+
+        assertThat(useCase.execute(request).getData()).isEqualTo(2);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<PublishNationalExchangeSendUseCase.ExternalRecipient>> captor = ArgumentCaptor.forClass(List.class);
+        verify(publishNationalExchangeSendUseCase).execute(org.mockito.ArgumentMatchers.eq(document),
+            org.mockito.ArgumentMatchers.eq(VbdiSendType.SEND_DOCUMENT), captor.capture(), any());
+        assertThat(captor.getValue()).extracting(PublishNationalExchangeSendUseCase.ExternalRecipient::sendLogId)
+            .containsExactly(log1, log2);
+        assertThat(captor.getValue()).extracting(PublishNationalExchangeSendUseCase.ExternalRecipient::agencyCode)
+            .containsExactly("000.00.00.G22", "000.00.00.H41");
     }
 
     private VbdiDocument issuedDocument() {

@@ -109,6 +109,9 @@ public class PostgresXinYKienDocumentRepository implements XinYKienDocumentRepos
         appendStatusPredicate(sql, parameters, filter.getExcludeFieldValues(), false);
         appendDynamicFieldValuePredicates(sql, parameters, filter.getIncludeFieldValues(), true);
         appendDynamicFieldValuePredicates(sql, parameters, filter.getExcludeFieldValues(), false);
+        // 19/10/2026: bộ lọc nâng cao vbden áp cả cho 14 view xin ý kiến (ViewQueryService#withAdvancedSearch).
+        TextContainsSql.appendContainsAny(sql, parameters, filter.getContainsAnyFieldValues(), "xyAny");
+        TextContainsSql.append(sql, parameters, filter.getTextContainsFieldValues(), false);
         if (filter.getRequireEmptyFieldName() != null && !filter.getRequireEmptyFieldName().isBlank()) {
             sql.append(" AND COALESCE(d.dynamic_fields->>'")
                 .append(filter.getRequireEmptyFieldName()).append("', '') = ''");
@@ -281,14 +284,14 @@ public class PostgresXinYKienDocumentRepository implements XinYKienDocumentRepos
         if (keyword == null || keyword.isBlank() || keywordColumns == null || keywordColumns.isEmpty()) {
             return;
         }
-        String likeValue = "%" + keyword.trim().toLowerCase() + "%";
+        String likeValue = SearchTextSql.containsLike(keyword); // 20/10/2026: không phân biệt dấu
         sql.append(" AND (");
         for (int index = 0; index < keywordColumns.size(); index++) {
             if (index > 0) {
                 sql.append(" OR ");
             }
             String parameterName = "keyword" + index;
-            sql.append("LOWER(COALESCE(d.dynamic_fields->>'").append(keywordColumns.get(index)).append("', ''))")
+            sql.append("td_search_norm(COALESCE(d.dynamic_fields->>'").append(keywordColumns.get(index)).append("', ''))")
                 .append(" LIKE :").append(parameterName);
             parameters.put(parameterName, likeValue);
         }

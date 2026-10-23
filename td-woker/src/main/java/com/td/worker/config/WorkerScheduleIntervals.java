@@ -23,4 +23,9 @@ public class WorkerScheduleIntervals {
     public long controlPlaneRefreshIntervalMs() {
         return props.getControlPlane().getRefreshInterval().toMillis();
     }
+
+    /** Cron job dọn dẹp tệp đính kèm dùng chung hết tham chiếu. */
+    public String fileRegistryGcCron() {
+        return props.getFileRegistry().getGcCron();
+    }
 }

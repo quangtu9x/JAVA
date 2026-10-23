@@ -55,4 +55,35 @@ public class WorkerMinioClient {
     public String bucketName() {
         return props.getMinio().getBucketName();
     }
+
+    /**
+     * 22/10/2026: CHỈ dùng cho {@code SharedFileGcJob} — xóa object dùng chung đã hết đơn vị tham chiếu. Ném lỗi
+     * để job trả object về trạng thái chưa xóa và thử lại lượt sau.
+     */
+    public void removeObject(String bucket, String objectName) throws Exception {
+        if (!isEnabled()) {
+            throw new IllegalStateException("MinIO chưa bật (MINIO_ENABLED=false)");
+        }
+        client.removeObject(io.minio.RemoveObjectArgs.builder()
+            .bucket(bucket == null || bucket.isBlank() ? props.getMinio().getBucketName() : bucket)
+            .object(objectName)
+            .build());
+    }
+
+    /**
+     * 17/10/2026 (trích nội dung tệp — docs/architecture/14-trich-noi-dung-tep.md): mở luồng đọc 1 object để trích
+     * chữ. Đây là ngoại lệ DUY NHẤT của nguyên tắc "worker không tải tệp" ở trên: chỉ đọc luồng vào bộ nhớ (không ghi
+     * đĩa), có giới hạn dung lượng ở người gọi. Người gọi PHẢI đóng luồng.
+     *
+     * @param bucket bucket của dòng file_metadata; trống = bucket cấu hình
+     */
+    public java.io.InputStream openObject(String bucket, String objectName) throws Exception {
+        if (!isEnabled()) {
+            throw new IllegalStateException("MinIO chưa bật (MINIO_ENABLED=false)");
+        }
+        return client.getObject(io.minio.GetObjectArgs.builder()
+            .bucket(bucket == null || bucket.isBlank() ? props.getMinio().getBucketName() : bucket)
+            .object(objectName)
+            .build());
+    }
 }

@@ -6,6 +6,7 @@ import com.td.worker.config.WorkerProperties;
 import com.td.worker.core.task.TaskContext;
 import com.td.worker.core.task.TaskHandler;
 import com.td.worker.core.task.UnitResult;
+import com.td.worker.infrastructure.fileregistry.SharedFileRegistry;
 import com.td.worker.infrastructure.minio.WorkerMinioClient;
 import com.td.worker.infrastructure.tenant.TenantDataSourceManager;
 import com.td.worker.transport.rabbit.RabbitPublisher;
@@ -20,6 +21,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -74,6 +76,7 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
     private final WorkerMinioClient minio;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<RabbitPublisher> rabbitPublisher;
+    private final SharedFileRegistry sharedFileRegistry;
 
     @Override
     public String taskType() {
@@ -157,6 +160,7 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
         // không nhận được văn bản"). DataSourceTransactionManager tạo mới mỗi lần gọi - chi phí
         // không đáng kể so với round-trip DB thật, không cần cache theo tenant.
         AtomicReference<UUID> createdDocumentId = new AtomicReference<>();
+        AtomicReference<List<SharedFileRegistry.SharedFileRef>> sharedFileRefs = new AtomicReference<>(List.of());
         boolean firstTime = Boolean.TRUE.equals(tx.execute(status -> {
             int inserted = markArrived(jdbc, context, p, table);
             if (inserted == 1 && createDocument) {
@@ -193,6 +197,7 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
                 // VbdenIncomingDocumentWriter#insertFileMetadata).
                 VbdenIncomingDocumentWriter.insertFileMetadata(jdbc, docId, preparedFiles);
                 createdDocumentId.set(docId);
+                sharedFileRefs.set(VbdenIncomingDocumentWriter.toSharedFileRefs(docId, preparedFiles));
             }
             return inserted == 1;
         }));
@@ -203,6 +208,10 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
             log.info("Đã tạo văn bản đến (chờ vào sổ) id={} cho sendLog={}, tenant={}",
                 createdDocumentId.get(), p.getSendLogId(), context.tenantId());
         }
+        // 22/10/2026: ghi tham chieu tep dung chung SAU commit (DB so dang ky rieng) - loi chi log, xem
+        // SharedFileRegistry#registerQuietly.
+        sharedFileRegistry.registerQuietly(context.tenantId(), p.isNationalIncoming()
+            ? SharedFileRegistry.SOURCE_NATIONAL_INCOMING : SharedFileRegistry.SOURCE_VBDI_DELIVERY, sharedFileRefs.get());
 
         verifyObjectExists(p);
         publishArrivedReply(context, p, createdDocumentId.get());
@@ -340,7 +349,10 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
         try {
             Map<String, Object> reply = new LinkedHashMap<>();
             reply.put("sendLogId", p.getSendLogId());
-            reply.put("documentId", p.getDocumentId());
+            // Với gói nhận từ Trục, ACK phải tham chiếu ID vận chuyển để Gateway
+            // đóng đúng lần poll. documentId là ID nghiệp vụ bên trong eDXML và được
+            // giữ riêng để chống trùng/tạo quan hệ văn bản cập nhật.
+            reply.put("documentId", p.isNationalIncoming() ? p.getSendId() : p.getDocumentId());
             reply.put("statusCode", VbdiTaskConstants.STATUS_01_DA_DEN);
             reply.put("statusLabel", VbdiTaskConstants.LABEL_DA_DEN);
             if (createdDocumentId != null) {
@@ -361,7 +373,9 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
 
             Map<String, Object> envelope = new LinkedHashMap<>();
             envelope.put("messageId", messageId);
-            envelope.put("taskType", VbdiTaskConstants.TASK_REPLY);
+            String replyTask = p.isNationalIncoming()
+                ? "guinhanquocgia.receive.ack" : VbdiTaskConstants.TASK_REPLY;
+            envelope.put("taskType", replyTask);
             envelope.put("correlationId", context.correlationId() == null ? "" : context.correlationId());
             envelope.put("source", "td-worker-vbdi-delivery");
             envelope.put("createdAt", Instant.now().toString());
@@ -369,11 +383,16 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
             envelope.put("units", java.util.List.of(unit));
 
             String json = objectMapper.writeValueAsString(envelope);
-            String routingKey = "worker." + VbdiTaskConstants.TASK_REPLY.replace('.', '_');
+            String routingKey = p.isNationalIncoming()
+                ? "worker.guinhanquocgia.receive.ack"
+                : "worker." + VbdiTaskConstants.TASK_REPLY.replace('.', '_');
             rabbitPublisher.ifAvailable(rp -> rp.publish(props.getRabbit().getExchange(), routingKey, json));
             log.info("Đã publish phản hồi 'Đã đến' (sendLog={}) tới tenant {} qua routing {}",
                 p.getSendLogId(), p.getSenderTenantId(), routingKey);
         } catch (Exception e) {
+            if (p.isNationalIncoming()) {
+                throw new IllegalStateException("Không publish được ACK tiếp nhận Trục quốc gia", e);
+            }
             // Phản hồi không gửi được KHÔNG làm FAIL unit gốc (reply gửi lại được sau).
             log.warn("Publish phản hồi 'Đã đến' thất bại: {}", e.getMessage());
         }

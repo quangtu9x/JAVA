@@ -154,6 +154,8 @@ class PostgresDuThaoDocumentRepositoryTest {
         String text = sql.toString();
         assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_coordinated', '') = :orGroupScalar0");
         assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_coordinator', '') = :orGroupScalar1");
+        // 19/10/2026: người ủy quyền phối hợp (user_coordinated_movement) cũng thấy ở "Đã phối hợp".
+        assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_coordinated_movement', '') = :orGroupScalarDelegated");
         assertThat(text).contains("LOWER(COALESCE(d.status, '')) IN (:orGroupDoneStatus0,:orGroupDoneStatus1,:orGroupDoneStatus2)");
         // nhanh 1 (coordinated) phai dung TRUOC dieu kien status - status chi rang buoc nhanh 2.
         int coordinatedIndex = text.indexOf("orGroupScalar0");
@@ -210,5 +212,34 @@ class PostgresDuThaoDocumentRepositoryTest {
         assertThat(text.indexOf("orGroupMember0")).isLessThan(text.indexOf("d.status"));
         assertThat(parameters).containsEntry("orGroupMember0", "%;demo1;%");
         assertThat(parameters).containsEntry("orGroupMember1", "%;demo1;%");
+    }
+
+    // 22/10/2026 - vwChoDuyetKyBanHanh: moi nhanh (field, status rieng) la 1 OR, status gan dung nhanh cua no.
+    @Test
+    void appendFieldStatusBranchesPredicate_shouldOrBranchesEachWithOwnStatuses() {
+        StringBuilder sql = new StringBuilder();
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        Map<String, List<String>> branches = new LinkedHashMap<>();
+        branches.put("user_signer", List.of("1", "3"));
+        branches.put("user_other_process_handler", List.of("9"));
+
+        repository.appendFieldStatusBranchesPredicate(sql, parameters, branches, "demo1");
+
+        String text = sql.toString();
+        assertThat(text).doesNotContain("1 = 0");
+        assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_signer', '') = :branchScalar0");
+        assertThat(text).contains("COALESCE(d.dynamic_fields->>'user_other_process_handler', '') = :branchScalar1");
+        assertThat(text).contains("IN (:branchStatus0_0,:branchStatus0_1)) OR (");
+        assertThat(text).contains("IN (:branchStatus1_0))");
+        assertThat(parameters).containsEntry("branchStatus0_1", "3");
+        assertThat(parameters).containsEntry("branchStatus1_0", "9");
+        assertThat(parameters).containsEntry("branchScalar0", "demo1");
+    }
+
+    @Test
+    void appendFieldStatusBranchesPredicate_withBlankValue_shouldMatchNothing() {
+        StringBuilder sql = new StringBuilder();
+        repository.appendFieldStatusBranchesPredicate(sql, new LinkedHashMap<>(), Map.of("user_signer", List.of("1")), " ");
+        assertThat(sql.toString()).isEqualTo(" AND 1 = 0");
     }
 }

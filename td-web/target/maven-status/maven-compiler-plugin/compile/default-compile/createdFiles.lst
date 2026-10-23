@@ -19,9 +19,11 @@ com\td\web\controllers\v1\QLVBCompatAuthController.class
 com\td\web\controllers\v1\UserDelegationsController.class
 template\department\web\DepartmentsController.class
 com\td\web\config\FormDataToJsonFilter$JsonBodyWrapper$1.class
+com\td\web\controllers\v1\FileContentExtractsController.class
 com\td\web\controllers\v1\SharedCorePermissionsController.class
 com\td\web\config\StringNormalizationConfig$StringNormalizationAdvice$1.class
 com\td\web\controllers\v1\DuThaoController.class
+com\td\web\controllers\v1\TongHopController.class
 com\td\web\controllers\v1\NumberingConfigController.class
 com\td\web\config\FormDataToJsonFilter$JsonBodyWrapper.class
 com\td\web\controllers\v1\ViewQueryController.class
@@ -31,9 +33,11 @@ com\td\web\controllers\v1\OnlyOfficeController.class
 com\td\web\controllers\v1\SharedCoreUsersController.class
 com\td\web\controllers\v1\SimPkiSignController.class
 com\td\web\controllers\v1\VbdiController.class
+com\td\web\controllers\v1\TrucQuocGiaController.class
 com\td\web\controllers\v1\HoSoLuuTruController.class
 com\td\web\controllers\v1\SimPkiSignController$1.class
 com\td\web\controllers\v1\PrivateCategoriesController.class
+com\td\web\config\RedisOrganizationTreeCacheStore.class
 com\td\web\controllers\SwaggerOAuthConfigController.class
 com\td\web\config\StringNormalizationConfig$StringNormalizationAdvice.class
 com\td\web\config\RequestBodyCachingFilter.class

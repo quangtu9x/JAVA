@@ -30,6 +30,13 @@ public class ThuHoiVanBanRequest {
      */
     private String type;
 
+    /**
+     * 11/10/2026: true = KHÔNG thu hồi gì, chỉ gỡ người thao tác khỏi user_delivered/user_track nếu không
+     * còn ai do họ chuyển đang xử lý/đã xử lý (dọn dấu "đã chuyển" sót từ trước bản sửa 09/10) — FE gọi
+     * khi GetNguoiThuHoi rỗng. Không ghi vết quá trình xử lý.
+     */
+    private boolean cleanupOnly;
+
     /** Nhánh {@code "select"}: JSON mảng {@code {name,username,identifier}} — chủ trì cần thu hồi. */
     private String userProcessObj;
 

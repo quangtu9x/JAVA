@@ -16,5 +16,6 @@ COPY --from=build /build/target/td-worker.jar app.jar
 EXPOSE 8090
 
 # Graceful shutdown đúng cách (drain executor + đóng pool)
-ENV JAVA_OPTS="-Xms256m -Xmx512m"
+# Trích nội dung tệp giữ tệp trong bộ nhớ (tối đa WORKER_FILE_EXTRACT_MAX_FILE_BYTES/tệp × số tenant song song) → heap 1GB.
+ENV JAVA_OPTS="-Xms256m -Xmx1024m"
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

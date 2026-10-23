@@ -12,8 +12,7 @@ import java.util.List;
  * @param units     (FLOW_OK) chi tiết từng unit đã chờ xong lượt này — xem {@link UnitOutcome};
  *                  rỗng cho PARSE_ERROR/TRANSIENT_ERROR (chưa chạy tới unit nào). RabbitMQ/Kafka
  *                  listener hiện có KHÔNG cần field này (chỉ dùng {@code canAck}) — thêm để HTTP
- *                  debug endpoint trả được payload nghiệp vụ thật (vd transId/verificationCode
- *                  simpki.sign) mà không đổi hợp đồng ACK hiện có.
+ *                  debug endpoint trả được payload nghiệp vụ thật mà không đổi hợp đồng ACK hiện có.
  */
 public record RoutedResult(Type type, boolean canAck, String detail, List<UnitOutcome> units) {
 

@@ -186,8 +186,17 @@ app:
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket-name: ${MINIO_BUCKET_NAME:td-webapi-files}
-  elasticsearch:
-    enabled: ${ELASTICSEARCH_ENABLED:true}
+  # 17/10/2026: tim kiem nang cao doc Elasticsearch (docs/analysis/27, docs/architecture/13). Index do td-woker
+  # dong bo (worker.search-sync) - CUNG index-prefix. Tat / module khong bat / index chua san sang / loi -> SQL.
+  # Dia chi ES: spring.elasticsearch.uris (ELASTICSEARCH_URIS).
+  search:
+    elasticsearch:
+      enabled: ${SEARCH_ES_ENABLED:false}
+      index-prefix: ${SEARCH_ES_INDEX_PREFIX:hscv}
+      modules: ${SEARCH_ES_MODULES:vbden,vbdi,duthao,hosocv,phieutrinhtd}
+      readiness-cache-ttl: ${SEARCH_ES_READINESS_CACHE_TTL:30s}
+      # Tu khoa tim ca trong NOI DUNG TEP dinh kem (files_text, td-woker trich bang Tika, chua OCR - docs/architecture/14).
+      include-file-content: ${SEARCH_ES_INCLUDE_FILE_CONTENT:true}
   email:
     # BL-221: dia chi gui di + cong tac (bat/tat that su gui mail — mac dinh true, chi tat khi
     # test/staging chua co SMTP relay that de tranh loi khi goi API).
@@ -244,6 +253,55 @@ app:
     vbqp:
       enabled: ${VBDEN_VBQP_ENABLED:false}
       mailin: ${VBDEN_VBQP_MAILIN:}
+  # Gui VB di toi noi nhan NGOAI TINH qua Truc lien thong van ban quoc gia (TD Gateway - project tdgateway):
+  # bat thi moi luot gui phat 1 task guinhanquocgia.send (routing key worker.guinhanquocgia.send / topic
+  # tdgateway.guinhanquocgia.send). TAT (mac dinh): ghi "Gui loi - chua bat ket noi Truc" vao Nhat ky gui nhan.
+  # Chi bat khi TD Gateway da bat broker (GATEWAY_RABBIT_ENABLED/GATEWAY_KAFKA_ENABLED) va GATEWAY_VPCP_ENABLED.
+  vbdi:
+    national-exchange:
+      enabled: ${VBDI_NATIONAL_EXCHANGE_ENABLED:false}
+  # Man /tonghop/trucquocgia: doc (CHI DOC) read model quan tri gui nhan quoc gia trong DB RIENG cua TD Gateway
+  # (tdgateway V8/V9/V15). TAT (mac dinh): API tra "chua cau hinh", khong tao ket noi. DB gateway ngat KHONG lam
+  # sap khoi dong/health td-web (NationalExchangeDataSourceConfig).
+  national-exchange:
+    admin:
+      enabled: ${NATIONAL_EXCHANGE_ADMIN_ENABLED:false}
+      datasource:
+        url: ${NATIONAL_EXCHANGE_DB_URL:jdbc:postgresql://localhost:5432/tdgateway}
+        # Khong khai bao rieng -> dung lai tai khoan DB nghiep vu cua td-web (DATABASE_USERNAME/PASSWORD).
+        # Production nen cap tai khoan rieng chi SELECT (tdgateway/docs/24 muc 2.7).
+        username: ${NATIONAL_EXCHANGE_DB_USERNAME:${DATABASE_USERNAME:postgres}}
+        password: ${NATIONAL_EXCHANGE_DB_PASSWORD:${DATABASE_PASSWORD:postgres}}
+        maximum-pool-size: ${NATIONAL_EXCHANGE_DB_MAX_POOL:4}
+      # Ten co quan Truc tra Redis truoc (gateway day danh ba len HASH <prefix>:names), thieu moi tra SQL. Prefix PHAI
+      # khop GATEWAY_ADMIN_AGENCY_REDIS_KEY_PREFIX ben tdgateway, CUNG Redis + REDIS_DATABASE.
+      agency-redis-enabled: ${NATIONAL_EXCHANGE_AGENCY_REDIS_ENABLED:true}
+      agency-redis-key-prefix: ${NATIONAL_EXCHANGE_AGENCY_REDIS_KEY_PREFIX:tdgateway:national-agency}
+      # Thao tac quan tri (gui lai/nhan lai/phat lai/xu ly lai): td-web GHI lenh vao hang doi cua gateway, gateway
+      # thuc thi bat dong bo (GATEWAY_ADMIN_EXECUTOR_ENABLED ben tdgateway PHAI bat). TAT: an nut, API tu choi.
+      operations-enabled: ${NATIONAL_EXCHANGE_OPERATIONS_ENABLED:false}
+      # Tai khoan GHI lenh (bo trong -> dung tai khoan doc o tren); production nen tach rieng.
+      command-datasource:
+        username: ${NATIONAL_EXCHANGE_COMMAND_DB_USERNAME:}
+        password: ${NATIONAL_EXCHANGE_COMMAND_DB_PASSWORD:}
+      # Tai goi eDXML: proxy endpoint noi bo cua gateway (GATEWAY_ADMIN_HTTP_ENABLED). Token PHAI trung
+      # GATEWAY_ADMIN_HTTP_TOKEN. Bo trong URL -> tat nut tai goi.
+      gateway:
+        url: ${NATIONAL_EXCHANGE_GATEWAY_URL:}
+        token: ${NATIONAL_EXCHANGE_GATEWAY_TOKEN:}
+  # Tong hop toan tinh (/tonghop): dong bo vbden/vbdi + nhat ky gui nhan cua MOI tenant ve cac bang
+  # province_* trong control-plane (ProvinceIndexSyncService). Tang dan theo watermark moi interval-ms,
+  # quet lai toan bo theo full-cron (bat cac thay doi worker ghi bang JDBC khong cap nhat last_modified_on).
+  province:
+    # Pham vi cac man /tonghop (Tim kiem, Giam sat VB di, Truc quoc gia - ProvinceScopePolicy): dang nhap tenant
+    # "cap tinh" nay thi xem TOAN TINH; tenant khac (vd H05_01) chi thay du lieu cua minh. Tai khoan tong (username
+    # admin / PLATFORM_ADMIN) luon xem toan tinh. Nhieu gia tri: phan cach dau phay.
+    admin-tenant-ids: ${PROVINCE_ADMIN_TENANT_IDS:H05}
+    sync:
+      enabled: ${PROVINCE_SYNC_ENABLED:true}
+      interval-ms: ${PROVINCE_SYNC_INTERVAL_MS:300000}
+      initial-delay-ms: ${PROVINCE_SYNC_INITIAL_DELAY_MS:60000}
+      full-cron: ${PROVINCE_SYNC_FULL_CRON:0 30 1 * * *}
   # Error Tracking tap trung — DB RIENG, tach hoan toan khoi spring.datasource.* (DB nghiep vu) o
   # tren. Moi exception di qua GlobalExceptionHandler/security handler duoc ghi vao day kem Error ID
   # tra ve client de tra cuu qua GET /api/v1/error-logs/{errorId} (chi ADMIN).
@@ -270,6 +328,17 @@ app:
     deadlock-watchdog:
       enabled: ${ERROR_TRACKING_DEADLOCK_WATCHDOG_ENABLED:true}
       interval-ms: ${ERROR_TRACKING_DEADLOCK_WATCHDOG_INTERVAL_MS:60000}
+  # So dang ky tep dinh kem DUNG CHUNG giua cac don vi nhan (van ban den noi tinh/truc quoc gia, chuyen xu ly)
+  # - DB RIENG (khong phai control-plane). td-web so huu migration (db/migration-fileregistry); td-woker ghi
+  # tham chieu + chay job don dep (worker.file-registry, PHAI tro CUNG database nay).
+  file-registry:
+    enabled: ${FILE_REGISTRY_ENABLED:true}
+    datasource:
+      url: ${FILE_REGISTRY_DB_URL:jdbc:postgresql://localhost:5432/tdfileregistry}
+      username: ${FILE_REGISTRY_DB_USERNAME:postgres}
+      password: ${FILE_REGISTRY_DB_PASSWORD:postgres}
+      driver-class-name: org.postgresql.Driver
+      maximum-pool-size: ${FILE_REGISTRY_DB_MAX_POOL:4}
 
 # Management Endpoints
 management:

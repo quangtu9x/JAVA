@@ -85,6 +85,10 @@ public class XinYKienPhoiHopUseCase {
     private static final String PHOI_HOP_ACTION = "ykienphoihop";
     private static final String DEFAULT_OPINION = "Đã phối hợp";
     private static final String LIST_SEPARATOR = ";";
+    // 1 trình ký, 3 đã ký chờ chuyển văn thư, 4 chuyển văn thư, 6 trình ký nháy, 7 kết thúc, 8 đã ban hành.
+    private static final java.util.Set<String> CHO_Y_KIEN_CLOSED_STATUSES = java.util.Set.of(
+        DuThaoStatus.PENDING_SIGNATURE, DuThaoStatus.SIGNED_WAITING_SUBMIT, DuThaoStatus.PUBLISHED,
+        DuThaoStatus.PRE_SIGN_SUBMIT, DuThaoStatus.ENDED, DuThaoStatus.DOCUMENT_OUT_FINALIZED);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     // Xem AuthorAclFieldsService javadoc muc "user_fields dong".
     private static final java.util.Set<String> AUTHOR_TOUCHED_FIELDS = java.util.Set.of(
@@ -111,6 +115,13 @@ public class XinYKienPhoiHopUseCase {
         }
 
         String actingUsername = currentUserProvider.currentUsername().orElse("system");
+        // 20/10/2026 (yêu cầu người dùng): dự thảo đã chuyển ký / đã ký / chuyển văn thư / kết thúc thì người
+        // phối hợp không cho ý kiến nữa — cùng danh sách FE duThaoRoles.CHOYKIEN_HIDDEN_STATUSES (FE ẩn nút).
+        // Chỉ chặn luồng CHO Ý KIẾN (không kèm thêm người phối hợp).
+        boolean opinionOnly = request.getNguoiPhoiHop() == null || request.getNguoiPhoiHop().isEmpty();
+        if (opinionOnly && CHO_Y_KIEN_CLOSED_STATUSES.contains(draft.getStatus())) {
+            return Result.failure("Dự thảo đã chuyển ký/chuyển văn thư hoặc đã kết thúc, không thể cho ý kiến phối hợp.");
+        }
         var before = buildSnapshot(draft);
         Map<String, Object> fields = new LinkedHashMap<>(dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson()));
 
@@ -134,6 +145,9 @@ public class XinYKienPhoiHopUseCase {
         if (responded && !coordinated.contains(actingUsername)) {
             coordinated.add(actingUsername);
         }
+        // 20/10/2026 (báo lỗi "Bạn không còn trong danh sách cho ý kiến phối hợp" khi cho ý kiến LẦN 2): người
+        // đã cho ý kiến (đã ở user_coordinated) vẫn được cho thêm ý kiến — ghi thêm 1 vết, danh sách giữ nguyên.
+        boolean addingOpinionAgain = !responded && coordinated.contains(actingUsername) && opinionOnly;
 
         fields.put(USER_COORDINATOR_FIELD, coordinatorAsString ? String.join(LIST_SEPARATOR, coordinator) : coordinator);
         fields.put(USER_COORDINATED_FIELD, coordinatedAsString ? String.join(LIST_SEPARATOR, coordinated) : coordinated);
@@ -144,7 +158,7 @@ public class XinYKienPhoiHopUseCase {
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
 
-        if (responded) {
+        if (responded || addingOpinionAgain) {
             return createOpinionRecord(request, actingUsername);
         }
 

@@ -2,6 +2,7 @@ package com.td.worker.tasks.vbdi;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.td.worker.infrastructure.fileregistry.SharedFileRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -317,7 +318,12 @@ final class VbdenIncomingDocumentWriter {
         // Truoc day Worker khong ghi field nay -> moi van ban den nhan qua mang deu "cam" nut.
         // Du lieu da tao truoc do: backfill boi V1.0.68 (td-web).
         fields.put("form", "DocumentIn");
-        fields.put("document_internet", "1");
+        // 14/10/2026: văn bản từ Trục liên thông QUỐC GIA = "2" (ViewQueryService.lienthongFilter, kho tổng hợp toàn
+        // tỉnh); "1" = liên thông trong tỉnh. Kèm mã văn bản eDXML gốc để phản hồi trạng thái về đơn vị gửi.
+        fields.put("document_internet", p.isNationalIncoming() ? "2" : "1");
+        if (p.isNationalIncoming()) {
+            putIfNotBlank(fields, "national_document_id", p.getNationalDocumentId());
+        }
         fields.put("received_date", LocalDateTime.now().format(DATE_TIME_PATTERN));
         putIfNotBlank(fields, "unit_in_charge", p.getSenderOrganName());
         putIfNotBlank(fields, "unit_in_charge_identifier", p.getSenderIdentifier());
@@ -532,6 +538,12 @@ final class VbdenIncomingDocumentWriter {
      * nơi-nhận/MỖI lần xử lý unit), KHÔNG BAO GIỜ trùng giữa 2 tenant/2 sendLogId khác nhau dù cùng
      * tham chiếu 1 object MinIO vật lý — cột này vốn chỉ cần DUY NHẤT trong phạm vi 1 database
      * tenant, không mang ý nghĩa nghiệp vụ nào khác ngoài thoả ràng buộc UNIQUE.</p>
+     *
+     * <p><b>Bổ sung 22/10/2026 — người dùng: "các đơn vị dùng chung file... đơn vị có xóa văn bản đến thì không
+     * xóa đính kèm để đơn vị khác vẫn dùng được, chỉ xóa khi hết đơn vị"</b>: {@code is_shared = TRUE} (như
+     * bản sao "Chuyển xử lý") — td-web chặn xóa tệp, object chỉ bị xóa bởi {@code SharedFileGcJob} khi không còn
+     * đơn vị nào tham chiếu. Handler ghi tham chiếu vào sổ đăng ký SAU KHI commit
+     * ({@link #toSharedFileRefs}).</p>
      */
     static void insertFileMetadata(JdbcTemplate jdbc, UUID documentId, List<PreparedFile> files) {
         if (files == null || files.isEmpty()) {
@@ -543,11 +555,21 @@ final class VbdenIncomingDocumentWriter {
             jdbc.update("""
                     INSERT INTO file_metadata
                      (id, document_id, original_filename, stored_filename, file_path, file_size,
-                      content_type, file_extension, file_category, bucket_name, uploaded_at, is_public)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DOCUMENT', ?, CURRENT_TIMESTAMP, FALSE)
+                      content_type, file_extension, file_category, bucket_name, uploaded_at, is_public,
+                      is_shared)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DOCUMENT', ?, CURRENT_TIMESTAMP, FALSE, TRUE)
                     """,
                 f.id(), documentId, f.originalFilename(), storedFilename, f.objectKey(), f.size(),
                 f.contentType(), f.fileExtension(), f.bucketName());
         }
+    }
+
+    static List<SharedFileRegistry.SharedFileRef> toSharedFileRefs(UUID documentId, List<PreparedFile> files) {
+        if (files == null || files.isEmpty()) {
+            return List.of();
+        }
+        return files.stream()
+            .map(f -> new SharedFileRegistry.SharedFileRef(f.id(), documentId, f.bucketName(), f.objectKey()))
+            .toList();
     }
 }

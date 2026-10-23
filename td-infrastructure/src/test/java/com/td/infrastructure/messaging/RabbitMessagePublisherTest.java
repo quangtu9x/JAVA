@@ -77,6 +77,26 @@ class RabbitMessagePublisherTest {
     }
 
     /**
+     * 14/10/2026: task của TD Gateway giữ dấu chấm — queue gateway bind {@code worker.guinhanquocgia.send}; dạng "_"
+     * lại khớp queue chung {@code worker.*} của td-woker (không có handler) và gateway không nhận được.
+     */
+    @Test
+    void publish_gatewayTask_shouldKeepDottedRoutingKey() {
+        var message = new OutboundMessage("guinhanquocgia.send", "corr-1", List.of(new MessageUnitSpec("u1", "t", Map.of())));
+        org.mockito.Mockito.when(envelopeJsonBuilder.build("msg-2", message)).thenReturn("{}");
+
+        publisher.publish("msg-2", message);
+
+        ArgumentCaptor<String> routingKeyCaptor = ArgumentCaptor.forClass(String.class);
+        verify(rabbitTemplate).convertAndSend(org.mockito.ArgumentMatchers.anyString(), routingKeyCaptor.capture(),
+            org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(MessagePostProcessor.class),
+            org.mockito.ArgumentMatchers.any(CorrelationData.class));
+        assertThat(routingKeyCaptor.getValue()).isEqualTo("worker.guinhanquocgia.send");
+        assertThat(props.kafkaTopicFor("guinhanquocgia.send")).isEqualTo("tdgateway.guinhanquocgia.send");
+        assertThat(props.kafkaTopicFor("vbdi.delivery")).isEqualTo("worker.tasks");
+    }
+
+    /**
      * Đảm bảo việc sanitize routing key KHÔNG ảnh hưởng envelope JSON body — {@code td-woker} dispatch
      * handler dựa trên {@code taskType} ĐỌC TỪ BODY, không phải routing key.
      */

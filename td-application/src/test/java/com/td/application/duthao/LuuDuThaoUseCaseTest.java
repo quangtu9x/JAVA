@@ -228,7 +228,8 @@ class LuuDuThaoUseCaseTest {
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("system_test"));
         return new LuuDuThaoUseCase(
             duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider, authorAclFieldsService,
-            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository));
+            com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
+            new DuThaoCoordinatorDelegations(com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver()));
     }
 
     private DuThaoDocument newDocument(String documentType, String dynamicFieldsJson) {

@@ -111,7 +111,15 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
     @Override
     public Page<DuThaoDocument> findByVbdenOrgView(
             String documentType, VbdenOrgViewFilter filter, Pageable pageable) {
-        StringBuilder sql = new StringBuilder("""
+        // 22/10/2026 (thùng rác dự thảo vwUser_Draft_Deleted): deletedOnly đảo điều kiện xoá mềm — xem
+        // javadoc VbdenOrgViewFilter#deletedOnly (cùng khuôn DocumentRepository).
+        StringBuilder sql = new StringBuilder(filter.isDeletedOnly()
+            ? """
+            SELECT d.*
+            FROM duthao_documents d
+            WHERE d.deleted_on IS NOT NULL
+            """
+            : """
             SELECT d.*
             FROM duthao_documents d
             WHERE d.deleted_on IS NULL
@@ -127,6 +135,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
         // field -> danh sach gia tri, khop IT NHAT 1 (OR) - dung cho field text tu do cua
         // CollapseVBduthao.jsx - xem javadoc ViewQueryService#buildDuThaoAdvancedSearchFilter.
         appendContainsAnyFieldValuePredicates(sql, parameters, filter.getContainsAnyFieldValues());
+        TextContainsSql.append(sql, parameters, filter.getTextContainsFieldValues(), true); // 19/10/2026
         // DT-002 loat 2 (25/08/2026): cac view moi (vwUser_Return_Draft/vwCreator_Signer_Submit/...)
         // dung dieu kien scalar tren field dong - KHONG dung duoc hook kieu JSON-array cua base
         // DocumentRepository (jsonb_array_length bao loi tren scalar). Ban scalar rieng ben duoi.
@@ -175,7 +184,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
     public Page<DuThaoDocument> findByFieldOrFieldWithStatus(
             String documentType, String fieldWithoutStatus, String fieldWithStatus,
             List<String> doneStatuses, String value, String keyword, List<String> keywordColumns,
-            Pageable pageable) {
+            VbdenOrgViewFilter search, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM duthao_documents d
@@ -185,6 +194,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
         Map<String, Object> parameters = new LinkedHashMap<>();
         appendFieldOrFieldWithStatusPredicate(sql, parameters, fieldWithoutStatus, fieldWithStatus, doneStatuses, value);
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendAdvancedSearchPredicates(sql, parameters, search);
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -208,7 +218,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
     @Override
     public Page<DuThaoDocument> findReturnedByClerkForUser(
             String documentType, Map<String, String> statusByReturnFor, String username,
-            String keyword, List<String> keywordColumns, Pageable pageable) {
+            String keyword, List<String> keywordColumns, VbdenOrgViewFilter search, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM duthao_documents d
@@ -218,6 +228,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
         Map<String, Object> parameters = new LinkedHashMap<>();
         appendReturnedByClerkPredicate(sql, parameters, statusByReturnFor, username);
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendAdvancedSearchPredicates(sql, parameters, search);
 
         if (documentType != null && !documentType.isBlank()) {
             sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
@@ -235,6 +246,91 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
         @SuppressWarnings("unchecked")
         List<DuThaoDocument> content = query.getResultList();
         return new PageImpl<>(content, pageable, total);
+    }
+
+    // 22/10/2026 - vwChoDuyetKyBanHanh/MC (xem javadoc DuThaoDocumentRepository).
+    @Override
+    public Page<DuThaoDocument> findByFieldStatusBranches(
+            String documentType, Map<String, List<String>> statusesByField, String value,
+            String requireEmptyField, String requireNonEmptyField,
+            String keyword, List<String> keywordColumns, VbdenOrgViewFilter search, Pageable pageable) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM duthao_documents d
+            WHERE d.deleted_on IS NULL
+            """);
+
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        appendFieldStatusBranchesPredicate(sql, parameters, statusesByField, value);
+        if (requireEmptyField != null && !requireEmptyField.isBlank()) {
+            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(requireEmptyField).append("', '') = ''");
+        }
+        if (requireNonEmptyField != null && !requireNonEmptyField.isBlank()) {
+            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(requireNonEmptyField).append("', '') <> ''");
+        }
+        appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendAdvancedSearchPredicates(sql, parameters, search);
+
+        if (documentType != null && !documentType.isBlank()) {
+            sql.append(" AND LOWER(COALESCE(d.document_type, '')) = :documentType");
+            parameters.put("documentType", documentType.trim().toLowerCase());
+        }
+
+        long total = countNative(sql.toString(), parameters);
+
+        sql.append(" ORDER BY ").append(NEWEST_CREATED_FIRST).append(" LIMIT :limit OFFSET :offset");
+        Query query = entityManager.createNativeQuery(sql.toString(), DuThaoDocument.class);
+        parameters.forEach(query::setParameter);
+        query.setParameter("limit", pageable.getPageSize());
+        query.setParameter("offset", pageable.getOffset());
+
+        @SuppressWarnings("unchecked")
+        List<DuThaoDocument> content = query.getResultList();
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    // Package-private seam cho unit test. Moi nhanh: value khop field (containment/scalar/thanh vien "a;b",
+    // cung ngu nghia orgFieldNames) VA status thuoc danh sach rieng cua nhanh. Khong co nhanh/value -> 1 = 0.
+    void appendFieldStatusBranchesPredicate(
+            StringBuilder sql, Map<String, Object> parameters, Map<String, List<String>> statusesByField, String value) {
+        if (value == null || value.isBlank() || statusesByField == null || statusesByField.isEmpty()) {
+            sql.append(" AND 1 = 0");
+            return;
+        }
+        List<String> branches = new ArrayList<>();
+        int index = 0;
+        for (Map.Entry<String, List<String>> entry : statusesByField.entrySet()) {
+            List<String> statuses = entry.getValue() == null ? List.of() : entry.getValue();
+            if (statuses.isEmpty()) {
+                index++;
+                continue;
+            }
+            String fieldName = entry.getKey();
+            String containsParam = "branchContains" + index;
+            String scalarParam = "branchScalar" + index;
+            StringBuilder branch = new StringBuilder("((d.dynamic_fields @> CAST(:").append(containsParam)
+                .append(" AS jsonb) OR COALESCE(d.dynamic_fields->>'").append(fieldName).append("', '') = :")
+                .append(scalarParam);
+            appendDelimitedMemberMatch(branch, parameters, fieldName, value, "branchMember" + index);
+            branch.append(")");
+            parameters.put(containsParam, buildContainsFilter(fieldName, value));
+            parameters.put(scalarParam, value);
+            List<String> paramRefs = new ArrayList<>();
+            for (int statusIndex = 0; statusIndex < statuses.size(); statusIndex++) {
+                String parameterName = "branchStatus" + index + "_" + statusIndex;
+                paramRefs.add(":" + parameterName);
+                String status = statuses.get(statusIndex);
+                parameters.put(parameterName, status == null ? "" : status.trim().toLowerCase());
+            }
+            branch.append(" AND LOWER(COALESCE(d.status, '')) IN (").append(String.join(",", paramRefs)).append("))");
+            branches.add(branch.toString());
+            index++;
+        }
+        if (branches.isEmpty()) {
+            sql.append(" AND 1 = 0");
+            return;
+        }
+        sql.append(" AND (").append(String.join(" OR ", branches)).append(")");
     }
 
     // Package-private seam cho unit test. Moi cap (return_document_out_for -> status) la 1 nhanh OR,
@@ -269,6 +365,8 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
     // user_coordinated); "fieldWithStatus" CHI tinh khi status nam trong doneStatuses (nhanh
     // user_coordinator, dxl 183: & (status="8"|status="7"|status="4")). doneStatuses rong -> nhanh
     // 2 khong bao gio dung (thay vi loi SQL "IN ()" rong).
+    static final String DELEGATED_COORDINATOR_FIELD = "user_coordinated_movement";
+
     void appendFieldOrFieldWithStatusPredicate(
             StringBuilder sql, Map<String, Object> parameters, String fieldWithoutStatus,
             String fieldWithStatus, List<String> doneStatuses, String value) {
@@ -276,8 +374,16 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
             .append("(d.dynamic_fields @> CAST(:orGroupContains0 AS jsonb)")
             .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldWithoutStatus).append("', '') = :orGroupScalar0");
         appendDelimitedMemberMatch(sql, parameters, fieldWithoutStatus, value, "orGroupMember0");
-        sql.append(")")
-            .append(" OR ((d.dynamic_fields @> CAST(:orGroupContains1 AS jsonb)")
+        sql.append(")");
+        // 19/10/2026 (ủy quyền ở Người nhận phối hợp): người ủy quyền (đã xác minh, ghi bởi
+        // DuThaoCoordinatorDelegations) vẫn thấy dự thảo ở "Đã phối hợp" - nhánh OR thứ 3, không điều kiện status.
+        sql.append(" OR (d.dynamic_fields @> CAST(:orGroupContainsDelegated AS jsonb)")
+            .append(" OR COALESCE(d.dynamic_fields->>'").append(DELEGATED_COORDINATOR_FIELD).append("', '') = :orGroupScalarDelegated");
+        appendDelimitedMemberMatch(sql, parameters, DELEGATED_COORDINATOR_FIELD, value, "orGroupMemberDelegated");
+        sql.append(")");
+        parameters.put("orGroupContainsDelegated", buildContainsFilter(DELEGATED_COORDINATOR_FIELD, value));
+        parameters.put("orGroupScalarDelegated", value == null ? "" : value);
+        sql.append(" OR ((d.dynamic_fields @> CAST(:orGroupContains1 AS jsonb)")
             .append(" OR COALESCE(d.dynamic_fields->>'").append(fieldWithStatus).append("', '') = :orGroupScalar1");
         appendDelimitedMemberMatch(sql, parameters, fieldWithStatus, value, "orGroupMember1");
         sql.append(")");
@@ -406,6 +512,26 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
     }
 
     // "status" luon la cot tinh duthao_documents.status (khong phai dynamic_fields).
+    // 19/10/2026 (bộ lọc dự thảo bị bỏ qua ở Phối hợp/Văn thư trả lại): 2 view SQL riêng ở trên không đi
+    // qua findByVbdenOrgView - áp cùng điều kiện lọc nâng cao (includeFieldValues + khoảng created_on,
+    // xem ViewQueryService#buildDuThaoAdvancedSearchFilter). null = không lọc thêm.
+    private void appendAdvancedSearchPredicates(
+            StringBuilder sql, Map<String, Object> parameters, VbdenOrgViewFilter search) {
+        if (search == null) {
+            return;
+        }
+        appendStatusPredicate(sql, parameters, search.getIncludeFieldValues(), true);
+        appendDynamicFieldValuePredicates(sql, parameters, search.getIncludeFieldValues(), true);
+        if (search.getMinCreatedOn() != null) {
+            sql.append(" AND CAST(d.created_on AS date) >= :minCreatedOn");
+            parameters.put("minCreatedOn", java.sql.Date.valueOf(search.getMinCreatedOn()));
+        }
+        if (search.getMaxCreatedOn() != null) {
+            sql.append(" AND CAST(d.created_on AS date) <= :maxCreatedOn");
+            parameters.put("maxCreatedOn", java.sql.Date.valueOf(search.getMaxCreatedOn()));
+        }
+    }
+
     private void appendStatusPredicate(
             StringBuilder sql, Map<String, Object> parameters, Map<String, List<String>> fieldValues, boolean include) {
         if (fieldValues == null) {

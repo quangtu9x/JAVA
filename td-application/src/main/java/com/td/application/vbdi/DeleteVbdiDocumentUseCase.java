@@ -4,7 +4,6 @@ import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
-import com.td.application.documents.DocumentSearchService;
 import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.application.sharedcore.AppUserRepository;
 import com.td.domain.sharedcore.AppUser;
@@ -36,7 +35,6 @@ public class DeleteVbdiDocumentUseCase {
     private final VbdiDocumentRepository vbdiDocumentRepository;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentCacheService documentCacheService;
-    private final DocumentSearchService documentSearchService;
     private final DocumentLogService documentLogService;
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
@@ -51,7 +49,6 @@ public class DeleteVbdiDocumentUseCase {
             var document = documentOptional.get();
             if (document.isDeleted()) {
                 // Đã xóa trước đó — trả về thành công (idempotent)
-                documentSearchService.delete(documentId);
                 documentCacheService.evict(documentId);
                 documentCacheService.evictAllListCaches();
                 return Result.success(documentId);
@@ -61,7 +58,6 @@ public class DeleteVbdiDocumentUseCase {
 
             document.markAsDeleted(resolveCurrentUserId());
             var saved = vbdiDocumentRepository.save(document);
-            documentSearchService.delete(saved.getId());
             documentCacheService.evict(saved.getId());
             documentCacheService.evictAllListCaches();
             documentLogService.logDelete(saved.getId(), before);

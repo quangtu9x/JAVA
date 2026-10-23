@@ -115,8 +115,8 @@ private int waitForCompletion(List<Future<UnitResult>> futures, List<TaskContext
             }
             try {
                 // Trước đây (bug đã sửa): kết quả Future.get() bị BỎ QUA hoàn toàn ở đây — chỉ
-                // dùng để "chờ xong", nên payload chi tiết TaskHandler trả về (vd transId/
-                // verificationCode simpki.sign) không bao giờ ra khỏi Worker Core. Giờ giữ lại
+                // dùng để "chờ xong", nên payload chi tiết TaskHandler trả về không bao giờ ra
+                // khỏi Worker Core. Giờ giữ lại
                 // thành UnitOutcome để transport (HTTP debug endpoint) trả ra được.
                 UnitResult result = f.get(waitMs, TimeUnit.MILLISECONDS);
                 outcomes.add(new UnitOutcome(ctx.unitId(), result.isSuccess(), result.error(), result.detail()));

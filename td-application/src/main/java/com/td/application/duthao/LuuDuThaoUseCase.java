@@ -69,6 +69,8 @@ public class LuuDuThaoUseCase {
     private final CurrentUserProvider currentUserProvider;
     private final AuthorAclFieldsService authorAclFieldsService;
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
+    // 19/10/2026: ủy quyền ở Người nhận phối hợp -> người ủy quyền vào user_coordinated_movement (đã xác minh).
+    private final DuThaoCoordinatorDelegations coordinatorDelegations;
 
     public Result<UUID> execute(LuuDuThaoRequest request) {
         if (request == null || request.getId() == null) {
@@ -108,6 +110,9 @@ public class LuuDuThaoUseCase {
         Map<String, Object> merged = new LinkedHashMap<>(existing);
         merged.putAll(incoming);
         backfillUserCreatorIfBlank(merged);
+        if (fields.containsKey(DuThaoCoordinatorDelegations.COORDINATOR_OBJ_FIELD)) {
+            coordinatorDelegations.apply(merged);
+        }
         authorAclFieldsService.applyOnUpdate(DOCUMENT_TYPE, merged, fields.keySet());
         document.replaceDynamicFields(toJson(merged));
 

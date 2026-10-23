@@ -59,8 +59,7 @@ public class RabbitMessagePublisher implements MessagePublisher {
     public void publish(String messageId, OutboundMessage message) {
         // Sanitize CHỈ cho routing key (xem javadoc lớp bugfix lần 2) - envelope JSON build bên
         // dưới dùng message.taskType() GỐC nguyên vẹn, không bị ảnh hưởng.
-        String sanitizedTaskType = message.taskType().replace('.', '_');
-        String routingKey = props.getRoutingPrefix() + sanitizedTaskType;
+        String routingKey = props.routingKeyFor(message.taskType());
         String json = envelopeJsonBuilder.build(messageId, message);
 
         String tenantId = TenantContext.getCurrentTenant();

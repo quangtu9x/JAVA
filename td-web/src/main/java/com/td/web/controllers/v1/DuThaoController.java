@@ -41,6 +41,8 @@ import com.td.application.duthao.ThuHoiVanBanDiRequest;
 import com.td.application.duthao.ThuHoiVanBanDiUseCase;
 import com.td.application.duthao.XinYKienPhoiHopRequest;
 import com.td.application.duthao.XinYKienPhoiHopUseCase;
+import com.td.application.duthao.ChuyenPhoiHopDuThaoRequest;
+import com.td.application.duthao.ChuyenPhoiHopDuThaoUseCase;
 import com.td.application.duthao.XuLyDuThaoRequest;
 import com.td.application.duthao.XuLyDuThaoUseCase;
 import com.td.application.viewquery.ViewQueryRequest;
@@ -88,6 +90,7 @@ public class DuThaoController extends BaseController {
     private final GetDuThaoDetailUseCase getDuThaoDetailUseCase;
     private final LuuDuThaoUseCase luuDuThaoUseCase;
     private final XinYKienPhoiHopUseCase xinYKienPhoiHopUseCase;
+    private final ChuyenPhoiHopDuThaoUseCase chuyenPhoiHopDuThaoUseCase;
     private final ChuyenThanhVanBanDiUseCase chuyenThanhVanBanDiUseCase;
     private final ThuHoiVanBanDiUseCase thuHoiVanBanDiUseCase;
     private final DuThaoDaBanHanhUseCase duThaoDaBanHanhUseCase;
@@ -110,6 +113,10 @@ public class DuThaoController extends BaseController {
     private final AddDuThaoEditHistoryUseCase addDuThaoEditHistoryUseCase;
     private final ListDuThaoEditHistoryUseCase listDuThaoEditHistoryUseCase;
     private final AddDuThaoSeenDocumentUseCase addDuThaoSeenDocumentUseCase;
+    // 22/10/2026: thùng rác dự thảo — xoá mềm / khôi phục (thay qlvb/delete, qlvb/add Form=draft_document).
+    private final com.td.application.duthao.XoaDuThaoUseCase xoaDuThaoUseCase;
+    // 22/10/2026: tra cứu nhóm + thống kê dự thảo (thay qlvb/view/query viewaction=group, qlvb/search reports).
+    private final com.td.application.duthao.DuThaoGroupViewQuery duThaoGroupViewQuery;
 
     @PostMapping("/TaoDuThao")
     @PreAuthorize("isAuthenticated()")
@@ -181,6 +188,16 @@ public class DuThaoController extends BaseController {
             + "(user_coordinated). nguoiPhoiHop (tuỳ chọn) thêm người vào danh sách chờ")
     public ResponseEntity<ApiResponse<UUID>> xinYKienPhoiHop(@Valid @RequestBody XinYKienPhoiHopRequest request) {
         return created(xinYKienPhoiHopUseCase.execute(request));
+    }
+
+    @PostMapping("/ChuyenPhoiHop")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Chuyển phối hợp dự thảo (port qlvb/vanbanduthao/ChuyenPhoiHopDuThao)",
+        description = "Người đang trong danh sách chờ phối hợp chuyển tiếp cho người khác: gộp người mới vào "
+            + "coordinator/user_coordinator/coordinator_obj, người thao tác sang user_coordinated, ghi vết "
+            + "draft_process chuyenphoihop. Ủy quyền đã xác minh -> user_coordinated_movement")
+    public ResponseEntity<ApiResponse<UUID>> chuyenPhoiHop(@Valid @RequestBody ChuyenPhoiHopDuThaoRequest request) {
+        return ok(chuyenPhoiHopDuThaoUseCase.execute(request));
     }
 
     @PostMapping("/ChuyenThanhVanBanDi")
@@ -366,6 +383,22 @@ public class DuThaoController extends BaseController {
         return ok(chuyenTepVetDuThaoUseCase.execute(request));
     }
 
+    @PostMapping("/Xoa")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xoá dự thảo vào thùng rác (xoá mềm, chỉ người tạo)",
+        description = "Thay qlvb/delete?databasetype=duthao (deleteoption=trash). Body: {id}. Đã xoá → thành công")
+    public ResponseEntity<ApiResponse<UUID>> xoa(@RequestBody Map<String, String> body) {
+        return ok(xoaDuThaoUseCase.execute(parseUuidOrNull(body == null ? null : body.get("id"))));
+    }
+
+    @PostMapping("/KhoiPhuc")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Khôi phục dự thảo từ thùng rác (chỉ người tạo)",
+        description = "Thay qlvb/add?databasetype=duthao (Form=draft_document) ở thùng rác. Body: {id}")
+    public ResponseEntity<ApiResponse<UUID>> khoiPhuc(@RequestBody Map<String, String> body) {
+        return ok(xoaDuThaoUseCase.khoiPhuc(parseUuidOrNull(body == null ? null : body.get("id"))));
+    }
+
     private static UUID parseUuidOrNull(String value) {
         try {
             return value == null || value.isBlank() ? null : UUID.fromString(value.trim());
@@ -416,10 +449,14 @@ public class DuThaoController extends BaseController {
         description = "Uỷ quyền cho ViewQueryService (BL-102) — hỗ trợ đủ 26 view hàng đợi cá nhân "
             + "của duthao (DT-002, chi tiết điều kiện từng view xem javadoc ViewQueryService khối "
             + "constants) + vwGroup_process_by_draft_id (DT-007, lịch sử xử lý theo id dự thảo, khác "
-            + "hàng đợi cá nhân — khoá không phải username). Ngoại lệ vẫn đi Domino: "
-            + "vwUser_Draft_Deleted (thùng rác), vwChoDuyetKyBanHanh/MC (OR-group)")
+            + "hàng đợi cá nhân — khoá không phải username). 22/10/2026: thêm vwChoDuyetKyBanHanh/MC, "
+            + "vwCreator_UserCreate/UserSigned, vwDraft_Rated, vwUser_Assignment_Table_Created, "
+            + "vwUser_Draft_Deleted (thùng rác) — không còn view dự thảo nào đi Domino")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getView(
             @Valid @RequestBody ViewQueryRequest request) {
+        if (com.td.application.duthao.DuThaoGroupViewQuery.handles(request.getViewname())) {
+            return ok(duThaoGroupViewQuery.execute(request));
+        }
         return ok(viewQueryService.execute(DB_TYPE, request));
     }
 }

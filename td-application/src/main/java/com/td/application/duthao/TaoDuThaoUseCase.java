@@ -52,6 +52,8 @@ public class TaoDuThaoUseCase {
     private final AddDuThaoDynamicDocumentUseCase addDuThaoDynamicDocumentUseCase;
     private final CurrentUserProvider currentUserProvider;
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
+    // 19/10/2026: xem LuuDuThaoUseCase#coordinatorDelegations.
+    private final DuThaoCoordinatorDelegations coordinatorDelegations;
 
     public Result<UUID> execute(TaoDuThaoRequest request) {
         var addRequest = new AddDynamicDocumentRequest();
@@ -61,6 +63,7 @@ public class TaoDuThaoUseCase {
             ? DuThaoStatus.DRAFTING
             : request.getStatus());
         Map<String, String> fields = stampUserCreator(request.getFields());
+        coordinatorDelegations.applyToStringFields(fields);
         // 06/10/2026 (bang document_links giai doan 2 - docs/architecture/document-links.md): documentin_obj /
         // vanban_lienquan_obj KHONG luu trong dynamic_fields nua - tao moi
         // thi chuyen phan tu thanh lien ket (luong "tao du thao tu van ban den" gui documentin_obj).

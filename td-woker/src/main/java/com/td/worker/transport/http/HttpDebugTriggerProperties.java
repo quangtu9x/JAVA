@@ -6,12 +6,10 @@ import org.springframework.stereotype.Component;
 
 /**
  * Cấu hình endpoint HTTP debug/test {@code POST /internal/debug/publish} (xem
- * {@link DebugTriggerController}) — bổ sung để TEST ĐỘC LẬP không cần dựng RabbitMQ/Kafka thật (vd
- * máy chủ test chưa có broker, xem docs/18-trien-khai-test-simpki.md mục "Test độc lập không cần
- * RabbitMQ").
+ * {@link DebugTriggerController}) — dùng để test độc lập không cần dựng RabbitMQ/Kafka thật.
  *
  * <p>File config MỚI, RIÊNG — KHÔNG sửa {@code WorkerProperties.java}/{@code application.yml} hiện
- * có (cùng cách làm với {@code SimPkiProperties}/{@code GuiNhanQuocGiaProperties}). Mặc định
+ * có (cùng cách làm với {@code GuiNhanQuocGiaProperties}). Mặc định
  * {@code enabled=false} — CHỈ bật trên môi trường dev/test, KHÔNG bật ở production/expose port này
  * ra Internet: endpoint gọi thẳng {@link com.td.worker.transport.InboundMessageRouter} — tương đương
  * quyền hạn 1 producer hợp lệ publish message vào broker (KHÔNG có xác thực riêng, dựa vào việc cổng

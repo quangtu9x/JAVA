@@ -307,7 +307,7 @@ public class PostgresDocumentRepository extends DocumentRepository {
 			return;
 		}
 		keywordColumns = safeColumns;
-		String likeValue = "%" + keyword.trim().toLowerCase() + "%";
+		String likeValue = SearchTextSql.containsLike(keyword); // 20/10/2026: không phân biệt dấu
 		for (int index = 0; index < keywordColumns.size(); index++) {
 			parameters.put("keyword" + index, likeValue);
 		}
@@ -333,10 +333,10 @@ public class PostgresDocumentRepository extends DocumentRepository {
 			}
 			String column = keywordColumns.get(index);
 			String parameterName = ":keyword" + index;
-			match.append("LOWER(COALESCE(").append(alias).append(".dynamic_fields->>'").append(column).append("', ''))")
+			match.append("td_search_norm(COALESCE(").append(alias).append(".dynamic_fields->>'").append(column).append("', ''))")
 				.append(" LIKE ").append(parameterName);
 			if ("subject".equalsIgnoreCase(column) || "title".equalsIgnoreCase(column)) {
-				match.append(" OR LOWER(COALESCE(").append(alias).append(".title, '')) LIKE ").append(parameterName);
+				match.append(" OR td_search_norm(COALESCE(").append(alias).append(".title, '')) LIKE ").append(parameterName);
 			}
 		}
 		return match.toString();

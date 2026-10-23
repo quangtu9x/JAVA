@@ -25,7 +25,7 @@ public final class UnitResult {
     }
 
     /**
-     * @param detail payload nghiệp vụ tự do (vd transId/verificationCode của simpki.sign) — chảy
+     * @param detail payload nghiệp vụ tự do do TaskHandler trả về — chảy
      *               tới {@link com.td.worker.core.flow.UnitOutcome} rồi ra transport (HTTP debug
      *               endpoint), KHÔNG bắt buộc TaskHandler nào phải dùng (mặc định null, các
      *               handler cũ không đổi hành vi).
@@ -38,7 +38,7 @@ public final class UnitResult {
         return new UnitResult(false, false, error == null ? "unit failed" : error, null);
     }
 
-    /** Như {@link #failure(String)}, kèm payload chi tiết lỗi (vd errorCode/errorDesc gốc từ MSSP). */
+    /** Như {@link #failure(String)}, kèm payload chi tiết lỗi từ hệ thống nghiệp vụ. */
     public static UnitResult failure(String error, Map<String, Object> detail) {
         return new UnitResult(false, false, error == null ? "unit failed" : error, detail);
     }

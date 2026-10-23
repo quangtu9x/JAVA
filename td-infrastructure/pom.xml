@@ -85,6 +85,11 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
         </dependency>
+        <!-- 22/10/2026: tra ten co quan Truc tren Redis (RedisNationalAgencyNames); td-web da co starter-data-redis -->
+        <dependency>
+            <groupId>org.springframework.data</groupId>
+            <artifactId>spring-data-redis</artifactId>
+        </dependency>
 
         <!-- MinIO SDK -->
         <dependency>

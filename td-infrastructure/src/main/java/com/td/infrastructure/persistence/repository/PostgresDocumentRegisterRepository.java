@@ -104,12 +104,12 @@ public class PostgresDocumentRegisterRepository implements DocumentRegisterRepos
 
     private static Specification<DocumentRegister> keywordFilter(SearchDocumentRegistersRequest req) {
         if (req.getKeyword() == null || req.getKeyword().isBlank()) return null;
-        String kw = "%" + req.getKeyword().trim().toLowerCase() + "%";
+        String kw = SearchTextSql.containsLike(req.getKeyword()); // 20/10/2026: không phân biệt dấu (td_search_norm)
         return (root, q, cb) -> cb.or(
-            cb.like(cb.lower(root.get("name")),         kw),
-            cb.like(cb.lower(root.get("documentType")),  kw),
-            cb.like(cb.lower(root.get("codeNotation")),  kw),
-            cb.like(cb.lower(root.get("agency")),        kw)
+            cb.like(SearchTextSql.norm(cb, root.get("name")),         kw),
+            cb.like(SearchTextSql.norm(cb, root.get("documentType")),  kw),
+            cb.like(SearchTextSql.norm(cb, root.get("codeNotation")),  kw),
+            cb.like(SearchTextSql.norm(cb, root.get("agency")),        kw)
         );
     }
 

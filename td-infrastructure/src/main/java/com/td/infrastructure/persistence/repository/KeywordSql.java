@@ -35,7 +35,7 @@ final class KeywordSql {
         if (columns.isEmpty()) {
             return;
         }
-        String likeValue = "%" + keyword.trim().toLowerCase() + "%";
+        String likeValue = SearchTextSql.containsLike(keyword); // 20/10/2026: không phân biệt dấu
         sql.append(" AND (");
         for (int index = 0; index < columns.size(); index++) {
             if (index > 0) {
@@ -43,10 +43,10 @@ final class KeywordSql {
             }
             String column = columns.get(index);
             String parameterName = "keyword" + index;
-            sql.append("LOWER(COALESCE(").append(alias).append(".dynamic_fields->>'").append(column).append("', ''))")
+            sql.append("td_search_norm(COALESCE(").append(alias).append(".dynamic_fields->>'").append(column).append("', ''))")
                 .append(" LIKE :").append(parameterName);
             if ("subject".equalsIgnoreCase(column) || "title".equalsIgnoreCase(column)) {
-                sql.append(" OR LOWER(COALESCE(").append(alias).append(".title, '')) LIKE :").append(parameterName);
+                sql.append(" OR td_search_norm(COALESCE(").append(alias).append(".title, '')) LIKE :").append(parameterName);
             }
             parameters.put(parameterName, likeValue);
         }

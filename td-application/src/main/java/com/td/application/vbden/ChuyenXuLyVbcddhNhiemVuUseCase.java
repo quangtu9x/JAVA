@@ -234,7 +234,7 @@ public class ChuyenXuLyVbcddhNhiemVuUseCase {
             UUID idNhiemVu, ChuTriAggregation chuTri, PhoiHopAggregation phoiHop,
             String fullName, String actingUsername, String ykien) {
         var childRequest = new AddDynamicDocumentRequest();
-        childRequest.setTitle(ykien);
+        childRequest.setTitle(AddDynamicDocumentRequest.labelTitle(ykien)); // 19/10/2026: ý kiến dài > 300 ký tự
         childRequest.setDocumentType(VBCDDH_RES_DOCUMENT_TYPE);
 
         Map<String, String> fields = new LinkedHashMap<>();

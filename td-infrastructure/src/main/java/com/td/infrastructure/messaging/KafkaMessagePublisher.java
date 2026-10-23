@@ -30,7 +30,7 @@ public class KafkaMessagePublisher implements MessagePublisher {
 
     @Override
     public void publish(String messageId, OutboundMessage message) {
-        String topic = props.getKafkaTopic();
+        String topic = props.kafkaTopicFor(message.taskType());
         String json = envelopeJsonBuilder.build(messageId, message);
         String key = message.units().isEmpty() ? messageId : message.units().get(0).tenantId();
         kafkaTemplate.send(topic, key, json);

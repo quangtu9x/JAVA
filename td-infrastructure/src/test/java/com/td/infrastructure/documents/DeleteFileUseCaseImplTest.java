@@ -3,6 +3,7 @@ package com.td.infrastructure.documents;
 import com.td.application.documents.DeleteFileRequest;
 import com.td.application.documents.DocumentCacheService;
 import com.td.infrastructure.config.MinioService;
+import com.td.infrastructure.fileregistry.SharedFileRegistryClient;
 import com.td.infrastructure.persistence.entity.FileMetadataEntity;
 import com.td.infrastructure.persistence.repository.FileMetadataJpaRepository;
 import org.junit.jupiter.api.Test;
@@ -38,11 +39,13 @@ class DeleteFileUseCaseImplTest {
     private VbdenFilesJsonbSync vbdenFilesJsonbSync;
     @Mock
     private VbdiEditHistorySync vbdiEditHistorySync;
+    @Mock
+    private SharedFileRegistryClient sharedFileRegistry;
 
     private DeleteFileUseCaseImpl newUseCase() {
         return new DeleteFileUseCaseImpl(
             fileMetadataRepo, minioService, documentCacheService, vbdiFilesJsonbSync, vbdenFilesJsonbSync,
-            vbdiEditHistorySync);
+            vbdiEditHistorySync, sharedFileRegistry);
     }
 
     private FileMetadataEntity newEntity(UUID documentId, UUID fileId) {
@@ -107,7 +110,7 @@ class DeleteFileUseCaseImplTest {
         var result = newUseCase().execute(request);
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getError()).contains("Chuyển xử lý");
+        assertThat(result.getError()).contains("dùng chung");
         verify(minioService, never()).removeObject(org.mockito.ArgumentMatchers.any());
         verify(fileMetadataRepo, never()).delete(org.mockito.ArgumentMatchers.any());
         verify(vbdiFilesJsonbSync, never()).syncIfVbdiDocument(org.mockito.ArgumentMatchers.any());
@@ -128,6 +131,47 @@ class DeleteFileUseCaseImplTest {
 
         assertThat(result.isSuccess()).isTrue();
         verify(minioService).removeObject(entity.getFilePath());
+        verify(fileMetadataRepo).delete(entity);
+    }
+
+    /**
+     * Yêu cầu người dùng 22/10/2026: tệp gốc (is_shared=FALSE) đã được "Chuyển xử lý" sang đơn vị khác —
+     * đơn vị gốc xóa thì chỉ xóa dòng của mình, GIỮ object cho đơn vị đang dùng chung.
+     */
+    @Test
+    void execute_whenOwnerFileStillReferencedByOtherUnits_shouldKeepObject() {
+        UUID documentId = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        FileMetadataEntity entity = newEntity(documentId, fileId);
+        entity.setIsShared(false);
+        entity.setBucketName("td-webapi-files");
+        when(fileMetadataRepo.findByIdAndDocumentId(fileId, documentId)).thenReturn(Optional.of(entity));
+        when(sharedFileRegistry.isEnabled()).thenReturn(true);
+        when(sharedFileRegistry.hasActiveRefs("td-webapi-files", entity.getFilePath())).thenReturn(true);
+
+        var result = newUseCase().execute(DeleteFileRequest.builder().documentId(documentId).fileId(fileId).build());
+
+        assertThat(result.isSuccess()).isTrue();
+        verify(minioService, never()).removeObject(org.mockito.ArgumentMatchers.any());
+        verify(fileMetadataRepo).delete(entity);
+    }
+
+    @Test
+    void execute_whenRegistryUnavailable_shouldKeepObjectButDeleteRow() {
+        UUID documentId = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        FileMetadataEntity entity = newEntity(documentId, fileId);
+        entity.setIsShared(false);
+        entity.setBucketName("td-webapi-files");
+        when(fileMetadataRepo.findByIdAndDocumentId(fileId, documentId)).thenReturn(Optional.of(entity));
+        when(sharedFileRegistry.isEnabled()).thenReturn(true);
+        when(sharedFileRegistry.hasActiveRefs("td-webapi-files", entity.getFilePath()))
+            .thenThrow(new IllegalStateException("db down"));
+
+        var result = newUseCase().execute(DeleteFileRequest.builder().documentId(documentId).fileId(fileId).build());
+
+        assertThat(result.isSuccess()).isTrue();
+        verify(minioService, never()).removeObject(org.mockito.ArgumentMatchers.any());
         verify(fileMetadataRepo).delete(entity);
     }
 }

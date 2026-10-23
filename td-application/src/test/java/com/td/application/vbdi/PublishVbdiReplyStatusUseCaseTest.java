@@ -40,7 +40,8 @@ class PublishVbdiReplyStatusUseCaseTest {
     private PublishVbdiReplyStatusUseCase useCase;
 
     private PublishVbdiReplyStatusUseCase newUseCase() {
-        return new PublishVbdiReplyStatusUseCase(organizationRepository, outboxPublisherService, currentTenantProvider);
+        return new PublishVbdiReplyStatusUseCase(organizationRepository, outboxPublisherService, currentTenantProvider,
+            new PublishNationalStatusUseCase(true, outboxPublisherService, currentTenantProvider));
     }
 
     private Map<String, Object> validFields() {
@@ -193,5 +194,59 @@ class PublishVbdiReplyStatusUseCaseTest {
         request.setStatusCode("03");
 
         useCase.execute(request); // khong duoc nem exception
+    }
+
+    /**
+     * 14/10/2026: văn bản đến TỪ TRỤC QUỐC GIA (send_log_id "national:...") — phản hồi qua TD Gateway
+     * (guinhanquocgia.status.send, mã nội bộ + ResponseFor), không tra bảng tổ chức, không phát vbdi.reply.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_nationalIncoming_shouldPublishNationalStatusSend() {
+        useCase = newUseCase();
+        when(currentTenantProvider.currentTenantId()).thenReturn(Optional.of("H05_21"));
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("send_log_id", "national:truc-doc-1");
+        fields.put("parentid_send", "truc-doc-1");
+        fields.put("sender_identifier", "G12.98.24.05");
+        fields.put("contact_unit_identifier", "H05.21.35");
+        fields.put("code", "12/BHXH");
+        fields.put("promulgation_date", "2026-10-14");
+        fields.put("national_document_id", "G12.98.24.05,2026/10/14,12/BHXH");
+        var request = new PublishVbdiReplyStatusRequest();
+        request.setDynamicFields(fields);
+        request.setStatusCode("03");
+        request.setStatusLabel("Đã tiếp nhận");
+        request.setActorDisplayName("Văn thư");
+
+        useCase.execute(request);
+
+        verifyNoInteractions(organizationRepository);
+        ArgumentCaptor<OutboundMessage> captor = ArgumentCaptor.forClass(OutboundMessage.class);
+        verify(outboxPublisherService).enqueue(eq("vbdi_reply"), any(), captor.capture());
+        assertThat(captor.getValue().taskType()).isEqualTo("guinhanquocgia.status.send");
+        Map<String, Object> payload = (Map<String, Object>) captor.getValue().units().get(0).payload();
+        assertThat(payload.get("senderAgencyCode")).isEqualTo("H05.21.35");
+        assertThat(payload.get("recipientAgencyCode")).isEqualTo("G12.98.24.05");
+        Map<String, Object> status = (Map<String, Object>) payload.get("status");
+        assertThat(status.get("statusCode")).isEqualTo("03");
+        assertThat(status.get("responseForDocumentId")).isEqualTo("G12.98.24.05,2026/10/14,12/BHXH");
+        assertThat(status.get("responseForCode")).isEqualTo("12/BHXH");
+    }
+
+    @Test
+    void execute_nationalIncomingWhenDisabled_shouldDoNothing() {
+        useCase = new PublishVbdiReplyStatusUseCase(organizationRepository, outboxPublisherService, currentTenantProvider,
+            new PublishNationalStatusUseCase(false, outboxPublisherService, currentTenantProvider));
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("send_log_id", "national:truc-doc-1");
+        fields.put("sender_identifier", "G12.98.24.05");
+        var request = new PublishVbdiReplyStatusRequest();
+        request.setDynamicFields(fields);
+        request.setStatusCode("06");
+
+        useCase.execute(request);
+
+        verifyNoInteractions(outboxPublisherService, organizationRepository);
     }
 }

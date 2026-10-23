@@ -58,6 +58,14 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
     }
 
     @Override
+    public java.util.List<HoSoCVDocument> findAllByIds(java.util.Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return java.util.List.of();
+        }
+        return ((org.springframework.data.jpa.repository.JpaRepository<HoSoCVDocument, UUID>) jpaRepository).findAllById(ids);
+    }
+
+    @Override
     public <S extends HoSoCVDocument> S save(S entity) {
         return jpaRepository.save(entity);
     }
@@ -81,6 +89,34 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         appendDocumentTypeFilter(sql, parameters, documentType);
 
         return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
+    }
+
+    /**
+     * Ho so cong viec co mot so view can sap theo field dong truoc khi phan trang. Field name chi
+     * duoc phep la identifier noi bo; view "van ban khac" hien dung ngay ban hanh dang dd/MM/yyyy
+     * (dong thoi chap nhan ISO de du lieu cu khong bi sap sai).
+     */
+    String resolveOrderBy(VbdenOrgViewFilter filter) {
+        String fieldName = filter == null ? null : filter.getPrimarySortField();
+        if (fieldName == null || fieldName.isBlank()) {
+            return NEWEST_CREATED_FIRST;
+        }
+        if (!fieldName.matches("[A-Za-z0-9_]+")) {
+            throw new IllegalArgumentException("Invalid dynamic sort field");
+        }
+        String path = "d.dynamic_fields->>'" + fieldName + "'";
+        String expression;
+        if ("date".equals(filter.getPrimarySortType())) {
+            expression = "(CASE WHEN " + path + " ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'"
+                + " THEN TO_DATE(SUBSTRING(" + path + " FROM 1 FOR 10), 'DD/MM/YYYY')"
+                + " WHEN " + path + " ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'"
+                + " THEN TO_DATE(SUBSTRING(" + path + " FROM 1 FOR 10), 'YYYY-MM-DD')"
+                + " ELSE NULL END)";
+        } else {
+            expression = path;
+        }
+        String direction = filter.isSortDescending() ? " DESC NULLS LAST" : " ASC NULLS LAST";
+        return expression + direction + ", " + NEWEST_CREATED_FIRST;
     }
 
     @Override
@@ -113,6 +149,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
         // danh sach gia tri, khop IT NHAT 1 (OR) - dung cho field text tu do cua CollapseHoSoCV.jsx
         // (name/title/first_topic/second_topic) - xem javadoc buildHoSoCVAdvancedSearchFilter.
         appendContainsAnyFieldValuePredicates(sql, parameters, filter.getContainsAnyFieldValues());
+        TextContainsSql.append(sql, parameters, filter.getTextContainsFieldValues(), true); // 19/10/2026
         appendExcludeMemberFieldValuePredicates(sql, parameters, filter.getExcludeMemberFieldValues());
         if (filter.getRequireEmptyFieldName() != null && !filter.getRequireEmptyFieldName().isBlank()) {
             sql.append(" AND COALESCE(d.dynamic_fields->>'")
@@ -140,7 +177,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             "minStoragedDate", filter.getMinStoragedDate(), "maxStoragedDate", filter.getMaxStoragedDate());
         appendDocumentTypeFilter(sql, parameters, documentType);
 
-        return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
+        return executeQuery(sql, parameters, pageable, resolveOrderBy(filter));
     }
 
     @Override
@@ -199,7 +236,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             String dateFieldName, boolean strictlyBefore,
             Map<String, String> extraDynamicFieldEquals, Pageable pageable) {
         return findByFieldValueDueDate(documentType, keyFieldName, keyValue, dateFieldName, strictlyBefore,
-            extraDynamicFieldEquals, null, null, pageable);
+            extraDynamicFieldEquals, null, null, null, pageable);
     }
 
     // 01/10/2026: + keyword/keywordColumns ("tim trong danh sach").
@@ -208,7 +245,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             String documentType, String keyFieldName, String keyValue,
             String dateFieldName, boolean strictlyBefore,
             Map<String, String> extraDynamicFieldEquals, String keyword, List<String> keywordColumns,
-            Pageable pageable) {
+            VbdenOrgViewFilter search, Pageable pageable) {
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM hosocv_documents d
@@ -247,9 +284,36 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
             }
         }
         appendKeywordPredicate(sql, parameters, keyword, keywordColumns);
+        appendAdvancedSearchPredicates(sql, parameters, search);
         appendDocumentTypeFilter(sql, parameters, documentType);
 
         return executeQuery(sql, parameters, pageable, NEWEST_CREATED_FIRST);
+    }
+
+    // 19/10/2026: bộ lọc nâng cao cho method SQL riêng (không qua findByVbdenOrgView) - cùng các
+    // predicate findByVbdenOrgView dùng cho phần "search". null = không lọc thêm.
+    private void appendAdvancedSearchPredicates(
+            StringBuilder sql, Map<String, Object> parameters, VbdenOrgViewFilter search) {
+        if (search == null) {
+            return;
+        }
+        appendStatusPredicate(sql, parameters, search.getIncludeFieldValues(), true);
+        appendDynamicFieldValuePredicates(sql, parameters, search.getIncludeFieldValues(), true);
+        appendContainsAnyFieldValuePredicates(sql, parameters, search.getContainsAnyFieldValues());
+        TextContainsSql.append(sql, parameters, search.getTextContainsFieldValues(), true);
+        appendExcludeMemberFieldValuePredicates(sql, parameters, search.getExcludeMemberFieldValues());
+        if (search.getMinCreatedOn() != null) {
+            sql.append(" AND CAST(d.created_on AS date) >= :minCreatedOn");
+            parameters.put("minCreatedOn", java.sql.Date.valueOf(search.getMinCreatedOn()));
+        }
+        if (search.getMaxCreatedOn() != null) {
+            sql.append(" AND CAST(d.created_on AS date) <= :maxCreatedOn");
+            parameters.put("maxCreatedOn", java.sql.Date.valueOf(search.getMaxCreatedOn()));
+        }
+        appendDateFieldInRangePredicate(sql, parameters, "end_date",
+            "minEndDate", search.getMinEndDate(), "maxEndDate", search.getMaxEndDate());
+        appendDateFieldInRangePredicate(sql, parameters, "storaged_date",
+            "minStoragedDate", search.getMinStoragedDate(), "maxStoragedDate", search.getMaxStoragedDate());
     }
 
     // ---- helpers (copy tu PostgresDuThaoDocumentRepository, chi doi ten bang) ----

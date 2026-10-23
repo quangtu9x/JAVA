@@ -45,4 +45,10 @@ WORKER_INSTANCE_ID=worker-1
   Worker (secret manager/vault, KHÔNG chép qua email/chat/git — docs/architecture/11 §13.3).
 - Salt phải là chuỗi HEX hợp lệ (yêu cầu `Encryptors.text`).
 
+## Đồng bộ Elasticsearch (`worker.search-sync`, 16/10/2026)
+
+Biến `WORKER_SEARCH_SYNC_*` và `ELASTICSEARCH_URIS/USERNAME/PASSWORD/API_KEY`: bảng đầy đủ ở
+[21-dong-bo-elasticsearch.md](21-dong-bo-elasticsearch.md) §3. Để trống `ELASTICSEARCH_URIS` thì bộ đồng bộ không
+chạy, nhưng hàng đợi trong DB tenant vẫn được ghi; khai cấu hình sau rồi khởi động lại worker, hàng đợi sẽ tự bù.
+
 Tài liệu tiếp: [10-deployment.md](10-deployment.md)

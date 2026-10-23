@@ -6,6 +6,7 @@ import com.td.worker.config.WorkerProperties;
 import com.td.worker.core.task.TaskContext;
 import com.td.worker.core.task.TaskHandler;
 import com.td.worker.core.task.UnitResult;
+import com.td.worker.infrastructure.fileregistry.SharedFileRegistry;
 import com.td.worker.infrastructure.tenant.TenantDataSourceManager;
 import com.td.worker.transport.rabbit.RabbitPublisher;
 import lombok.RequiredArgsConstructor;
@@ -84,6 +85,7 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
     private final TenantDataSourceManager tenantDataSources;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<RabbitPublisher> rabbitPublisher;
+    private final SharedFileRegistry sharedFileRegistry;
 
     @Override
     public String taskType() {
@@ -137,6 +139,14 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
         }
         log.info("Đã tạo bản sao văn bản đến id={} tại tenant {} (từ tenant {}, văn bản gốc {})",
             createdId, context.tenantId(), p.getOriginTenantId(), p.getOriginDocumentId());
+        // 22/10/2026: ghi tham chieu tep dung chung SAU commit - object goc chi bi xoa khi het don vi tham chieu
+        // (SharedFileGcJob); loi chi log, xem SharedFileRegistry#registerQuietly.
+        String defaultBucket = props.getMinio().getBucketName();
+        sharedFileRegistry.registerQuietly(context.tenantId(), SharedFileRegistry.SOURCE_FORWARD_UNIT,
+            preparedFiles.stream()
+                .map(f -> new SharedFileRegistry.SharedFileRef(f.id(), createdId,
+                    f.bucketName() == null || f.bucketName().isBlank() ? defaultBucket : f.bucketName(), f.objectKey()))
+                .toList());
         publishForwardUnitReply(context, p, createdId);
         return UnitResult.success();
     }

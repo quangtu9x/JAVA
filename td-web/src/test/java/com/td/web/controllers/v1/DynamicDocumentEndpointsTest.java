@@ -8,7 +8,6 @@ import com.td.application.documents.DeleteDocumentUseCase;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.GetDeletedDocumentsUseCase;
 import com.td.application.documents.GetDocumentLogsUseCase;
-import com.td.application.documents.GetDocumentSearchStatusUseCase;
 import com.td.application.documents.GetDocumentUseCase;
 import com.td.application.documents.GetDynamicDocumentRequest;
 import com.td.application.documents.GetDynamicDocumentUseCase;
@@ -17,10 +16,7 @@ import com.td.application.documents.HardDeleteDocumentUseCase;
 import com.td.application.documents.ListDocumentFilesUseCase;
 import com.td.application.documents.DeleteFileUseCase;
 import com.td.application.documents.RenameFileUseCase;
-import com.td.application.documents.ReindexDocumentSearchUseCase;
-import com.td.application.documents.SearchDocumentsElasticUseCase;
 import com.td.application.documents.SearchDocumentsUseCase;
-import com.td.application.documents.SyncDocumentSearchByIdUseCase;
 import com.td.application.documents.UpdateDocumentUseCase;
 import com.td.application.documents.UpdateDocumentWithFileUseCase;
 import com.td.application.documents.UploadFileUseCase;
@@ -87,14 +83,6 @@ class DynamicDocumentEndpointsTest {
     private GetDocumentUseCase getDocumentUseCase;
     @MockBean
     private SearchDocumentsUseCase searchDocumentsUseCase;
-    @MockBean
-    private SearchDocumentsElasticUseCase searchDocumentsElasticUseCase;
-    @MockBean
-    private GetDocumentSearchStatusUseCase getDocumentSearchStatusUseCase;
-    @MockBean
-    private ReindexDocumentSearchUseCase reindexDocumentSearchUseCase;
-    @MockBean
-    private SyncDocumentSearchByIdUseCase syncDocumentSearchByIdUseCase;
     @MockBean
     private GetDeletedDocumentsUseCase getDeletedDocumentsUseCase;
     @MockBean

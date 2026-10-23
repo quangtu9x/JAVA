@@ -3,7 +3,6 @@ package com.td.application.vbdi;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
-import com.td.application.documents.DocumentSearchService;
 import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.application.sharedcore.AppUserRepository;
 import com.td.domain.sharedcore.AppUser;
@@ -45,8 +44,6 @@ class DeleteVbdiDocumentUseCaseTest {
     @Mock
     private DocumentCacheService documentCacheService;
     @Mock
-    private DocumentSearchService documentSearchService;
-    @Mock
     private DocumentLogService documentLogService;
     @Mock
     private CurrentUserProvider currentUserProvider;
@@ -59,7 +56,7 @@ class DeleteVbdiDocumentUseCaseTest {
     @BeforeEach
     void setUp() {
         useCase = new DeleteVbdiDocumentUseCase(
-            vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService, documentSearchService,
+            vbdiDocumentRepository, dynamicDocumentFieldsService, documentCacheService,
             documentLogService, currentUserProvider, appUserRepository);
     }
 
@@ -92,7 +89,6 @@ class DeleteVbdiDocumentUseCaseTest {
         assertThat(vbdi.isDeleted()).isTrue();
         verify(vbdiDocumentRepository, never()).delete(any());
         verify(vbdiDocumentRepository).save(vbdi);
-        verify(documentSearchService).delete(vbdi.getId());
         verify(documentCacheService).evict(vbdi.getId());
         verify(documentCacheService).evictAllListCaches();
         verify(documentLogService).logDelete(eq(vbdi.getId()), any());
@@ -136,7 +132,6 @@ class DeleteVbdiDocumentUseCaseTest {
         verify(vbdiDocumentRepository, never()).save(any());
         verify(documentLogService, never()).logDelete(any(), any());
         // Idempotent van goi lai search/cache evict de dam bao dong bo (khop nhanh "da xoa" trong use case).
-        verify(documentSearchService).delete(vbdi.getId());
         verify(documentCacheService).evict(vbdi.getId());
     }
 }

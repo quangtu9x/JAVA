@@ -28,13 +28,11 @@ class UpdateDocumentUseCaseTest {
     @Mock
     private DocumentCacheService documentCacheService;
     @Mock
-    private DocumentSearchService documentSearchService;
-    @Mock
     private DocumentLogService documentLogService;
 
     @Test
     void execute_shouldLogUpdateWithDifferentOldAndNewTitle() {
-        var useCase = new UpdateDocumentUseCase(documentRepository, documentCacheService, documentSearchService, documentLogService);
+        var useCase = new UpdateDocumentUseCase(documentRepository, documentCacheService, documentLogService);
 
         BusinessDocument existing = new BusinessDocument("Tieu de cu", null, "DRAFT", null, null, null, null);
         UUID id = existing.getId();
@@ -61,7 +59,7 @@ class UpdateDocumentUseCaseTest {
 
     @Test
     void execute_documentNotFound_shouldNotLogUpdate() {
-        var useCase = new UpdateDocumentUseCase(documentRepository, documentCacheService, documentSearchService, documentLogService);
+        var useCase = new UpdateDocumentUseCase(documentRepository, documentCacheService, documentLogService);
         UUID id = UUID.randomUUID();
         when(documentRepository.findById(id)).thenReturn(Optional.empty());
 

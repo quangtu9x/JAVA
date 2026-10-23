@@ -19,9 +19,9 @@ class KeywordSqlTest {
         KeywordSql.append(sql, parameters, "Ho So", List.of("name", "title", "subject"), "d");
 
         String text = sql.toString();
-        assertThat(text).contains("LOWER(COALESCE(d.dynamic_fields->>'name', '')) LIKE :keyword0");
-        assertThat(text).contains("LOWER(COALESCE(d.title, '')) LIKE :keyword1");
-        assertThat(text).contains("LOWER(COALESCE(d.title, '')) LIKE :keyword2");
+        assertThat(text).contains("td_search_norm(COALESCE(d.dynamic_fields->>'name', '')) LIKE :keyword0");
+        assertThat(text).contains("td_search_norm(COALESCE(d.title, '')) LIKE :keyword1");
+        assertThat(text).contains("td_search_norm(COALESCE(d.title, '')) LIKE :keyword2");
         assertThat(text).doesNotContain("d.title, '')) LIKE :keyword0");
         assertThat(parameters).containsEntry("keyword0", "%ho so%");
     }

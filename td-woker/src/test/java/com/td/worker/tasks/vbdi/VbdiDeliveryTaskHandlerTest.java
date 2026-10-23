@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.td.worker.config.WorkerProperties;
 import com.td.worker.core.task.TaskContext;
 import com.td.worker.core.task.UnitResult;
+import com.td.worker.infrastructure.fileregistry.SharedFileRegistry;
 import com.td.worker.infrastructure.minio.WorkerMinioClient;
 import com.td.worker.infrastructure.tenant.TenantDataSourceManager;
 import com.td.worker.transport.rabbit.RabbitPublisher;
@@ -52,7 +53,8 @@ class VbdiDeliveryTaskHandlerTest {
         props = new WorkerProperties();
         props.getTasks().getVbdi().setEnabled(true);
         props.getTasks().getVbdi().setVerifyObjectExists(false);
-        handler = new VbdiDeliveryTaskHandler(props, tenantDataSources, minio, objectMapper, rabbitPublisher);
+        handler = new VbdiDeliveryTaskHandler(props, tenantDataSources, minio, objectMapper, rabbitPublisher,
+            mock(SharedFileRegistry.class));
     }
 
     private ObjectNode basePayload(String recipientGroup) {

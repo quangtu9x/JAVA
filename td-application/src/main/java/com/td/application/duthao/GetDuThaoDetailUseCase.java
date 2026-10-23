@@ -51,6 +51,7 @@ public class GetDuThaoDetailUseCase {
 
     private static final String SUBJECT_FIELD = "subject";
     private static final String NOT_FOUND_MESSAGE = "Không tìm thấy văn bản dự thảo";
+    static final String DELETED_FORM = "draft_document_Deleted";
 
     private final DuThaoDocumentRepository duThaoDocumentRepository;
     private final ListDocumentFilesUseCase listDocumentFilesUseCase;
@@ -69,7 +70,9 @@ public class GetDuThaoDetailUseCase {
         }
 
         DuThaoDocument document = duThaoDocumentRepository.findById(id).orElse(null);
-        if (document == null || document.isDeleted()) {
+        // 22/10/2026 (thùng rác dự thảo): dự thảo đã xoá mềm vẫn mở được chi tiết (từ thùng rác), gắn
+        // form "draft_document_Deleted" như Domino để FE (DuThaoButtonAction) ẩn mọi chức năng.
+        if (document == null) {
             return Result.failure(NOT_FOUND_MESSAGE);
         }
         if (!DOCUMENT_TYPE.equalsIgnoreCase(document.getDocumentType())) {
@@ -92,6 +95,9 @@ public class GetDuThaoDetailUseCase {
         allFields.put("last_modified_on", document.getLastModifiedOn());
         allFields.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
         allFields.putIfAbsent(SUBJECT_FIELD, document.getTitle());
+        if (document.isDeleted()) {
+            allFields.put("form", DELETED_FORM);
+        }
         allFields.put("files", collectFiles(document.getId()));
         // 06/10/2026: documentin_obj / vanban_lienquan_obj dung lai tu bang document_links (giai doan 2 -
         // docs/architecture/document-links.md), ghi de gia tri cu con sot trong dynamic_fields.
@@ -101,6 +107,11 @@ public class GetDuThaoDetailUseCase {
             dynamicDocumentFieldsService.filterItems(allFields, request.getItems()));
         // 09/10/2026: dự thảo chờ ký duyệt — FE chỉ hiện "Thu hồi" cho người trình khi người ký chưa
         // thao tác (DuThaoButtonAction.jsx). Gắn SAU filterItems để không bị lọc mất theo items.
+        // 19/10/2026: dự thảo đã kết thúc — người kết thúc (FE chỉ hiện nút "Thu hồi" cho đúng người này).
+        if (DuThaoStatus.ENDED.equals(document.getStatus())) {
+            String endedBy = asText(allFields.get("user_ended"));
+            filtered.put("ended_by", endedBy.isEmpty() ? signSubmissionInspector.endedBy(document.getId()) : endedBy);
+        }
         if (DuThaoStatus.PENDING_SIGNATURE.equals(document.getStatus())) {
             var inspection = signSubmissionInspector.inspect(document.getId(), asText(allFields.get("user_signer")));
             filtered.put("sign_submitter", inspection.submitterUsername());

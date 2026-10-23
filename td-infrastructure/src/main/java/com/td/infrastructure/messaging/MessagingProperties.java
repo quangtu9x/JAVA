@@ -38,6 +38,30 @@ public class MessagingProperties {
     /** Envelope {@code source} — nhận diện app phát sinh message trong log/metrics phía Worker. */
     private String source = "td-web";
 
+    /**
+     * Task thuộc dịch vụ RIÊNG (TD Gateway — {@code tdgateway}) GIỮ dấu "." trong routing key: queue gateway bind
+     * {@code worker.guinhanquocgia.send}; dạng thay "_" ({@code worker.guinhanquocgia_send}) lại khớp queue chung
+     * {@code worker.*} của td-woker (không có handler → treo WAITING_DEPENDENCY), gateway không bao giờ nhận được.
+     */
+    private java.util.List<String> dottedRoutingTaskPrefixes = new java.util.ArrayList<>(java.util.List.of("guinhanquocgia."));
+
+    /** Topic Kafka riêng theo taskType (mặc định mọi task vào {@link #kafkaTopic}) — khớp topic TD Gateway. */
+    private java.util.Map<String, String> kafkaTopicOverrides = new java.util.LinkedHashMap<>(java.util.Map.of(
+        "guinhanquocgia.send", "tdgateway.guinhanquocgia.send",
+        "guinhanquocgia.status.send", "tdgateway.guinhanquocgia.status.send"));
+
+    /** Routing key RabbitMQ cho 1 taskType theo quy ước trên. */
+    public String routingKeyFor(String taskType) {
+        boolean dotted = dottedRoutingTaskPrefixes != null
+            && dottedRoutingTaskPrefixes.stream().anyMatch(p -> p != null && !p.isBlank() && taskType.startsWith(p));
+        return routingPrefix + (dotted ? taskType : taskType.replace('.', '_'));
+    }
+
+    public String kafkaTopicFor(String taskType) {
+        String override = kafkaTopicOverrides == null ? null : kafkaTopicOverrides.get(taskType);
+        return override == null || override.isBlank() ? kafkaTopic : override;
+    }
+
     private Outbox outbox = new Outbox();
 
     @Data

@@ -48,6 +48,10 @@ public interface AppUserRepository extends IRepository<AppUser> {
     // cho man "Nhom xem lich tong hop"): nap 1 lan CHO CA CAY, gom theo organizationId - tranh N+1.
     List<AppUser> findByOrganizationIdInAndDeletedOnIsNull(List<UUID> organizationIds);
 
+    // 15/10/2026 (cache cây cơ cấu): nạp 1 lần mọi "người đại diện nhận" (Organization.receiverId) của
+    // CẢ cây, thay cho findByIdAndDeletedOnIsNull từng node (N+1, cây thật ~50k node).
+    List<AppUser> findByIdInAndDeletedOnIsNull(java.util.Collection<UUID> ids);
+
     List<AppUser> findAllByDeletedOnIsNullOrderByFullNameAsc();
 
     Page<AppUser> search(SearchAppUsersRequest request, Pageable pageable);

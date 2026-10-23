@@ -136,6 +136,7 @@ public class ChuyenXuLyVbdenUseCase {
     private static final String USER_PROCESS_OBJ_FIELD = "process_obj";
     private static final String USER_COORDINATE_OBJ_FIELD = "coordinate_obj";
     private static final String USER_TO_READ_OBJ_FIELD = "to_read_obj";
+    private static final String COORDINATE_TO_CHUTRI_FIELD = "coordinate_to_chutri";
     // Ten field CHINH XAC Domino dung tren ban ghi CON vbden_res (KHAC ten field tren van ban CHA o
     // tren - "user_process_obj" khong phai "process_obj") - ThuHoiVanBan.java doc lai dung ten nay.
     static final String USER_PROCESS_OBJ_FIELD_RAW = "user_process_obj";
@@ -188,18 +189,17 @@ public class ChuyenXuLyVbdenUseCase {
 
         String actingUsername = currentUserProvider.currentUsername().orElse("system");
         List<String> newAssignees = splitSemicolon(request.getUserProcess());
-        // Bo sung 07/09/2026 (2, "lam not" STATUS_05 - xem javadoc publishReplyStatusAfterPhanCong):
-        // phai chup status TRUOC khi updateParentDocument goi recomputeStatusOnFirstAssignment (ham
-        // do MUTATE thang parent.status) - chup SAU se luon doc duoc gia tri MOI, lam dieu kien
-        // "status truoc do la STATUS_MOI" khong bao gio dung.
-        String statusBeforeUpdate = parent.getStatus();
 
-        var childResult = createProcessingRecord(request, actingUsername);
+        // 20/10/2026: người/đơn vị đang PHỐI HỢP được giao làm CHỦ TRÌ (Phân công bổ sung) -> bỏ khỏi phối hợp,
+        // vết ghi ở quá trình xử lý. Tính trên dữ liệu TRƯỚC khi cập nhật.
+        CoordinatorPromotion promotion = findCoordinatorPromotion(parent, request, newAssignees);
+
+        var childResult = createProcessingRecord(request, actingUsername, promotion);
         if (!childResult.isSuccess()) {
             return childResult;
         }
 
-        updateParentDocument(parent, request, actingUsername, newAssignees);
+        updateParentDocument(parent, request, actingUsername, newAssignees, promotion);
         recordProcessDiagramNodes(parent, request, actingUsername, newAssignees, childResult.getData());
 
         // Bo sung 07/09/2026 (yeu cau nguoi dung: hoan thien broker phan hoi trang thai "phan xu
@@ -209,16 +209,10 @@ public class ChuyenXuLyVbdenUseCase {
         // cong xu ly" theo dung StatusCode 04. Use case tu bo qua neu van ban khong tao qua giao
         // lien thong (khong co send_log_id).
         if (!newAssignees.isEmpty()) {
-            // Bo sung 07/09/2026 (2, yeu cau nguoi dung "lam not" STATUS_05/06 - doi chieu
-            // ChuyenXuLy.java:240-260 that): STATUS_05 "Dang xu ly" CHI ban khi day la LAN DAU van
-            // ban duoc phan cong chu tri (status TRUOC do = STATUS_MOI "0", dung DIEU KIEN
-            // `status.equals("0")` cua Domino that) - KHONG ban lai o moi lan phan cong/chuyen tiep
-            // sau do (khac han STATUS_04, luon ban moi lan). Ban TRUOC STATUS_04, dung thu tu Domino
-            // (status_pack STATUS_05 o nhanh status=="0" chay truoc, STATUS_04 luon chay sau, khong
-            // dieu kien).
-            if (VbdenStatusService.STATUS_MOI.equals(statusBeforeUpdate)) {
-                publishReplyStatusAfterPhanCong(parent, actingUsername, "05", "Đang xử lý", null);
-            }
+            // 20/10/2026 (báo lỗi người dùng: Nhật ký gửi nhận văn bản đi THỪA vết "Văn thư - Đang xử lý" sau
+            // bước văn thư vào sổ + chuyển xử lý cho lãnh đạo): BỎ STATUS_05 "Đang xử lý" mà Domino
+            // (ChuyenXuLy.java:240-260) phát ở lần phân công đầu — vết phía nơi gửi dừng ở "Phân công xử lý"
+            // (STATUS_04) của văn thư.
             publishReplyStatusAfterPhanCong(parent, actingUsername, "04", "Phân công xử lý",
                 String.join("; ", newAssignees));
         }
@@ -288,7 +282,9 @@ public class ChuyenXuLyVbdenUseCase {
                     continue;
                 }
                 var org = orgOpt.get();
-                String linkedTenantId = org.getLinkedTenantId();
+                // 12/10/2026: đơn vị con không khai báo -> tenant của tổ tiên gần nhất (OrganizationTenantLookup).
+                String linkedTenantId = com.td.application.sharedcore.OrganizationTenantLookup
+                    .resolveLinkedTenantId(organizationRepository, org).orElse(null);
                 if (linkedTenantId == null || linkedTenantId.isBlank() || linkedTenantId.equals(currentTenantId)) {
                     continue; // Don vi noi bo/cung tenant - da xu ly du boi updateChutri, khong can relay.
                 }
@@ -576,7 +572,8 @@ public class ChuyenXuLyVbdenUseCase {
     }
 
     // Domino: dbVBden_res.createDocument(), parentid = docVBden.getUniversalID() (ChuyenXuLy.java)
-    private Result<UUID> createProcessingRecord(ChuyenXuLyVbdenRequest request, String actingUsername) {
+    private Result<UUID> createProcessingRecord(
+            ChuyenXuLyVbdenRequest request, String actingUsername, CoordinatorPromotion promotion) {
         var childRequest = new AddDynamicDocumentRequest();
         childRequest.setTitle(request.getAction());
         childRequest.setDocumentType(CHILD_DOCUMENT_TYPE);
@@ -608,6 +605,14 @@ public class ChuyenXuLyVbdenUseCase {
             .ifPresent(value -> childFields.put("identifier", value));
         if (request.getOpinion() != null && !request.getOpinion().isBlank()) {
             childFields.put("opinion", request.getOpinion());
+        }
+        // 20/10/2026: vết "chuyển từ phối hợp sang chủ trì" — field riêng + 1 dòng trong ý kiến (hiện ở Quá
+        // trình xử lý).
+        if (!promotion.isEmpty()) {
+            String note = "Chuyển từ phối hợp sang chủ trì: " + promotion.label();
+            childFields.put(COORDINATE_TO_CHUTRI_FIELD, promotion.label());
+            String opinion = childFields.get("opinion");
+            childFields.put("opinion", isBlank(opinion) ? note : opinion + "\n(" + note + ")");
         }
         if (request.getUserProcess() != null && !request.getUserProcess().isBlank()) {
             childFields.put(USER_PROCESS_FIELD, request.getUserProcess());
@@ -646,7 +651,8 @@ public class ChuyenXuLyVbdenUseCase {
     // updateTheodoi()/updatePhutrach() - moi ham tu quyet dinh co mutate hay khong dua tren field
     // form tuong ung co blank hay khong (khong re nhanh theo action) - xem ChuyenXuLy.java:129-454.
     private void updateParentDocument(
-            BusinessDocument parent, ChuyenXuLyVbdenRequest request, String actingUsername, List<String> newAssignees) {
+            BusinessDocument parent, ChuyenXuLyVbdenRequest request, String actingUsername, List<String> newAssignees,
+            CoordinatorPromotion promotion) {
         var before = buildSnapshot(parent);
         Map<String, Object> fields = new LinkedHashMap<>(dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson()));
 
@@ -664,6 +670,7 @@ public class ChuyenXuLyVbdenUseCase {
         updatePhutrach(fields, request);
         applyDelegations(fields, request);
         updateRichObjFields(fields, request);
+        removePromotedCoordinators(fields, promotion); // SAU updateRichObjFields (coordinate_obj có thể vừa bị ghi)
         authorAclFieldsService.applyOnUpdate(DOCUMENT_TYPE, fields, AUTHOR_TOUCHED_FIELDS);
 
         appendChuyenXuLyHistory(fields, request, actingUsername, newAssignees);
@@ -676,6 +683,97 @@ public class ChuyenXuLyVbdenUseCase {
         documentCacheService.evict(saved.getId());
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
+    }
+
+    /** 20/10/2026 — người (tài khoản) / đơn vị (identifier) đang phối hợp vừa được giao chủ trì; label = tên hiển thị. */
+    record CoordinatorPromotion(List<String> users, List<String> units, String label) {
+        static final CoordinatorPromotion NONE = new CoordinatorPromotion(List.of(), List.of(), "");
+
+        boolean isEmpty() {
+            return users.isEmpty() && units.isEmpty();
+        }
+    }
+
+    // Yêu cầu người dùng 20/10/2026: chọn người/đơn vị/phòng đang PHỐI HỢP làm CHỦ TRÌ thì bỏ phần phối hợp
+    // (không còn ở tab Phối hợp), vẫn lưu vết ở quá trình xử lý. Chỉ xét người/đơn vị MỚI giao chủ trì lần
+    // này có trong user_coordinate/unit_coordinate hiện tại.
+    CoordinatorPromotion findCoordinatorPromotion(
+            BusinessDocument parent, ChuyenXuLyVbdenRequest request, List<String> newAssignees) {
+        Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+        List<String> coordinators = toStringList(fields.get(USER_COORDINATE_FIELD));
+        List<String> coordinatorUnits = toStringList(fields.get(UNIT_COORDINATE_FIELD));
+        List<String> users = newAssignees.stream()
+            .filter(u -> coordinators.stream().anyMatch(c -> c.equalsIgnoreCase(u)))
+            .distinct().toList();
+        List<String> units = splitSemicolon(request.getUnitProcess()).stream()
+            .filter(u -> coordinatorUnits.stream().anyMatch(c -> c.equalsIgnoreCase(u)))
+            .distinct().toList();
+        if (users.isEmpty() && units.isEmpty()) {
+            return CoordinatorPromotion.NONE;
+        }
+        List<String> names = new ArrayList<>();
+        for (Object item : asObjectList(fields.get(USER_COORDINATE_OBJ_FIELD))) {
+            if (!(item instanceof Map<?, ?> entry)) {
+                continue;
+            }
+            String username = asString(entry.get("username"));
+            String identifier = asString(entry.get("identifier"));
+            boolean promoted = (!isBlank(username) && users.stream().anyMatch(u -> u.equalsIgnoreCase(username)))
+                || (!isBlank(identifier) && units.stream().anyMatch(u -> u.equalsIgnoreCase(identifier)));
+            String name = asString(entry.get("name"));
+            if (promoted && !isBlank(name) && !names.contains(name)) {
+                names.add(name);
+            }
+        }
+        if (names.isEmpty()) {
+            names.addAll(users);
+            names.addAll(units);
+        }
+        return new CoordinatorPromotion(users, units, String.join(", ", names));
+    }
+
+    private void removePromotedCoordinators(Map<String, Object> fields, CoordinatorPromotion promotion) {
+        if (promotion.isEmpty()) {
+            return;
+        }
+        List<String> userCoordinate = toStringList(fields.get(USER_COORDINATE_FIELD));
+        userCoordinate.removeIf(u -> promotion.users().stream().anyMatch(p -> p.equalsIgnoreCase(u)));
+        fields.put(USER_COORDINATE_FIELD, userCoordinate);
+        List<String> unitCoordinate = toStringList(fields.get(UNIT_COORDINATE_FIELD));
+        unitCoordinate.removeIf(u -> promotion.units().stream().anyMatch(p -> p.equalsIgnoreCase(u)));
+        fields.put(UNIT_COORDINATE_FIELD, unitCoordinate);
+        Object coordinateObj = fields.get(USER_COORDINATE_OBJ_FIELD);
+        if (coordinateObj != null) {
+            List<Object> kept = new ArrayList<>();
+            for (Object item : asObjectList(coordinateObj)) {
+                if (item instanceof Map<?, ?> entry) {
+                    String username = asString(entry.get("username"));
+                    String identifier = asString(entry.get("identifier"));
+                    boolean promoted = (!isBlank(username) && promotion.users().stream().anyMatch(p -> p.equalsIgnoreCase(username)))
+                        || (!isBlank(identifier) && promotion.units().stream().anyMatch(p -> p.equalsIgnoreCase(identifier)));
+                    if (promoted) {
+                        continue;
+                    }
+                }
+                kept.add(item);
+            }
+            fields.put(USER_COORDINATE_OBJ_FIELD, kept);
+        }
+    }
+
+    // coordinate_obj: mảng thật hoặc chuỗi JSON mảng (dữ liệu cũ).
+    private List<Object> asObjectList(Object value) {
+        if (value instanceof List<?> list) {
+            return new ArrayList<>(list);
+        }
+        if (value instanceof String text && text.trim().startsWith("[")) {
+            try {
+                return new ArrayList<>(OBJECT_MAPPER.readValue(text, List.class));
+            } catch (Exception ex) {
+                return new ArrayList<>();
+            }
+        }
+        return new ArrayList<>();
     }
 
     // Domino: ChuyenXuLy.updateChutri() (dòng 425-454) — loại người thực hiện khỏi user_process,

@@ -21,8 +21,8 @@ Tham chiếu kiến trúc kế thừa từ project Spring Boot (`JAVA/.../docs/a
 | 12 | [12-observability.md](12-observability.md) | Structured logging, metrics, health/readiness |
 | 13 | [13-testing.md](13-testing.md) | Test & kiểm chứng các tình huống lỗi |
 | 15 | [15-vbden-forward-unit-reference.md](15-vbden-forward-unit-reference.md) | vbden.forward_unit — chuyển xử lý cross-tenant cho đơn vị con có văn thư riêng |
-| 16 | [16-checklist-tich-hop-gui-nhan-quoc-gia.md](16-checklist-tich-hop-gui-nhan-quoc-gia.md) | Checklist tích hợp "Gửi nhận quốc gia" (VPCP/VXP, eDXML QCVN 102) từ `docs/td-guinhanquocgia` — khung sườn `guinhanquocgia.send` |
-| 17 | [17-checklist-tich-hop-kyso-simpki.md](17-checklist-tich-hop-kyso-simpki.md) | Checklist tích hợp "Ký số SIM-PKI" (MSSP/ETSI TS 102 204) từ `docs/TDSimSign/sdk-mobilepki` — `simpki.sign` |
-| 18 | [18-trien-khai-test-simpki.md](18-trien-khai-test-simpki.md) | Triển khai môi trường TEST chỉ chạy `simpki.sign` (build/run script Linux+Windows, profile riêng, database mới, trigger thử) |
+| 16 | [16-checklist-tich-hop-gui-nhan-quoc-gia.md](16-checklist-tich-hop-gui-nhan-quoc-gia.md) | Biên bản cutover Gửi nhận quốc gia sang project độc lập `tdgateway`; TD Worker không còn handler/SDK VPCP |
+| 21 | [21-dong-bo-elasticsearch.md](21-dong-bo-elasticsearch.md) | Đồng bộ PostgreSQL → Elasticsearch (hàng đợi trigger, bootstrap, đối soát, vận hành) |
+| 17–18, 20 | Đã chuyển khỏi `td-woker` | Dịch vụ ký SIM-PKI đã được tách thành dịch vụ độc lập; worker không còn chứa runtime, SDK hoặc cấu hình triển khai ký SIM. Migration V3 được giữ lại chỉ để tương thích lịch sử Flyway của các môi trường đã triển khai. |
 
 Để hiểu nhanh: đọc `01` → `02` → `03`, sau đó `07` (phần quan trọng nhất) và `11` (use case. cap chứng).

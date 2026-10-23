@@ -162,6 +162,27 @@ class AddVbdiSendLogUseCaseTest {
         assertThat(captor.getValue().taskType()).isEqualTo("vbdi.revoke");
     }
 
+    /**
+     * 14/10/2026: nơi nhận ngoài tỉnh đi qua Trục quốc gia (PublishNationalExchangeSendUseCase) — KHÔNG phát
+     * vbdi.delivery/vbdi.revoke (vbdi.revoke chạy ở tenant đơn vị gửi từng đánh dấu nhầm văn bản đến nội bộ).
+     */
+    @Test
+    void execute_externalUnit_shouldNotEnqueueDeliveryOrRevoke() {
+        var document = existingVbdi("vbdi");
+        when(vbdiDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+        var saved = new VbdiSendLogDocument(document.getId(), VbdiSendType.THU_HOI_TOAN_BO,
+            VbdiSendRecipientGroup.EXTERNAL_UNIT, "000.00.00.G22", "VPCP", null, "Lay lai", null, "xuanlt.skhcn");
+        when(vbdiSendLogDocumentRepository.save(any())).thenReturn(saved);
+
+        var request = request(document.getId());
+        request.setSendType(VbdiSendType.THU_HOI_TOAN_BO);
+        request.setRecipientGroup(VbdiSendRecipientGroup.EXTERNAL_UNIT);
+        request.setRecipientIdentifier("000.00.00.G22");
+        assertThat(useCase.execute(request).isSuccess()).isTrue();
+
+        verifyNoInteractions(outboxPublisherService);
+    }
+
     /** {@link VbdiSendType#THU_HOI_VAN_BAN}/{@link VbdiSendType#THU_HOI_TOAN_BO} — cùng cơ chế. */
     @Test
     void execute_thuHoiVanBanAndThuHoiToanBo_shouldAlsoEnqueueVbdiRevokeTaskType() {

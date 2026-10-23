@@ -1,10 +1,10 @@
 -- H2 (PostgreSQL mode) - dùng cho unit test / context test, tương đương
 -- db/migration-worker/V1__create_worker_tables.sql (BIGSERIAL -> IDENTITY).
 --
--- Bổ sung "IF NOT EXISTS" (docs/18-trien-khai-test-simpki.md mục "H2 file cục bộ"): script này chạy
+-- Bổ sung "IF NOT EXISTS": script này chạy
 -- LẠI MỖI LẦN khởi động khi worker.db.schema-management=script (KHÔNG như Flyway tự theo dõi đã áp
 -- dụng migration nào) — với H2 in-memory (test tự động, mất dữ liệu mỗi JVM mới) điều này vô hại,
--- nhưng với H2 FILE cục bộ (persistent qua nhiều lần restart, dùng để test simpki.sign khi máy chủ
+-- nhưng với H2 FILE cục bộ (persistent qua nhiều lần restart)
 -- chưa có Postgres) CREATE TABLE không có IF NOT EXISTS sẽ lỗi "table already exists" ngay từ lần
 -- khởi động THỨ HAI. Thêm IF NOT EXISTS không đổi hành vi ở lần chạy đầu (bảng chưa tồn tại), chỉ
 -- làm script AN TOÀN khi chạy lặp lại trên cùng 1 file H2.

@@ -78,13 +78,13 @@ public class PostgresPrivateCategoryRepository implements PrivateCategoryReposit
 
     private static Specification<PrivateCategory> keywordFilter(SearchPrivateCategoriesRequest req) {
         if (req.getKeyword() == null || req.getKeyword().isBlank()) return null;
-        String kw = "%" + req.getKeyword().trim().toLowerCase() + "%";
+        String kw = SearchTextSql.containsLike(req.getKeyword()); // 20/10/2026: không phân biệt dấu (td_search_norm)
         return (root, q, cb) -> cb.or(
-            cb.like(cb.lower(root.get("name")),        kw),
-            cb.like(cb.lower(root.get("code")),        kw),
-            cb.like(cb.lower(root.get("description")), kw),
-            cb.like(cb.lower(root.get("fullPath")),    kw),
-            cb.like(cb.lower(root.get("form")),        kw)
+            cb.like(SearchTextSql.norm(cb, root.get("name")),        kw),
+            cb.like(SearchTextSql.norm(cb, root.get("code")),        kw),
+            cb.like(SearchTextSql.norm(cb, root.get("description")), kw),
+            cb.like(SearchTextSql.norm(cb, root.get("fullPath")),    kw),
+            cb.like(SearchTextSql.norm(cb, root.get("form")),        kw)
         );
     }
 

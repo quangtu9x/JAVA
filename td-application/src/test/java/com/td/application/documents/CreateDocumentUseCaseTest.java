@@ -22,8 +22,6 @@ class CreateDocumentUseCaseTest {
     @Mock
     private DocumentCacheService documentCacheService;
     @Mock
-    private DocumentSearchService documentSearchService;
-    @Mock
     private DocumentLogService documentLogService;
     @Mock
     private DocumentNumberingService documentNumberingService;
@@ -31,7 +29,7 @@ class CreateDocumentUseCaseTest {
     @Test
     void execute_shouldLogCreateAfterSavingDocument() {
         var useCase = new CreateDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService, documentNumberingService);
+            documentRepository, documentCacheService, documentLogService, documentNumberingService);
 
         when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -47,7 +45,7 @@ class CreateDocumentUseCaseTest {
     @Test
     void execute_whenSaveFails_shouldNotLogCreate() {
         var useCase = new CreateDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService, documentNumberingService);
+            documentRepository, documentCacheService, documentLogService, documentNumberingService);
         when(documentRepository.save(any())).thenThrow(new RuntimeException("DB error"));
 
         var request = new CreateDocumentRequest();
@@ -63,7 +61,7 @@ class CreateDocumentUseCaseTest {
     @SuppressWarnings("unchecked")
     void execute_withConfiguredDocumentType_shouldAssignGeneratedDocumentNumber() throws Exception {
         var useCase = new CreateDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService, documentNumberingService);
+            documentRepository, documentCacheService, documentLogService, documentNumberingService);
 
         when(documentNumberingService.generateNumber("vbden")).thenReturn(java.util.Optional.of("5/2026"));
         var savedCaptor = org.mockito.ArgumentCaptor.forClass(com.td.domain.documents.BusinessDocument.class);
@@ -84,7 +82,7 @@ class CreateDocumentUseCaseTest {
     @Test
     void execute_whenDocumentNumberAlreadyProvided_shouldNotOverwrite() throws Exception {
         var useCase = new CreateDocumentUseCase(
-            documentRepository, documentCacheService, documentSearchService, documentLogService, documentNumberingService);
+            documentRepository, documentCacheService, documentLogService, documentNumberingService);
 
         when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
