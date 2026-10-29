@@ -111,6 +111,36 @@ class JdbcCheckpointStoreTest {
         assertThat(reclaimed.get().status()).isEqualTo(UnitStatus.PROCESSING);
     }
 
+    /** 23/10/2026: heartbeat gia hạn lease — unit đang chạy không bị worker khác giành dù quá lease ban đầu. */
+    @Test
+    void renewLeasesKeepsClaimAliveAndReportsLostKeys() throws Exception {
+        MessageEnvelope m = message("m1", List.of(unit("u1", "H05"), unit("u2", "H05")));
+        store.initializeUnits(m);
+        String k1 = "H05|m1|u1";
+        String k2 = "H05|m1|u2";
+        store.claim(k1, "worker-A", 1);
+        store.claim(k2, "worker-B", 1);
+
+        // worker-A chỉ giữ k1; k2 thuộc worker-B -> báo mất.
+        assertThat(store.renewLeases("worker-A", List.of(k1, k2), 120)).containsExactly(k2);
+        Thread.sleep(1100);
+        assertThat(store.claim(k1, "worker-C", 120)).isEmpty(); // đã gia hạn
+        assertThat(store.claim(k2, "worker-C", 120)).isPresent(); // không gia hạn -> hết lease
+        assertThat(store.complete(k1, "worker-A")).isTrue();
+        assertThat(store.renewLeases("worker-A", List.of(k1), 120)).containsExactly(k1); // đã DONE
+    }
+
+    @Test
+    void requeueStalePendingUsesDatabaseClock() {
+        MessageEnvelope m = message("m1", List.of(unit("u1", "H05")));
+        store.initializeUnits(m);
+        assertThat(store.requeueStalePending(Duration.ofMinutes(5), 10)).isZero();
+        new JdbcTemplate(dataSource).update(
+            "UPDATE worker_units SET updated_at = CURRENT_TIMESTAMP - INTERVAL '10' MINUTE");
+        assertThat(store.requeueStalePending(Duration.ofMinutes(5), 10)).isEqualTo(1);
+        assertThat(store.findByUniqueKey("H05|m1|u1").get().status()).isEqualTo(UnitStatus.RETRY);
+    }
+
     @Test
     void failTransitionsToRetryThenFailedAfterMaxAttempts() {
         MessageEnvelope m = message("m1", List.of(unit("u1", "H05")));

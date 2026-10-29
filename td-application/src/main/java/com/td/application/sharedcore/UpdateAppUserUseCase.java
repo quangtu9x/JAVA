@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.TextNormalizer;
 import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.documents.DynamicDocumentFieldsService;
 import com.td.domain.sharedcore.AppUser;
 import com.td.domain.sharedcore.AppUserRoleGroup;
@@ -35,6 +37,7 @@ public class UpdateAppUserUseCase {
     private final CurrentUserProvider currentUserProvider;
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final AppUserDeactivationGuard deactivationGuard;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(UUID id, UpdateAppUserRequest request) {
         try {
@@ -124,6 +127,11 @@ public class UpdateAppUserUseCase {
             }
 
             var saved = appUserRepository.save(current);
+            // LuuDanhMuc.java#sendSocketToUser: báo chính tài khoản vừa được sửa (quyền/đơn vị đổi -> đăng nhập lại).
+            realtimeNotifier.notify(RealtimeNotification.of((String) null, "capnhatnguoidung", (String) null, null)
+                .to(saved.getUsername())
+                .exclude(currentUserProvider.currentUsername().orElse(""))
+                .message("Tài khoản của bạn đã được cập nhật thông tin mới, hãy thoát ra đăng nhập lại"));
             return Result.success(saved.getId());
         } catch (Exception ex) {
             log.error("Cập nhật người dùng thất bại", ex);

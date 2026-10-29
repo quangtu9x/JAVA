@@ -52,6 +52,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dbser
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\AddVbdiEditHistoryUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\categories\UpdateCategoryUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\CopyDocumentRegistersRequest.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\RealtimeNotifier.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\template\department\application\GetDepartmentUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\TaoDuThaoRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\DeleteDocumentRegisterUseCase.java
@@ -176,6 +177,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosol
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workcalendars\GetWeekWorkCalendarRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\GanVanBanLienQuanDuThaoRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\ChoYKienPhieuTrinhTdRequest.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\UserNotificationRepository.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dbserver\DbServerDtoMapper.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tenant\ActivateTenantUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\duthao\XuLyDuThaoUseCase.java
@@ -379,10 +381,12 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tongh
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\KiemTrungVbdenUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tonghop\GetProvinceStatisticsUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\XoaTraLoiVanBanDenUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\UserNotificationInboxUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workcalendars\WorkCalendarDtoMapper.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\UpdateDocumentRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tonghop\national\NationalExchangeAccess.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\phieutrinhtd\TrinhThamKhaoPhieuTrinhTdUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\RealtimeNotification.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\CompleteExternalPdfSignatureUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\recordsstorage\GetRecordsStorageCatalogUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tonghop\ProvinceDispatchDocumentItem.java
@@ -470,6 +474,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\workf
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\SimPkiSignSubmissionResult.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\GuiSangVbcddhUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbdi\ListVbdiSendLogUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\RealtimeNotificationGateway.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\UpdateDocumentRegisterRequest.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\dbserver\ActivateDbServerUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\tonghop\ProvinceDocumentStates.java
@@ -594,6 +599,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\share
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\VbdenForwardUnitStatusMessagePayload.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\identityfiles\DeleteIdentityFileUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\ListVbdenUserActionLogUseCase.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\RecipientTenantResolver.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\UploadFileUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\hosocv\DuyetHoSoUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documentregister\CopyDocumentRegistersResponse.java
@@ -716,6 +722,7 @@ C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\sharedcore\ListUserDirectoryUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\documents\SupersedeDocumentFilesUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\template\department\application\SearchDepartmentsRequest.java
+C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\realtime\RealtimeTaskDispatcher.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\vbden\ChuyenXuLyVbdenUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\simpki\SubmitSimPkiSignatureUseCase.java
 C:\code_projects\HSCV\JAVA\td-application\src\main\java\com\td\application\identityfiles\GetIdentityFileUseCase.java

@@ -46,7 +46,7 @@ class ChuyenTrangThaiPhieuTrinhTdUseCaseTest {
     void setUp() {
         useCase = new ChuyenTrangThaiPhieuTrinhTdUseCase(
             phieuTrinhTdDocumentRepository, phieuTrinhTdProcessDocumentRepository,
-            dynamicDocumentFieldsService, currentUserProvider, appUserRepository);
+            dynamicDocumentFieldsService, currentUserProvider, appUserRepository, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(phieuTrinhTdDocumentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(phieuTrinhTdProcessDocumentRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));

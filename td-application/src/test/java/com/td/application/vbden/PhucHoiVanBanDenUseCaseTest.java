@@ -45,7 +45,7 @@ class PhucHoiVanBanDenUseCaseTest {
     void setUp() {
         useCase = new PhucHoiVanBanDenUseCase(
             documentRepository, dynamicDocumentFieldsService, resolveIdentifierByLevelUseCase,
-            documentCacheService, documentLogService);
+            documentCacheService, documentLogService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 

@@ -163,7 +163,7 @@ public class PostgresHoSoLuuTruDocumentRepository implements HoSoLuuTruDocumentR
             }
             String column = STATUS_FIELD_NAME.equals(entry.getKey())
                 ? "LOWER(COALESCE(d.status, ''))"
-                : "LOWER(COALESCE(d.dynamic_fields->>'" + entry.getKey() + "', ''))";
+                : "LOWER(COALESCE(d.dynamic_fields->>'" + KeywordSql.requireSafeFieldName(entry.getKey()) + "', ''))";
             List<String> paramRefs = new ArrayList<>();
             String prefix = "fieldValueIn" + (fieldIndex++);
             for (int valueIndex = 0; valueIndex < allowedValues.size(); valueIndex++) {

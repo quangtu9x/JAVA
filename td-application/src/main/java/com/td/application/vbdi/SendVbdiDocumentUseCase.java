@@ -3,6 +3,8 @@ package com.td.application.vbdi;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.documents.PrepareVbdiDeliveryFilesRequest;
 import com.td.application.documents.PrepareVbdiDeliveryFilesUseCase;
 import com.td.application.documents.VbdiDeliveryFileRef;
@@ -191,6 +193,7 @@ public class SendVbdiDocumentUseCase {
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
     private final com.td.application.documents.ListDocumentFilesUseCase listDocumentFilesUseCase;
     private final PublishNationalExchangeSendUseCase publishNationalExchangeSendUseCase;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<Integer> execute(SendVbdiDocumentRequest request) {
         if (request == null || request.getDocumentId() == null) {
@@ -266,10 +269,35 @@ public class SendVbdiDocumentUseCase {
         }
         if (SEND_FAMILY_TYPES.contains(sendType)) {
             applySendSideEffects(document, writtenRecipientsByGroup);
+            notifyRecipients(document, writtenRecipientsByGroup);
         } else if (REVOKE_FAMILY_TYPES.contains(sendType)) {
             applyRevokeSideEffects(document, writtenRecipientsByGroup);
         }
         return Result.success(written);
+    }
+
+    /**
+     * SendDocument.java#gui_thong_bao_cho_noi_nhan: báo người nhận để biết (username) + văn thư đơn vị nội bộ /
+     * cơ quan liên hệ (mã định danh -> room coquan_<mã>) vừa được gửi. Người gửi hiển thị = đơn vị phát hành.
+     */
+    private void notifyRecipients(VbdiDocument document, Map<String, List<VbdiSendRecipientRequest>> written) {
+        Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        String code = fields.get("code_full") == null ? null : String.valueOf(fields.get("code_full"));
+        RealtimeNotification notification = RealtimeNotification.of("vbdi", "phathanhvanban", document.getId(), code);
+        Object unitPublish = fields.get("unit_publish");
+        if (unitPublish != null && !String.valueOf(unitPublish).isBlank()) {
+            notification.creator(String.valueOf(unitPublish));
+        }
+        written.forEach((group, recipients) -> {
+            if (VbdiSendRecipientGroup.EXTERNAL_UNIT.equals(group)) {
+                return;
+            }
+            for (VbdiSendRecipientRequest recipient : recipients) {
+                notification.to(VbdiSendRecipientGroup.COORDINATOR.equals(group)
+                    ? recipient.getUsername() : recipient.getIdentifier());
+            }
+        });
+        realtimeNotifier.notify(notification);
     }
 
     /**

@@ -11,6 +11,8 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.sharedcore.AppUserRepository;
 import com.td.application.sharedcore.GetUserOrganizationProfileUseCase;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
@@ -123,6 +125,7 @@ public class CapNhatKetQuaXuLyUseCase {
     private final AppUserRepository appUserRepository;
     private final GetUserOrganizationProfileUseCase getUserOrganizationProfileUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(CapNhatKetQuaXuLyRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -146,7 +149,16 @@ public class CapNhatKetQuaXuLyUseCase {
         LocalDate ngayBanHanh = resolveNgayBanHanh(request.getResObj());
         updateParentDocument(parent, actingUser, ngayBanHanh);
 
-        return createProcessingRecord(request, actingUsername);
+        var result = createProcessingRecord(request, actingUsername);
+        if (result.isSuccess()) {
+            // CapNhatVanBanDen.java#vanthuketthucxuly dong 287-296: báo user_process + user_processing (sau lưu).
+            Map<String, Object> saved = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+            realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "capnhatvanbantraloi", parent.getId(),
+                    java.util.Objects.toString(saved.get("code"), null))
+                .toValues(saved.get("user_process"), saved.get("user_processing"))
+                .exclude(actingUsername));
+        }
+        return result;
     }
 
     // Domino processResObj(): moi phan tu resObj co promulgation_date hop le se GHI DE ngaybanhanh -

@@ -12,7 +12,7 @@
 
 | Nhóm | Key | Mục đích |
 |---|---|---|
-| Core | `worker.core.max-inflight-units`, `unit-timeout`, `message-timeout`, `retries-per-unit`, `retry-initial-backoff`, `retry-max-backoff`, `retry-poll-interval`, `claim-lease-seconds`, `pending-stale-timeout`, `ack-policy`, `shutdown-grace` | concurrency/timeout/retry/lease/ACK |
+| Core | `worker.core.max-inflight-units`, `unit-timeout`, `message-timeout`, `retries-per-unit`, `retry-initial-backoff`, `retry-max-backoff`, `retry-poll-interval`, `claim-lease-seconds`, `lease-renew-interval` (`WORKER_LEASE_RENEW_INTERVAL`, trống = lease/3), `max-processing-time` (`WORKER_MAX_PROCESSING_TIME`, mặc định 15m), `pending-stale-timeout`, `ack-policy`, `shutdown-grace` | concurrency/timeout/retry/lease (heartbeat, xem [05](05-multi-instance.md))/ACK |
 | DB Worker | `worker.db.*` (`url`, `username`, `password`, `schema-management`, `hikari.*`) | checkpoint store riêng |
 | Control-plane | `worker.control-plane.*` (`url`, `username`, `password`, `credential-encryption-key/salt`, `refresh-interval`) | registry tenant (chỉ đọc) |
 | Tenant pool | `worker.tenant.*` (`max-pools`, `pool-*`) | pool mỗi database tenant |
@@ -36,7 +36,7 @@ TENANT_CREDENTIAL_ENCRYPTION_KEY=<cùng giá trị td-web>
 TENANT_CREDENTIAL_ENCRYPTION_SALT=<cùng giá trị td-web, hex hợp lệ>
 RABBITMQ_HOST=localhost
 WORKER_RABBIT_ENABLED=true
-WORKER_INSTANCE_ID=worker-1
+WORKER_INSTANCE_ID=worker-1   # tiền tố; thực tế dùng "worker-1-<8 ký tự ngẫu nhiên>" mỗi lần khởi động
 ```
 
 ## 4. Lưu ý bảo mật

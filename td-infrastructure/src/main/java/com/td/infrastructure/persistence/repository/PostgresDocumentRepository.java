@@ -389,7 +389,7 @@ public class PostgresDocumentRepository extends DocumentRepository {
 	// vi toan tu "::" cua Postgres - tranh hoan toan van de parser named-parameter cua Hibernate.
 	@Override
 	protected String dynamicSortExpression(String fieldName, String sortType) {
-		String path = "d.dynamic_fields->>'" + fieldName + "'";
+		String path = "d.dynamic_fields->>'" + KeywordSql.requireSafeFieldName(fieldName) + "'";
 		if ("integer".equals(sortType)) {
 			return "CAST(CAST(NULLIF(" + path + ", '') AS numeric) AS integer)";
 		}

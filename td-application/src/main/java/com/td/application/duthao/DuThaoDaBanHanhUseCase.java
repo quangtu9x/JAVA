@@ -5,6 +5,8 @@ import com.td.application.common.models.Result;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.duthao.DuThaoDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +55,7 @@ public class DuThaoDaBanHanhUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentLogService documentLogService;
     private final DocumentCacheService documentCacheService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(DuThaoDaBanHanhRequest request) {
         if (request == null || request.getId() == null) {
@@ -83,6 +86,10 @@ public class DuThaoDaBanHanhUseCase {
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
         log.info("Danh dau du thao {} da ban hanh (vbdi {})", saved.getId(), request.getVbdiId());
+        // vbdi/XuLyDuThao.java dong 149-154: báo người soạn + người ký, mở văn bản đi vừa vào sổ.
+        realtimeNotifier.notify(RealtimeNotification.of("vbdi", "vaosovanbandi", request.getVbdiId(),
+                request.getVbdiCode())
+            .to(text(fields.get("user_creator")), text(fields.get("user_signer"))));
         return Result.success(saved.getId());
     }
 
@@ -93,6 +100,10 @@ public class DuThaoDaBanHanhUseCase {
         snapshot.put("status", document.getStatus());
         snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
         return snapshot;
+    }
+
+    private static String text(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String toJson(Map<String, Object> value) {

@@ -57,7 +57,7 @@ class CapNhatPhoiHopUseCaseTest {
         useCase = new CapNhatPhoiHopUseCase(
             documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService,
-            resolveIdentifierByLevelUseCase, authorAclFieldsService);
+            resolveIdentifierByLevelUseCase, authorAclFieldsService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
     }

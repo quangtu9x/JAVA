@@ -1,3 +1,4 @@
+com\td\domain\notifications\UserNotification.class
 com\td\domain\duthao\DraftProcessDocument.class
 com\td\domain\sharedcore\RoleGroupRole.class
 com\td\domain\hosocv\HoSoCVDocument.class

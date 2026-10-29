@@ -5,6 +5,8 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
 import com.td.domain.documents.BusinessDocument;
 import lombok.RequiredArgsConstructor;
@@ -56,6 +58,7 @@ public class PhucHoiVanBanDenUseCase {
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final DocumentCacheService documentCacheService;
     private final DocumentLogService documentLogService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(PhucHoiVanBanDenRequest request) {
         if (request == null || request.getIdvbden() == null) {
@@ -96,6 +99,10 @@ public class PhucHoiVanBanDenUseCase {
         documentCacheService.evict(saved.getId());
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
+        // PhucHoiVanBan.java dong 65-78: báo danh sách author của văn bản.
+        realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "phuchoi", saved.getId(),
+                java.util.Objects.toString(fields.get("code"), null))
+            .toValues(fields.get("author")));
     }
 
     private void restoreRegisterEntry(UUID idso) {

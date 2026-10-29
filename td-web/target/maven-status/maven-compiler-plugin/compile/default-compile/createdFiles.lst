@@ -3,6 +3,7 @@ com\td\web\controllers\v1\VbcddhController.class
 com\td\web\controllers\BaseController.class
 com\td\web\controllers\v1\RecordsStorageCatalogsController.class
 com\td\web\controllers\v1\ErrorTrackingController.class
+com\td\web\controllers\v1\SafeFileResponse.class
 com\td\web\controllers\v1\DocumentsController.class
 com\td\web\controllers\v1\WorkflowsController.class
 com\td\web\config\OpenApiConfig.class
@@ -13,6 +14,7 @@ com\td\web\controllers\v1\QLVBCompatAuthController$ResolvedAgency.class
 com\td\web\controllers\v1\IdentityDocumentsController.class
 com\td\web\controllers\v1\LegacyDanhMucController.class
 com\td\web\controllers\v1\PlatformDbServersController.class
+com\td\web\controllers\v1\UserNotificationsController.class
 com\td\web\controllers\v1\VbdenController.class
 com\td\web\controllers\v1\FileController.class
 com\td\web\controllers\v1\QLVBCompatAuthController.class

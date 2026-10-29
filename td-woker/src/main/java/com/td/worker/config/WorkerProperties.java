@@ -32,9 +32,45 @@ public class WorkerProperties {
     private Tasks tasks = new Tasks();
     private FileRegistry fileRegistry = new FileRegistry();
 
+    /** Định danh thực dùng cho {@code claimed_by}/lease — sinh 1 lần cho mỗi tiến trình. */
+    @lombok.Getter(lombok.AccessLevel.NONE)
+    @lombok.Setter(lombok.AccessLevel.NONE)
+    @lombok.EqualsAndHashCode.Exclude
+    @lombok.ToString.Exclude
+    private volatile String effectiveInstanceId;
+
+    /**
+     * 23/10/2026 (chạy nhiều máy chủ): LUÔN duy nhất — {@code <WORKER_INSTANCE_ID hoặc hostname>-<8 ký tự
+     * ngẫu nhiên>}, sinh 1 lần/tiến trình rồi giữ nguyên. Trước đây trả nguyên {@code WORKER_INSTANCE_ID}
+     * nên copy cùng 1 giá trị sang 2 máy (vd docker-compose {@code worker-1} khi scale) làm 2 máy cùng
+     * "sở hữu" 1 claim/lease GC; còn để trống thì MỖI LẦN GỌI ra 1 UUID khác nhau.
+     */
     public String resolveInstanceId() {
-        return (instanceId == null || instanceId.isBlank())
-            ? UUID.randomUUID().toString() : instanceId;
+        String id = effectiveInstanceId;
+        if (id == null) {
+            synchronized (this) {
+                if (effectiveInstanceId == null) {
+                    effectiveInstanceId = buildEffectiveInstanceId();
+                }
+                id = effectiveInstanceId;
+            }
+        }
+        return id;
+    }
+
+    private String buildEffectiveInstanceId() {
+        String prefix = instanceId == null ? "" : instanceId.trim();
+        if (prefix.isEmpty()) {
+            try {
+                prefix = java.net.InetAddress.getLocalHost().getHostName();
+            } catch (Exception e) {
+                prefix = "worker";
+            }
+        }
+        if (prefix.length() > 150) {
+            prefix = prefix.substring(0, 150);
+        }
+        return prefix + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     /** Cấu hình lõi (concurrency, timeout, retry, lease, ACK policy). */
@@ -50,6 +86,13 @@ public class WorkerProperties {
         private Duration retryPollInterval = Duration.ofSeconds(5);
         private int retryPollBatchSize = 100;
         private int claimLeaseSeconds = 120;
+        /** Chu kỳ gia hạn lease unit đang chạy (heartbeat); null/0 = claimLeaseSeconds/3. */
+        private Duration leaseRenewInterval;
+        /**
+         * Trần thời gian 1 unit được giữ lease (kể cả đã interrupt mà handler chưa thoát) — quá trần thì
+         * NGỪNG gia hạn để lease hết hạn, máy khác nhận lại (unit treo vĩnh viễn không kẹt mãi).
+         */
+        private Duration maxProcessingTime = Duration.ofMinutes(15);
         private Duration pendingStaleTimeout = Duration.ofMinutes(5);
         private Duration dependencyRetryInterval = Duration.ofMinutes(5);
         private AckPolicy ackPolicy = AckPolicy.ALL_ACCOUNTED;

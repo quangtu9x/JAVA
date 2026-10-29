@@ -35,7 +35,7 @@ class DuThaoDaBanHanhUseCaseTest {
 
     private DuThaoDaBanHanhUseCase newUseCase() {
         return new DuThaoDaBanHanhUseCase(
-            duThaoDocumentRepository, dynamicDocumentFieldsService, documentLogService, documentCacheService);
+            duThaoDocumentRepository, dynamicDocumentFieldsService, documentLogService, documentCacheService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     private DuThaoDocument newDraft() {

@@ -63,7 +63,7 @@ class TraLaiVanBanUseCaseTest {
         useCase = new TraLaiVanBanUseCase(
             documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, resolveIdentifierByLevelUseCase,
-            processDiagramService, authorAclFieldsService, userFullNameResolver);
+            processDiagramService, authorAclFieldsService, userFullNameResolver, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(userFullNameResolver.resolveForWrite(any(), any()))
             .thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

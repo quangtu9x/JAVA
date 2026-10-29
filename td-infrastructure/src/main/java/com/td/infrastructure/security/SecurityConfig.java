@@ -88,7 +88,11 @@ public class SecurityConfig {
                 // Cau hinh OAuth cho trang Swagger tu tuy chinh (khong nam trong thu muc static).
                 .requestMatchers("/swagger-oauth-config").permitAll()
                 .requestMatchers("/error").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
+                // 28/10/2026 (rà soát bảo mật): trước đây permitAll cả /actuator/** — metrics/prometheus lộ
+                // URI, tên pool Hikari (tên tenant), số liệu JVM cho người chưa đăng nhập. Chỉ health/info công khai
+                // (probe của hạ tầng); phần còn lại cần ADMIN (máy thu thập Prometheus nên gọi qua mạng nội bộ).
+                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                .requestMatchers("/actuator/**").hasAnyRole("ADMIN", "PLATFORM_ADMIN")
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                 // Protected endpoints with role-based access

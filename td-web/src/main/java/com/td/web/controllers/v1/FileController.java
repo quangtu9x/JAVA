@@ -138,11 +138,11 @@ public class FileController extends BaseController {
             InputStream inputStream = minioService.getObject(file.getStoragePath());
             String rawName = file.getOriginalFileName() != null ? file.getOriginalFileName() : file.getFileName();
             String encoded = URLEncoder.encode(rawName, StandardCharsets.UTF_8).replace("+", "%20");
-            String contentDisposition = disposition + "; filename=\"" + rawName + "\"; filename*=UTF-8''" + encoded;
+            String contentDisposition = disposition + "; filename=\"" + SafeFileResponse.headerFileName(rawName)
+                    + "\"; filename*=UTF-8''" + encoded;
 
-            var mediaType = (file.getMimeType() != null && !file.getMimeType().isBlank())
-                    ? MediaType.parseMediaType(file.getMimeType())
-                    : MediaType.APPLICATION_OCTET_STREAM;
+            // 28/10/2026: không trả nguyên MIME client tự khai (html/svg inline = stored XSS) — xem SafeFileResponse.
+            var mediaType = SafeFileResponse.mediaType(file.getMimeType());
 
             return ResponseEntity.ok()
                     .contentType(mediaType)

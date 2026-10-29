@@ -216,6 +216,11 @@ public class OnlyOfficeController extends BaseController {
                 log.warn("OnlyOffice /callback: status={} nhung thieu field 'url' - bo qua", status);
                 return ResponseEntity.ok(Map.<String, Object>of("error", 1));
             }
+            if (!isTrustedEditedFileUrl(editedFileUrl)) {
+                log.warn("OnlyOffice /callback: tu choi url ngoai Document Server khi JWT tat (documentId={})",
+                        claims.documentId());
+                return ResponseEntity.ok(Map.<String, Object>of("error", 1));
+            }
             try {
                 byte[] content = downloadEditedFile(editedFileUrl);
                 var saveResult = TenantContext.runAsWithResult(claims.tenantId(), () ->
@@ -241,6 +246,49 @@ public class OnlyOfficeController extends BaseController {
         }
 
         return ResponseEntity.ok(Map.<String, Object>of("error", 0));
+    }
+
+    /**
+     * 28/10/2026 (rà soát bảo mật — chống SSRF): {@code token} callback nằm trong editor-config mà người dùng
+     * nhận được, nên khi JWT Document Server TẮT thì bất kỳ ai cũng tự POST callback với {@code url} trỏ vào
+     * dịch vụ nội bộ (Elasticsearch, MinIO, Keycloak admin...) và Backend sẽ tải về, lưu thành tệp đính kèm
+     * để tải xuống. Khi JWT BẬT, payload do Document Server ký nên tin được {@code url} (Document Server có
+     * thể trả url theo IP nội bộ khác {@code docserver-url}, không ép trùng host để khỏi hỏng lưu tệp). Khi
+     * JWT TẮT: chỉ nhận url http(s) cùng host + cổng với {@code app.onlyoffice.docserver-url}.
+     */
+    private boolean isTrustedEditedFileUrl(String editedFileUrl) {
+        URI target;
+        try {
+            target = URI.create(editedFileUrl);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+        String scheme = target.getScheme() == null ? "" : target.getScheme().toLowerCase();
+        if (!scheme.equals("http") && !scheme.equals("https")) {
+            return false;
+        }
+        if (onlyOfficeProperties.isJwtEnabled()) {
+            return true;
+        }
+        String docserverUrl = onlyOfficeProperties.getDocserverUrl();
+        if (docserverUrl == null || docserverUrl.isBlank()) {
+            return false;
+        }
+        try {
+            URI docserver = URI.create(docserverUrl.trim());
+            return docserver.getHost() != null
+                    && docserver.getHost().equalsIgnoreCase(target.getHost())
+                    && effectivePort(docserver) == effectivePort(target);
+        } catch (IllegalArgumentException ex) {
+            return false;
+        }
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 
     private byte[] downloadEditedFile(String editedFileUrl) throws java.io.IOException, InterruptedException {

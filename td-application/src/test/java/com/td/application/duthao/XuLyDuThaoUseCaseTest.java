@@ -56,7 +56,8 @@ class XuLyDuThaoUseCaseTest {
             documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
             new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
             DuThaoSignSubmissionInspectorTest.emptyInspector(),
-            com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver());
+            com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver(),
+            com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("nguyenvana"));
         lenient().when(duThaoDocumentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         // DT-007: mac dinh tao draft_process thanh cong - cac test khong quan tam ket qua nay chi
@@ -258,7 +259,8 @@ class XuLyDuThaoUseCaseTest {
             documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
             new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
             DuThaoSignSubmissionInspectorTest.emptyInspector(),
-            com.td.application.sharedcore.UserDelegationTestSupport.resolverWith(new java.util.ArrayList<>(java.util.List.of(delegation))));
+            com.td.application.sharedcore.UserDelegationTestSupport.resolverWith(new java.util.ArrayList<>(java.util.List.of(delegation))),
+            com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     // DT-007 (24/08/2026, cap nhat 25/08 tach bang): tao document con draft_process qua
@@ -407,6 +409,34 @@ class XuLyDuThaoUseCaseTest {
 
         Map<String, Object> fields = fieldsOf(document);
         assertThat(fields).containsEntry("user_signer", "nguoikyhientai");
+    }
+
+    // 27/10/2026: port DraftProcesses#senThongBao - "Chuyển ký duyệt" báo người ký qua socket.
+    @Test
+    void execute_chuyenkyduyet_shouldNotifySignerRealtime() {
+        var sent = new java.util.ArrayList<com.td.application.realtime.RealtimeNotification>();
+        var notifyingUseCase = new XuLyDuThaoUseCase(
+            duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider,
+            documentLogService, documentCacheService, addDraftProcessDocumentUseCase, authorAclFieldsService,
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
+            DuThaoSignSubmissionInspectorTest.emptyInspector(),
+            com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver(),
+            com.td.application.realtime.RealtimeNotifierTestSupport.recording(sent));
+        DuThaoDocument document = newDocument("duthao", DuThaoStatus.DRAFTING, "{\"user_signer\":\"lanhdao.a\"}");
+        when(duThaoDocumentRepository.findById(document.getId())).thenReturn(Optional.of(document));
+
+        var request = new XuLyDuThaoRequest();
+        request.setId(document.getId());
+        request.setAction("chuyenkyduyet");
+        request.setOpinion("Kính trình");
+        notifyingUseCase.execute(request);
+
+        assertThat(sent).hasSize(1);
+        assertThat(sent.get(0).getAction()).isEqualTo("chuyenkyduyet");
+        assertThat(sent.get(0).getDatabaseType()).isEqualTo("duthao");
+        assertThat(sent.get(0).getDocId()).isEqualTo(document.getId().toString());
+        assertThat(sent.get(0).getRecipients()).containsExactly("lanhdao.a");
+        assertThat(sent.get(0).getOpinion()).isEqualTo("Kính trình");
     }
 
     @Test

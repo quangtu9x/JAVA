@@ -7,6 +7,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\VbdenResDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\controlplane\PostgresTenantRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\AppRoleJpaRepository.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\realtime\UserNotificationRetentionScheduler.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\controlplane\PostgresCategoryRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\controlplane\CategoryFileMetadataJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresVbcddhDocumentRepository.java
@@ -78,6 +79,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\config\MinIOConfig.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresVbdenResDocumentRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\OrganizationJpaRepository.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresUserNotificationRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\KeycloakJwtConverter.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\fileregistry\FileRegistrySchemaMigrator.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\messaging\KafkaClientConfig.java
@@ -97,6 +99,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\controlplane\TenantJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\BaseRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\PostgresAppUserRoleGroupRepository.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\UserNotificationJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\tenant\TenantNotActiveException.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\config\MinIOProperties.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\VbdiUserActionLogJpaRepository.java
@@ -119,15 +122,18 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\SecurityConfig.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresOutboxEventRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\messaging\MessagingProperties.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\realtime\SocketIoRealtimeNotificationGateway.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\HoSoLuuTruVanBanDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\VbdenEditHistoryDocumentJpaRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\DocumentSearchSupport.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresPrivateCategoryRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\errortracking\ErrorTrackingDataSourceConfig.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\realtime\RealtimeNotificationConfig.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\TextContainsSql.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\errortracking\DeadlockWatchdog.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\messaging\RabbitDeliveryTracker.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\tonghop\national\PostgresNationalExchangeQueryRepository.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\security\UserAdministrationAccess.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\PostgresVbdenUserActionLogRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\tonghop\ProvinceDispatchAggregator.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\documents\VbdiFilesJsonbSync.java
@@ -199,6 +205,7 @@ C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\tenant\TenantPoolFactory.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\controlplane\PostgresDbServerRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\onlyoffice\OnlyOfficeAccessTokenService.java
+C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\realtime\SocketIoProperties.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\onlyoffice\BuildOnlyOfficeEditorConfigUseCaseImpl.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\identity\PostgresAppUserRepository.java
 C:\code_projects\HSCV\JAVA\td-infrastructure\src\main\java\com\td\infrastructure\persistence\repository\DocumentRepository.java

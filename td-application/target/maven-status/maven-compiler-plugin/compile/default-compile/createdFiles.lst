@@ -102,6 +102,7 @@ com\td\application\vbdi\SoanThaoVbdiRequest.class
 com\td\application\documents\CreateDocumentUseCase.class
 com\td\application\documents\DocumentDto.class
 com\td\application\tenant\UpdateTenantUseCase.class
+com\td\application\realtime\RealtimeTaskDispatcher.class
 com\td\application\tonghop\ProvinceDocumentSearchRequest.class
 com\td\application\sharedcore\SearchUserDataScopesRequest.class
 com\td\application\tonghop\national\NationalExchangeStates.class
@@ -125,6 +126,7 @@ com\td\application\hosocv\LuuHoSoRequest.class
 com\td\application\tenant\TenantDto.class
 com\td\application\sharedcore\UserDelegationRepository.class
 com\td\application\phieutrinhtd\TrinhThamKhaoPhieuTrinhTdRequest.class
+com\td\application\realtime\RecipientTenantResolver.class
 com\td\application\categories\CreateCategoryUseCase.class
 com\td\application\vbden\PhucHoiVanBanDenUseCase.class
 com\td\application\documents\GetFileUseCase.class
@@ -540,6 +542,7 @@ com\td\application\vbden\CapNhatDaXemDeBietRequest.class
 com\td\application\vbden\XuLyLaiUseCase.class
 com\td\application\sharedcore\GetAppPermissionUseCase.class
 com\td\application\sharedcore\AppPermissionDto.class
+com\td\application\realtime\RealtimeNotifier$1.class
 com\td\application\documents\DocumentLogRepository.class
 com\td\application\vbdi\GuiEmailVbdiUseCase.class
 com\td\application\categories\CapNhatCacheRequest.class
@@ -684,6 +687,7 @@ com\td\application\documents\GetDocumentUseCase.class
 com\td\application\vbden\TuChoiTiepNhanVbdenRequest.class
 com\td\application\documentregister\GetDocumentRegisterUseCase.class
 com\td\application\simpki\DownloadSignedPdfUseCase.class
+com\td\application\realtime\RealtimeNotification.class
 com\td\application\hosocv\AddHoSoCVDynamicDocumentUseCase.class
 com\td\application\tonghop\national\RequestNationalExchangeOperationUseCase.class
 com\td\application\sharedcore\SearchAppPermissionsUseCase.class
@@ -808,6 +812,7 @@ com\td\application\documentregister\DocumentRegisterRepository.class
 com\td\application\onlyoffice\LinkOnlyOfficeEditedFileToProcessUseCase.class
 com\td\application\tonghop\ProvinceDispatchRecipientItem$ProvinceDispatchRecipientItemBuilder.class
 com\td\application\phieutrinhtd\ChuyenTrangThaiPhieuTrinhTdUseCase$Receiver.class
+com\td\application\realtime\RealtimeNotifier.class
 com\td\application\categories\CategoryCacheStatsDto$CategoryCacheStatsDtoBuilder.class
 com\td\application\sharedcore\CreateAppUserRequest.class
 com\td\application\vbdi\VbdiStatus.class
@@ -818,7 +823,9 @@ com\td\application\vbdi\VbdiDocumentOutFilter.class
 com\td\application\hosoluutru\HoSoLuuTruPhieuYeuCauDocumentRepository.class
 com\td\application\vbdi\ChuyenXemDeBietVbdiRequest.class
 com\td\application\hosoluutru\TraTaiLieuUseCase.class
+com\td\application\realtime\UserNotificationInboxUseCase.class
 com\td\application\documents\DocumentLogDto.class
+com\td\application\realtime\UserNotificationRepository.class
 com\td\application\vbdi\KySoVbdiUseCase.class
 com\td\application\documentlinks\DocumentLinkService.class
 com\td\application\hosocv\XuLyLaiHoSoRequest.class
@@ -850,6 +857,7 @@ com\td\application\workcalendars\WorkCalendarRepository.class
 com\td\application\documentlinks\RelatedDocumentSnapshots.class
 com\td\application\numbering\GetNumberingConfigsUseCase.class
 com\td\application\tonghop\national\NationalExchangeCommandRepository$NewOperation.class
+com\td\application\realtime\UserNotificationInboxUseCase$UnitKey.class
 com\td\application\sharedcore\CreateRoleGroupRequest.class
 template\department\application\DepartmentCacheStatsDto$DepartmentCacheStatsDtoBuilder.class
 com\td\application\workflows\WorkflowStepDto.class
@@ -900,6 +908,7 @@ com\td\application\dbserver\CreateDbServerRequest.class
 com\td\application\vbdi\PublishVbdiReplyStatusUseCase.class
 com\td\application\vbden\PublishForwardUnitRevokeUseCase.class
 com\td\application\phieutrinhtd\ChoYKienPhieuTrinhTdUseCase.class
+com\td\application\realtime\RecipientTenantResolver$Entry.class
 com\td\application\hosocv\DuyetHoSoUseCase.class
 com\td\application\duthao\ListDuThaoEditHistoryRequest.class
 com\td\application\sharedcore\ListUserDirectoryUseCase.class
@@ -915,6 +924,7 @@ template\department\application\SearchDepartmentsUseCase.class
 com\td\application\vbden\GetVbdenDetailUseCase.class
 com\td\application\common\dynamicfields\ItemsFilter.class
 com\td\application\documentregister\CreateDocumentRegisterRequest.class
+com\td\application\realtime\RealtimeNotificationGateway.class
 com\td\application\phieutrinhtd\PhieuTrinhTdListCriteria.class
 template\department\application\DepartmentRepository.class
 com\td\application\duthao\XoaTraLoiVanBanDenDuThaoUseCase.class

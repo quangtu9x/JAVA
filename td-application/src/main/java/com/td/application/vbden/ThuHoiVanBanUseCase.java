@@ -12,6 +12,8 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.processdiagram.ProcessDiagramService;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
 import com.td.domain.documents.BusinessDocument;
@@ -168,6 +170,7 @@ public class ThuHoiVanBanUseCase {
     private final PublishForwardUnitRevokeUseCase publishForwardUnitRevokeUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
     private final VbdenRevokeRecipientMatcher recipientMatcher;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(ThuHoiVanBanRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -201,6 +204,15 @@ public class ThuHoiVanBanUseCase {
         var childResult = createProcessingRecord(request, actingUsername, revoked);
 
         removeDiagramNodes(request.getParentid(), revoked.revokedUsernames());
+        if (childResult.isSuccess()) {
+            // ThuHoiVanBan.java#sendSocketNotSave: Domino báo user_process CÒN LẠI; ở đây báo đúng người BỊ thu hồi
+            // (văn bản biến khỏi danh sách của họ).
+            realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "thuhoi", parent.getId(),
+                    java.util.Objects.toString(revoked.fields().get("code"), null))
+                .to(revoked.revokedUsernames())
+                .exclude(actingUsername)
+                .opinion(request.getOpinion()));
+        }
 
         return childResult;
     }

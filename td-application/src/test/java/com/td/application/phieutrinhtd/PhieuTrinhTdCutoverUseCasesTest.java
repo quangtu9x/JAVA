@@ -50,7 +50,7 @@ class PhieuTrinhTdCutoverUseCasesTest {
     @Test
     void chuyenTrangThai_shouldMergeFieldsBeforeResolvingReceiver_protectStatus_andReturnProcessId() {
         var useCase = new ChuyenTrangThaiPhieuTrinhTdUseCase(
-            documentRepository, processRepository, fields, currentUserProvider, appUserRepository);
+            documentRepository, processRepository, fields, currentUserProvider, appUserRepository, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         var request = new ChuyenTrangThaiPhieuTrinhTdRequest();
         request.setId(document.getId());
         request.setTargetStatus("2");

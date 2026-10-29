@@ -106,10 +106,13 @@ private int waitForCompletion(List<Future<UnitResult>> futures, List<TaskContext
             long remainingMs = Duration.between(Instant.now(), messageDeadline).toMillis();
             long unitTimeoutMs = retryPolicy.unitTimeout(ctx).toMillis();
             long waitMs = Math.min(remainingMs, unitTimeoutMs);
+            // 23/10/2026: het han cho CHI dung cho - KHONG cancel Future / KHONG tra unit ve RETRY nua. Truoc
+            // day thread handler (dang cho JDBC/HTTP, bo qua interrupt) van chay trong khi unit da RETRY ->
+            // may khac nhan lai va chay song song (xu ly kep). Timeout gio do watchdog cua UnitDispatcher
+            // (interrupt, giu lease toi khi handler thoat roi moi settle) - xem javadoc UnitDispatcher.
             if (waitMs <= 0) {
-                f.cancel(true);
                 timedOut++;
-                failTimedOut(key, ctx);
+                logStillRunning(key, ctx);
                 outcomes.add(new UnitOutcome(ctx.unitId(), false, "timeout", null));
                 continue;
             }
@@ -121,9 +124,8 @@ private int waitForCompletion(List<Future<UnitResult>> futures, List<TaskContext
                 UnitResult result = f.get(waitMs, TimeUnit.MILLISECONDS);
                 outcomes.add(new UnitOutcome(ctx.unitId(), result.isSuccess(), result.error(), result.detail()));
             } catch (java.util.concurrent.TimeoutException e) {
-                f.cancel(true);
                 timedOut++;
-                failTimedOut(key, ctx);
+                logStillRunning(key, ctx);
                 outcomes.add(new UnitOutcome(ctx.unitId(), false, "timeout", null));
             } catch (java.util.concurrent.ExecutionException e) {
                 log.error("ExecutionException khi chờ unit {}: {}", ctx.unitId(), e.getMessage());
@@ -136,23 +138,10 @@ private int waitForCompletion(List<Future<UnitResult>> futures, List<TaskContext
         return timedOut;
     }
 
-    private void failTimedOut(String key, TaskContext ctx) {
-        try {
-            store.findByUniqueKey(key).ifPresent(rec -> {
-                if (rec.status() == UnitStatus.PROCESSING) {
-                    Instant next = retryPolicy.nextRetryAt(rec.attempts());
-                    boolean ok = store.fail(key, dispatcher.workerId(), "timeout", next);
-                    if (ok) {
-                        metrics.unitFinal(ctx.taskType(),
-                            rec.attempts() >= rec.maxAttempts() ? UnitStatus.FAILED : UnitStatus.RETRY);
-                        log.warn("Unit {} timeout -> fail-in-place (attempt={}, nextRetryAt={})",
-                            ctx.unitId(), rec.attempts(), next);
-                    }
-                }
-            });
-        } catch (RuntimeException ex) {
-            log.error("Không fail-in-place được unit timeout {}: {}", key, ex.getMessage());
-        }
+    private void logStillRunning(String key, TaskContext ctx) {
+        log.warn("Unit {} (task {}) chưa xong trong thời gian chờ của message - vẫn PROCESSING, lease được gia "
+            + "hạn; watchdog của UnitDispatcher sẽ interrupt và settle khi handler thoát ({})",
+            ctx.unitId(), ctx.taskType(), key);
     }
 
     private boolean evaluateAckPolicy(Map<UnitStatus, Long> counts, int total) {

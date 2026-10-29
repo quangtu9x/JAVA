@@ -64,7 +64,7 @@ class ChuyenPhoiHopDuThaoUseCaseTest {
             duThaoDocumentRepository, addDraftProcessDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, authorAclFieldsService,
             new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
-            new DuThaoCoordinatorDelegations(UserDelegationTestSupport.resolverWith(delegations)));
+            new DuThaoCoordinatorDelegations(UserDelegationTestSupport.resolverWith(delegations)), com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     @Test

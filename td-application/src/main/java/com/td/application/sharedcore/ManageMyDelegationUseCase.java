@@ -2,6 +2,8 @@ package com.td.application.sharedcore;
 
 import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.sharedcore.AppUser;
 import com.td.domain.sharedcore.UserDelegation;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ public class ManageMyDelegationUseCase {
     private final UserDelegationRepository userDelegationRepository;
     private final AppUserRepository appUserRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final RealtimeNotifier realtimeNotifier;
 
     /** {@code current}: ủy quyền đang/sắp hiệu lực (dạng delegation_obj) hoặc null; {@code history}: mọi lần ủy quyền. */
     @Transactional(value = "identityTransactionManager", readOnly = true)
@@ -94,8 +97,10 @@ public class ManageMyDelegationUseCase {
         }
 
         LocalDate today = UserDelegationResolver.today();
+        List<String> previousDelegates = new java.util.ArrayList<>();
         for (UserDelegation existing : userDelegationRepository.findByDelegatorUserId(me.getId())) {
             if (existing.isCurrentOrUpcoming(today)) {
+                previousDelegates.add(existing.getDelegateUsername());
                 existing.revoke(me.getId());
                 userDelegationRepository.save(existing);
             }
@@ -103,7 +108,15 @@ public class ManageMyDelegationUseCase {
         UserDelegation delegation = new UserDelegation(me.getId(), me.getUsername(),
             delegate.getId(), delegate.getUsername(), delegate.getFullName(), resolvePosition(delegate),
             start, end, String.join(";", scopes), trimToNull(request.getSubject()));
-        return Result.success(userDelegationRepository.save(delegation).getId());
+        UUID savedId = userDelegationRepository.save(delegation).getId();
+        // UyQuyen.java dong 141-143: báo người được ủy quyền mới + người được ủy quyền cũ (bị thay).
+        realtimeNotifier.notify(RealtimeNotification.of((String) null, "capnhatuyquyen", (String) null, null)
+            .to(previousDelegates)
+            .to(delegate.getUsername())
+            .exclude(me.getUsername())
+            .message("Cập nhật ủy quyền xử lý thay từ " + request.getStartDate().trim() + " đến "
+                + request.getEndDate().trim()));
+        return Result.success(savedId);
     }
 
     public Result<UUID> revokeMine(UUID delegationId) {
@@ -121,7 +134,11 @@ public class ManageMyDelegationUseCase {
             return Result.failure("Ủy quyền đã được huỷ trước đó");
         }
         delegation.revoke(me.get().getId());
-        return Result.success(userDelegationRepository.save(delegation).getId());
+        UUID savedId = userDelegationRepository.save(delegation).getId();
+        realtimeNotifier.notify(RealtimeNotification.of((String) null, "capnhatuyquyen", (String) null, null)
+            .to(delegation.getDelegateUsername())
+            .message("Đã huỷ ủy quyền xử lý thay"));
+        return Result.success(savedId);
     }
 
     private Map<String, Object> toHistoryRow(UserDelegation d, LocalDate today) {

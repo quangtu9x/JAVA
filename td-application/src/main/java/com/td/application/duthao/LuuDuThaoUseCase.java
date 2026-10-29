@@ -5,6 +5,8 @@ import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.AuthorAclFieldsService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.duthao.DuThaoDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -71,6 +73,7 @@ public class LuuDuThaoUseCase {
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
     // 19/10/2026: ủy quyền ở Người nhận phối hợp -> người ủy quyền vào user_coordinated_movement (đã xác minh).
     private final DuThaoCoordinatorDelegations coordinatorDelegations;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(LuuDuThaoRequest request) {
         if (request == null || request.getId() == null) {
@@ -92,10 +95,38 @@ public class LuuDuThaoUseCase {
         // mang 1 phan tu moi lan luu du thao tao tu van ban den, ghi de mat cac van ban tra loi gan sau).
         relatedDocumentSnapshots.strip(fields);
 
+        String coordinatorsBefore = coordinators(document);
         mergeFieldsIntoDocument(document, fields, request);
         duThaoDocumentRepository.save(document);
+        notifyNewCoordinators(document, coordinatorsBefore);
 
         return Result.success(document.getId());
+    }
+
+    // TDDocument.java dong 666 (DraftInitNotification#DraftingCoordinatorInit): Lưu dự thảo có thêm người phối
+    // hợp -> báo người MỚI (Domino action "chuyenduthao4", FE không có nhãn -> "chuyenphoihop").
+    private void notifyNewCoordinators(DuThaoDocument document, String coordinatorsBefore) {
+        java.util.Set<String> before = new java.util.HashSet<>();
+        for (String user : coordinatorsBefore.split(";")) {
+            before.add(user.trim().toLowerCase(java.util.Locale.ROOT));
+        }
+        java.util.List<String> added = new java.util.ArrayList<>();
+        for (String user : coordinators(document).split(";")) {
+            if (!user.isBlank() && !before.contains(user.trim().toLowerCase(java.util.Locale.ROOT))) {
+                added.add(user.trim());
+            }
+        }
+        if (added.isEmpty()) {
+            return;
+        }
+        realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "chuyenphoihop", document.getId(), document.getTitle())
+            .to(added)
+            .exclude(currentUserProvider.currentUsername().orElse("")));
+    }
+
+    private String coordinators(DuThaoDocument document) {
+        Object value = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()).get("user_coordinator");
+        return value == null ? "" : String.valueOf(value);
     }
 
     // Merge (KHONG replace toan bo) field moi vao dynamic_fields hien co - field khong nam trong

@@ -40,7 +40,12 @@ Docker Compose (phát triển/smoke): `docker compose up -d --build` — gồm w
 
 Triển khai tối thiểu 2 instance trên ≥2 máy (docs/architecture/11 §13.7). Mỗi instance:
 
-- `WORKER_INSTANCE_ID` khác nhau.
+- `WORKER_INSTANCE_ID` tuỳ chọn (tiền tố dễ đọc; Worker tự nối hậu tố ngẫu nhiên nên copy cùng giá
+  trị/scale replica vẫn an toàn — từ 23/10/2026).
+- Đồng bộ giờ (NTP) vẫn nên bật cho log, nhưng lease đã tính theo đồng hồ DB nên lệch giờ không gây
+  xử lý kép.
+- Kiểm tra `max_connections` PostgreSQL: mỗi máy thêm ≈ 6 kết nối/DB tenant + 10 kết nối DB worker.
+- Xem bảng đánh giá an toàn theo loại việc: [05-multi-instance.md §5](05-multi-instance.md).
 - Cùng `WORKER_DB_URL` (checkpoint dùng chung), cùng broker.
 - Chịu được mất kết nối tạm thời khi khởi động (Hikari connection-timeout, Rabbit retry,
   `TenantRegistry` fail mềm).

@@ -7,6 +7,7 @@ com\td\infrastructure\documents\VerifyFileSignatureUseCaseImpl.class
 com\td\infrastructure\security\TdTokenAuthenticationFilter.class
 com\td\infrastructure\persistence\repository\VbdenUpdateHistoryDocumentJpaRepository.class
 com\td\infrastructure\errortracking\SensitiveDataSanitizer.class
+com\td\infrastructure\realtime\SocketIoProperties.class
 com\td\infrastructure\documents\VbdiEditHistorySync.class
 com\td\infrastructure\simpki\CompleteExternalPdfSignatureUseCaseImpl.class
 com\td\infrastructure\persistence\repository\DuThaoDocumentJpaRepository.class
@@ -97,10 +98,12 @@ com\td\infrastructure\persistence\identity\PostgresRoleGroupPermissionRepository
 com\td\infrastructure\categories\DeleteCategoryFileUseCaseImpl.class
 com\td\infrastructure\persistence\repository\DocumentJpaRepository.class
 com\td\infrastructure\identityfiles\UploadIdentityFileUseCaseImpl.class
+com\td\infrastructure\persistence\repository\UserNotificationJpaRepository.class
 com\td\infrastructure\categories\GetCategoryFileUseCaseImpl.class
 com\td\infrastructure\persistence\identity\PostgresUserDelegationRepository.class
 com\td\infrastructure\persistence\repository\DocumentSearchSupport.class
 com\td\infrastructure\persistence\repository\PostgresNumberingConfigRepository.class
+com\td\infrastructure\realtime\SocketIoRealtimeNotificationGateway.class
 com\td\infrastructure\tonghop\ProvinceIndexSyncService.class
 com\td\infrastructure\tenant\TenantDataSourceConfig$TenantDataSourcePool.class
 com\td\infrastructure\errortracking\ErrorTrackingService.class
@@ -117,6 +120,7 @@ com\td\infrastructure\documents\SupersedeDocumentFilesUseCaseImpl.class
 com\td\infrastructure\search\AdvancedSearchProperties.class
 com\td\infrastructure\config\MinIOConfig.class
 com\td\infrastructure\persistence\repository\PostgresHoSoLuuTruVanBanDocumentRepository.class
+com\td\infrastructure\persistence\repository\PostgresUserNotificationRepository.class
 com\td\infrastructure\persistence\repository\PostgresPhieuTrinhTdProcessDocumentRepository.class
 com\td\infrastructure\persistence\identity\RoleGroupJpaRepository.class
 com\td\infrastructure\persistence\repository\PostgresDuThaoEditHistoryDocumentRepository.class
@@ -171,9 +175,11 @@ com\td\infrastructure\persistence\controlplane\PostgresCategoryRepository.class
 com\td\infrastructure\messaging\OutboxDispatcherScheduler.class
 com\td\infrastructure\config\DatabaseConfig$Jpa.class
 com\td\infrastructure\errortracking\DeadlockWatchdog.class
+com\td\infrastructure\security\UserAdministrationAccess.class
 com\td\infrastructure\onlyoffice\OnlyOfficeDocumentJwtService.class
 com\td\infrastructure\persistence\entity\FileMetadataEntity.class
 com\td\infrastructure\documents\GetFileUseCaseImpl.class
+com\td\infrastructure\realtime\UserNotificationRetentionScheduler.class
 com\td\infrastructure\security\CorsProperties.class
 com\td\infrastructure\persistence\repository\DuThaoEditHistoryDocumentJpaRepository.class
 com\td\infrastructure\security\AuthenticatedUser.class
@@ -205,6 +211,7 @@ com\td\infrastructure\tonghop\ProvinceIndexSyncService$TenantSyncResult.class
 com\td\infrastructure\persistence\identity\PostgresRoleGroupRoleRepository.class
 com\td\infrastructure\security\SecurityConfig.class
 com\td\infrastructure\simpki\MultipartRequestBuilder.class
+com\td\infrastructure\realtime\RealtimeNotificationConfig$PooledRealtimeTaskDispatcher.class
 com\td\infrastructure\config\DatabaseConfig.class
 com\td\infrastructure\tenant\TenantDataSourceConfig.class
 com\td\infrastructure\tenant\controlplane\ControlPlaneJpaRepositoriesConfig.class
@@ -237,6 +244,7 @@ com\td\infrastructure\persistence\repository\PostgresVbdenUserActionLogRepositor
 com\td\infrastructure\errortracking\ErrorTrackingDataSourceConfig.class
 com\td\infrastructure\persistence\identity\PostgresAppUserRepository.class
 com\td\infrastructure\documents\UploadFileUseCaseImpl.class
+com\td\infrastructure\realtime\RealtimeNotificationConfig.class
 com\td\infrastructure\categories\ListCategoryFilesUseCaseImpl.class
 com\td\infrastructure\documents\DeleteFileUseCaseImpl.class
 com\td\infrastructure\hosocv\HttpLgspTokenClient.class

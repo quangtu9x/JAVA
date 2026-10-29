@@ -160,6 +160,23 @@ class VbdenForwardUnitStatusTaskHandlerIntegrationTest {
         assertThat(fields.get("identifier")).isEqualTo("H05.02");
     }
 
+    /** 23/10/2026: cùng unit chạy lại không nhân đôi dòng lịch sử; unit khác vẫn ghi dòng mới. */
+    @Test
+    void rerunOfSameUnit_doesNotDuplicateHistoryRow() throws Exception {
+        UUID originId = UUID.randomUUID();
+        JsonNode payload = basePayload(originId);
+
+        assertThat(handler.execute(context(), payload).isSuccess()).isTrue();
+        assertThat(handler.execute(context(), payload).isSuccess()).isTrue();
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        assertThat(jdbc.queryForList("SELECT id FROM vbden_res_documents")).hasSize(1);
+
+        TaskContext otherUnit = new TaskContext("vbden.forward_unit.status", "msg-2", "u2", "corr-2", "h05_01",
+            null, Map.of(), 5, null, Map.of());
+        assertThat(handler.execute(otherUnit, payload).isSuccess()).isTrue();
+        assertThat(jdbc.queryForList("SELECT id FROM vbden_res_documents")).hasSize(2);
+    }
+
     /** Thiếu actionLabel/opinion/newAssigneesLabel — vẫn ghi được, không lỗi, chỉ ngắn gọn hơn. */
     @Test
     void minimalPayload_stillInsertsHistoryRow() throws Exception {

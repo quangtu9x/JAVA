@@ -81,7 +81,7 @@ class ChuyenThanhVanBanDiUseCaseTest {
             addVbdiDynamicDocumentUseCase, dynamicDocumentFieldsService,
             documentLogService, documentCacheService, copyDocumentFilesUseCase, addDraftProcessDocumentUseCase,
             currentUserProvider, documentRepository,
-            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)), com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         // Mac dinh khong co nhiem vu CDDH nao lien ket - cac test khong quan tam vbcddh khong can
         // stub rieng.
         lenient().when(documentRepository.findByFieldValue(anyString(), anyString(), anyString(), any()))

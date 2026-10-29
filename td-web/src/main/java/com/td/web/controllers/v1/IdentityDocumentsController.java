@@ -86,7 +86,7 @@ public class IdentityDocumentsController extends BaseController {
 
             return ResponseEntity.ok()
                     .contentType(mediaType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + SafeFileResponse.headerFileName(fileName) + "\"")
                     .contentLength(file.getFileSize() != null ? file.getFileSize() : -1)
                     .body(new InputStreamResource(inputStream));
         } catch (Exception e) {

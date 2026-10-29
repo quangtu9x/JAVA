@@ -277,7 +277,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
                     sql.append(" AND LOWER(COALESCE(d.status, '')) = :").append(paramName);
                     parameters.put(paramName, entry.getValue() == null ? "" : entry.getValue().trim().toLowerCase());
                 } else {
-                    sql.append(" AND COALESCE(d.dynamic_fields->>'").append(entry.getKey()).append("', '') = :")
+                    sql.append(" AND COALESCE(d.dynamic_fields->>'").append(KeywordSql.requireSafeFieldName(entry.getKey())).append("', '') = :")
                         .append(paramName);
                     parameters.put(paramName, entry.getValue() == null ? "" : entry.getValue());
                 }
@@ -459,7 +459,7 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
                 paramRefs.add(":" + parameterName);
                 parameters.put(parameterName, values.get(valueIndex) == null ? "" : values.get(valueIndex));
             }
-            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(entry.getKey()).append("', '')")
+            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(KeywordSql.requireSafeFieldName(entry.getKey())).append("', '')")
                 .append(include ? " IN (" : " NOT IN (")
                 .append(String.join(",", paramRefs)).append(")");
         }

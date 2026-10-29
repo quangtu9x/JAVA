@@ -104,26 +104,39 @@ public class VbdenForwardUnitReplyTaskHandler implements TaskHandler {
         JdbcTemplate jdbc = new JdbcTemplate(ds);
 
         var tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
-        Boolean updated = tx.execute(status -> {
-            boolean ok = updateOriginDocument(jdbc, originDocumentId, p);
-            if (ok) {
+        ReplyOutcome outcome = tx.execute(status -> {
+            ReplyOutcome result = updateOriginDocument(jdbc, originDocumentId, p);
+            if (result == ReplyOutcome.APPLIED) {
                 insertArrivalHistoryRow(jdbc, originDocumentId, p);
             }
-            return ok;
+            return result;
         });
-        if (!Boolean.TRUE.equals(updated)) {
+        if (outcome == ReplyOutcome.NOT_FOUND || outcome == null) {
             log.warn("vbden.forward_unit.reply: khong tim thay van ban goc id={} tai tenant {} (co the da bi xoa)",
                 originDocumentId, context.tenantId());
+        } else if (outcome == ReplyOutcome.ALREADY_APPLIED) {
+            log.info("vbden.forward_unit.reply: ban sao {} cua van ban goc {} da ghi nhan truoc do (xac nhan gui lai) - bo qua",
+                p.getCreatedDocumentId(), originDocumentId);
         }
         return UnitResult.success();
     }
 
-    private boolean updateOriginDocument(JdbcTemplate jdbc, UUID originDocumentId, VbdenForwardUnitReplyPayload p) {
+    /** Kết quả ghi văn bản gốc — {@code ALREADY_APPLIED} = reply gửi lại, đã ghi nhận từ lần trước. */
+    private enum ReplyOutcome { APPLIED, ALREADY_APPLIED, NOT_FOUND, WRITE_FAILED }
+
+    /**
+     * 23/10/2026 (chạy nhiều instance td-woker): {@code SELECT ... FOR UPDATE} khoá dòng văn bản gốc tới
+     * hết giao dịch — trước đây đọc-sửa-ghi {@code dynamic_fields} KHÔNG khoá, 2 reply đồng thời cho cùng 1
+     * văn bản gốc (chuyển cho nhiều đơn vị, 2 thread/2 máy chạy song song) ghi đè nhau, mất
+     * {@code forwarded_units}/{@code unit_process}. Đồng thời idempotent: bản sao đã có trong
+     * {@code forwarded_units} ⇒ không ghi lại, không thêm dòng "Đã đến" trùng.
+     */
+    private ReplyOutcome updateOriginDocument(JdbcTemplate jdbc, UUID originDocumentId, VbdenForwardUnitReplyPayload p) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-            "SELECT dynamic_fields::text AS dynamic_fields FROM documents WHERE id = ? AND document_type = 'vbden'",
+            "SELECT dynamic_fields::text AS dynamic_fields FROM documents WHERE id = ? AND document_type = 'vbden' FOR UPDATE",
             originDocumentId);
         if (rows.isEmpty()) {
-            return false;
+            return ReplyOutcome.NOT_FOUND;
         }
         String currentJson = (String) rows.get(0).get("dynamic_fields");
         ObjectNode fields;
@@ -134,17 +147,39 @@ public class VbdenForwardUnitReplyTaskHandler implements TaskHandler {
             fields = objectMapper.createObjectNode();
         }
 
+        if (alreadyForwarded(fields, p)) {
+            return ReplyOutcome.ALREADY_APPLIED;
+        }
         removeFromUnitProcess(fields, p.getTargetIdentifier());
         appendForwardedUnit(fields, p);
 
         try {
             String updatedJson = objectMapper.writeValueAsString(fields);
             jdbc.update("UPDATE documents SET dynamic_fields = ?::jsonb WHERE id = ?", updatedJson, originDocumentId);
-            return true;
+            return ReplyOutcome.APPLIED;
         } catch (Exception ex) {
             log.warn("Loi ghi lai dynamic_fields cho van ban goc {}: {}", originDocumentId, ex.getMessage());
+            return ReplyOutcome.WRITE_FAILED;
+        }
+    }
+
+    /**
+     * Bản sao này đã nằm trong {@code forwarded_units} chưa — khớp theo {@code documentId} (mỗi lượt chuyển
+     * xử lý có bản sao riêng, nên chuyển LẠI cho cùng đơn vị vẫn được ghi như cũ). Reply cũ không có
+     * {@code createdDocumentId} thì không đối chiếu được ⇒ giữ hành vi cũ (luôn ghi).
+     */
+    private boolean alreadyForwarded(ObjectNode fields, VbdenForwardUnitReplyPayload p) {
+        String createdDocumentId = p.getCreatedDocumentId();
+        JsonNode existing = fields.get(FORWARDED_UNITS_FIELD);
+        if (createdDocumentId == null || createdDocumentId.isBlank() || existing == null || !existing.isArray()) {
             return false;
         }
+        for (JsonNode entry : existing) {
+            if (createdDocumentId.equalsIgnoreCase(entry.path("documentId").asText(""))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

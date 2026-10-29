@@ -344,6 +344,50 @@ class VbdenForwardUnitTaskHandlerIntegrationTest {
         assertThat(innerPayload.get("createdDocumentId").asText()).isNotBlank();
     }
 
+    /**
+     * 23/10/2026 (chạy nhiều instance): cùng 1 unit chạy lại (redelivery/lease hết hạn) — KHÔNG tạo bản
+     * sao thứ 2, không nhân đôi file_metadata; reply gửi lại mang CÙNG unitId. Unit KHÁC (lượt chuyển xử
+     * lý mới) vẫn tạo bản sao mới như trước.
+     */
+    @Test
+    void rerunOfSameUnit_doesNotDuplicateCopy_butNewUnitStillCreatesNewCopy() throws Exception {
+        var rabbitPublisherMock = mock(RabbitPublisher.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            java.util.function.Consumer<RabbitPublisher> consumer = invocation.getArgument(0);
+            consumer.accept(rabbitPublisherMock);
+            return null;
+        }).when(rabbitPublisher).ifAvailable(any());
+        props.getRabbit().setEnabled(true);
+
+        ObjectNode payload = basePayload();
+        ObjectNode file1 = payload.putArray("files").addObject();
+        file1.put("objectKey", "documents/2026/10/23/origin/a.pdf");
+        file1.put("bucketName", "td-webapi-files");
+        file1.put("originalFilename", "a.pdf");
+        file1.put("size", 10);
+        file1.put("fileExtension", "pdf");
+
+        assertThat(handler.execute(context("h05_02"), payload).isSuccess()).isTrue();
+        assertThat(handler.execute(context("h05_02"), payload).isSuccess()).isTrue();
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM documents", Long.class)).isEqualTo(1L);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM file_metadata", Long.class)).isEqualTo(1L);
+
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(rabbitPublisherMock, org.mockito.Mockito.times(2))
+            .publish(any(), any(), bodyCaptor.capture());
+        String unitId1 = objectMapper.readTree(bodyCaptor.getAllValues().get(0)).at("/units/0/unitId").asText();
+        String unitId2 = objectMapper.readTree(bodyCaptor.getAllValues().get(1)).at("/units/0/unitId").asText();
+        assertThat(unitId1).isNotBlank().isEqualTo(unitId2);
+
+        TaskContext otherUnit = new TaskContext("vbden.forward_unit", "msg-2", "u2", "corr-2", "h05_02",
+            null, Map.of(), 5, null, Map.of());
+        assertThat(handler.execute(otherUnit, payload).isSuccess()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM documents", Long.class)).isEqualTo(2L);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM file_metadata", Long.class)).isEqualTo(2L);
+    }
+
     @Test
     void missingRequiredFieldReturnsFailure() {
         ObjectNode payload = basePayload();

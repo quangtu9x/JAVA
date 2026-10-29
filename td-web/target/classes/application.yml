@@ -228,6 +228,26 @@ app:
     tenant-id: ${SIMPKI_TENANT_ID:default}
     connect-timeout-seconds: ${SIMPKI_CONNECT_TIMEOUT_SECONDS:15}
     request-timeout-seconds: ${SIMPKI_REQUEST_TIMEOUT_SECONDS:30}
+  realtime:
+    socket:
+      # Thong bao realtime qua server socket.io (docs/socketio/index_socketio.js) - thay Domino
+      # TDInit.sendSocketNotSave ($tdo_socketio_api_url). base-url GOM /api, rong = khong gui.
+      enabled: ${REALTIME_SOCKET_ENABLED:true}
+      base-url: ${REALTIME_SOCKET_BASE_URL:}
+      api-key: ${REALTIME_SOCKET_API_KEY:}
+      connect-timeout-millis: ${REALTIME_SOCKET_CONNECT_TIMEOUT_MILLIS:1000}
+      request-timeout-millis: ${REALTIME_SOCKET_REQUEST_TIMEOUT_MILLIS:3000}
+    # Luong nen ghi hop thu + day socket (RealtimeNotificationConfig) - qua tai thi luong goi tu chay, khong bo thong bao.
+    executor:
+      core-size: ${REALTIME_EXECUTOR_CORE_SIZE:2}
+      max-size: ${REALTIME_EXECUTOR_MAX_SIZE:4}
+      queue-capacity: ${REALTIME_EXECUTOR_QUEUE_CAPACITY:2000}
+    # Don hop thu user_notifications hang dem (UserNotificationRetentionScheduler). read-days <= 0 = tat.
+    inbox:
+      retention-read-days: ${REALTIME_INBOX_RETENTION_READ_DAYS:180}
+      retention-all-days: ${REALTIME_INBOX_RETENTION_ALL_DAYS:365}
+      cleanup-batch-size: ${REALTIME_INBOX_CLEANUP_BATCH_SIZE:5000}
+      cleanup-cron: "${REALTIME_INBOX_CLEANUP_CRON:0 30 2 * * *}"
   messaging:
     # Yeu cau nguoi dung 04/09/2026: switch RabbitMQ/Kafka QUA CAU HINH (khong sua code) - chi 1
     # MessagePublisher bean active theo gia tri nay (xem RabbitMessagePublisher/KafkaMessagePublisher,
@@ -354,11 +374,14 @@ management:
       enabled: true
 
 # OpenAPI Documentation
+# 28/10/2026 (rà soát bảo mật): Swagger/OpenAPI là route permitAll — PRODUCTION đặt SPRINGDOC_ENABLED=false
+# để không lộ toàn bộ bản đồ API cho người chưa đăng nhập.
 springdoc:
   api-docs:
+    enabled: ${SPRINGDOC_ENABLED:true}
     path: /v3/api-docs
   swagger-ui:
-    enabled: true
+    enabled: ${SPRINGDOC_ENABLED:true}
     path: /swagger-native.html
     operations-sorter: method
     tags-sorter: alpha
@@ -368,7 +391,7 @@ springdoc:
     show-extensions: true
     oauth:
       client-id: ${KEYCLOAK_CLIENT_ID:td-webapi-client}
-      client-secret: ${KEYCLOAK_CLIENT_SECRET:}
+      # 28/10/2026: bỏ client-secret — springdoc đẩy nó ra /v3/api-docs/swagger-config (công khai).
       app-name: TD Documents API
       scopes: openid,profile
   show-actuator: false

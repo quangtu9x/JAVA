@@ -9,6 +9,8 @@ import com.td.application.documents.AuthorAclFieldsService;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.duthao.DuThaoDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -68,6 +70,7 @@ public class ChuyenPhoiHopDuThaoUseCase {
     private final AuthorAclFieldsService authorAclFieldsService;
     private final DraftProcessActorFields draftProcessActorFields;
     private final DuThaoCoordinatorDelegations coordinatorDelegations;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(ChuyenPhoiHopDuThaoRequest request) {
         var draftOptional = duThaoDocumentRepository.findById(request.getId());
@@ -123,6 +126,12 @@ public class ChuyenPhoiHopDuThaoUseCase {
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
 
         createProcessRecord(saved.getId(), request, newUsers, actingUsername);
+        // DraftInitNotification#DraftingCoordinatorInit: báo người phối hợp mới (Domino action "chuyenduthao4"
+        // - FE không có nhãn, dùng "chuyenphoihop" = "chuyển phối hợp").
+        realtimeNotifier.notify(RealtimeNotification.of(ChuyenThanhVanBanDiUseCase.DOCUMENT_TYPE, "chuyenphoihop",
+                saved.getId(), saved.getTitle())
+            .to(newUsers)
+            .exclude(actingUsername));
         return Result.success(saved.getId());
     }
 

@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.sharedcore.AppUserRepository;
 import com.td.domain.phieutrinhtd.PhieuTrinhTdDocument;
 import com.td.domain.phieutrinhtd.PhieuTrinhTdProcessDocument;
@@ -54,6 +56,7 @@ public class ChuyenTrangThaiPhieuTrinhTdUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final CurrentUserProvider currentUserProvider;
     private final AppUserRepository appUserRepository;
+    private final RealtimeNotifier realtimeNotifier;
 
     // 06/10/2026 (cutover FE): field FE KHONG duoc ghi de qua "fields" (server-authoritative).
     private static final java.util.Set<String> PROTECTED_FIELDS =
@@ -126,6 +129,13 @@ public class ChuyenTrangThaiPhieuTrinhTdUseCase {
         document.changeStatus(targetStatus);
 
         var saved = phieuTrinhTdDocumentRepository.save(document);
+        // TDDocument.java#saveInitPhieutrinh: Domino báo mọi người liên quan mỗi lần lưu; ở đây báo người NHẬN
+        // bước này + người tạo phiếu (biết phiếu đã chuyển trạng thái).
+        realtimeNotifier.notify(RealtimeNotification.of("phieutrinh", "chuyenphieutrinh", saved.getId(), saved.getTitle())
+            .creator(fullName)
+            .toValues(receiver.username(), updatedFields.get("user_creator"))
+            .exclude(username)
+            .opinion(opinion));
         return Result.success(new ChuyenTrangThaiPhieuTrinhTdResult(saved.getId(), savedProcess.getId()));
     }
 

@@ -80,7 +80,7 @@ class LayLaiVanBanUseCaseTest {
             documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
             processDiagramService, resolveIdentifierByLevelUseCase, appUserRepository,
-            getUserOrganizationProfileUseCase, publishForwardUnitRevokeUseCase, authorAclFieldsService);
+            getUserOrganizationProfileUseCase, publishForwardUnitRevokeUseCase, authorAclFieldsService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));

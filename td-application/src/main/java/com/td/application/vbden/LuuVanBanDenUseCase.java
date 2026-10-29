@@ -9,6 +9,8 @@ import com.td.application.documents.AddDynamicDocumentUseCase;
 import com.td.application.documents.AuthorAclFieldsService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.documentregister.DocumentRegister;
 import com.td.domain.documents.BusinessDocument;
 import lombok.RequiredArgsConstructor;
@@ -148,6 +150,7 @@ public class LuuVanBanDenUseCase {
     private final com.td.application.vbdi.PublishVbdiReplyStatusUseCase publishVbdiReplyStatusUseCase;
     private final CurrentUserProvider currentUserProvider;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<LuuVanBanDenResultDto> execute(LuuVanBanDenRequest request) {
         if (request.getId() == null) {
@@ -176,6 +179,7 @@ public class LuuVanBanDenUseCase {
         }
         String userProcess = applyDefaultAssignerAsProcessor(document, beforeMerge);
         documentRepository.save(document);
+        notifyFirstAssignment(document, beforeMerge);
 
         UUID idso = request.getIdso();
         if (request.getDocumentRegisterId() != null) {
@@ -195,6 +199,32 @@ public class LuuVanBanDenUseCase {
         }
 
         return Result.success(new LuuVanBanDenResultDto(document.getId(), idso, userProcess));
+    }
+
+    /**
+     * LuuVanBanDen.java#TaoQTXL (dong 533-600): văn thư vào sổ và giao LẦN ĐẦU (trước đó chưa có người phân
+     * công/phân phối/xử lý) -> báo người phân công + người phân phối ("vanthuchuyenvanban").
+     */
+    private void notifyFirstAssignment(BusinessDocument document, Map<String, Object> beforeMerge) {
+        if (!text(beforeMerge.get("user_assigner")).isEmpty() || !text(beforeMerge.get("user_distributor")).isEmpty()
+                || !text(beforeMerge.get("process_obj")).isEmpty()) {
+            return;
+        }
+        Map<String, Object> after = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
+        realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "vanthuchuyenvanban", document.getId(),
+                text(after.get("code")))
+            .to(text(after.get("user_assigner")), text(after.get("user_distributor")))
+            .opinion(text(after.get("assigner_opinion")))
+            .deadline(text(after.get("deadline_date")))
+            .exclude(currentUserProvider.currentUsername().orElse("")));
+    }
+
+    private static String text(Object value) {
+        if (value == null) {
+            return "";
+        }
+        String s = String.valueOf(value).trim();
+        return "[]".equals(s) || "null".equals(s) ? "" : s;
     }
 
     // Bugfix 07/09/2026 (2, bao loi nguoi dung: "Nguoi thuc hien" cua trang thai 03 dang la "He

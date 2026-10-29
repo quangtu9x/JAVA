@@ -15,6 +15,8 @@ import com.td.application.messaging.OutboundMessage;
 import com.td.application.messaging.OutboxPublisherService;
 import com.td.application.processdiagram.DiagramNodeRequest;
 import com.td.application.processdiagram.ProcessDiagramService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.sharedcore.OrganizationRepository;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
 import com.td.application.sharedcore.UserDelegationResolver;
@@ -176,6 +178,7 @@ public class ChuyenXuLyVbdenUseCase {
     private final AuthorAclFieldsService authorAclFieldsService;
     // 09/10/2026 (port Ủy quyền): kiểm tra người ủy quyền trong userProcessDelegation/... trước khi ghi.
     private final UserDelegationResolver userDelegationResolver;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(ChuyenXuLyVbdenRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -227,6 +230,7 @@ public class ChuyenXuLyVbdenUseCase {
         // javadoc phuong thuc): echo NGUOC hanh dong xu ly nay ve tenant GOC neu van ban NAY tu no
         // la 1 ban sao nhan qua vbden.forward_unit.
         publishStatusBackToOriginIfForwardedCopy(parent, request, actingUsername);
+        notifyRealtime(parent, request, actingUsername);
 
         return Result.success(childResult.getData());
     }
@@ -529,9 +533,16 @@ public class ChuyenXuLyVbdenUseCase {
                         String userReceiver = item.path("user_receiver").asText(null);
                         if (userReceiver != null && !userReceiver.isBlank()) {
                             String receiverName = item.path("receiver").asText(null);
-                            result.put(userReceiver, new DisplayInfo(
+                            DisplayInfo unitDisplay = new DisplayInfo(
                                 isBlank(name) ? userReceiver : name,
-                                isBlank(receiverName) ? userReceiver : receiverName));
+                                isBlank(receiverName) ? userReceiver : receiverName);
+                            result.put(userReceiver, unitDisplay);
+                            // 26/10/2026: đại diện đang ủy quyền → FE giao cho người được ủy quyền (username),
+                            // node sơ đồ của người đó vẫn hiện tên đơn vị.
+                            String delegate = item.path("username").asText(null);
+                            if (!isBlank(item.path("delegated_from_username").asText(null)) && !isBlank(delegate)) {
+                                result.put(delegate, unitDisplay);
+                            }
                         }
                     } else {
                         String username = item.path("username").asText(null);
@@ -1105,6 +1116,47 @@ public class ChuyenXuLyVbdenUseCase {
     private void putIfNotEmpty(Map<String, String> target, String key, List<String> values) {
         if (!values.isEmpty()) {
             target.put(key, String.join(";", values));
+        }
+    }
+
+    /**
+     * Thông báo socket cho người chủ trì + phối hợp — trước đây FE tự gửi (SubFormChuyenXuLy.jsx/VaoSoNhieu.jsx)
+     * tới đường dẫn server socket không nhận (/api/socket/notification -> 400), Domino ChuyenXuLy không gửi.
+     * Người nhận = danh sách phẳng FE đã quy đơn vị về người đại diện (user_receiver/người được ủy quyền);
+     * đơn vị KHÔNG có người đại diện -> room coquan_<mã định danh> (như FE sendToDonvi).
+     */
+    private void notifyRealtime(BusinessDocument parent, ChuyenXuLyVbdenRequest request, String actingUsername) {
+        Object code = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson()).get("code");
+        String action = ACTION_CHUYEN_PHOI_HOP.equalsIgnoreCase(request.getAction()) ? ACTION_CHUYEN_PHOI_HOP : ACTION_CHUYEN_XU_LY;
+        RealtimeNotification notification = RealtimeNotification.of(DOCUMENT_TYPE, action, parent.getId(),
+                code == null ? null : String.valueOf(code))
+            .to(request.getUserProcess(), request.getUserCoordinate())
+            .opinion(request.getOpinion())
+            .deadline(request.getDeadlineDate())
+            .position(request.getPosition());
+        addUnitsWithoutReceiver(notification, request.getUserProcessObj());
+        addUnitsWithoutReceiver(notification, request.getUserCoordinateObj());
+        realtimeNotifier.notify(notification.exclude(actingUsername));
+    }
+
+    private void addUnitsWithoutReceiver(RealtimeNotification notification, String objJson) {
+        if (objJson == null || objJson.isBlank()) {
+            return;
+        }
+        try {
+            var arrayNode = OBJECT_MAPPER.readTree(objJson);
+            if (!arrayNode.isArray()) {
+                return;
+            }
+            for (var item : arrayNode) {
+                String identifier = item.path("identifier").asText("");
+                if (!identifier.isBlank() && isBlank(item.path("user_receiver").asText(null))
+                        && isBlank(item.path("username").asText(null))) {
+                    notification.to(identifier);
+                }
+            }
+        } catch (Exception ex) {
+            log.debug("Bỏ qua obj người nhận không hợp lệ khi gửi thông báo: {}", ex.getMessage());
         }
     }
 

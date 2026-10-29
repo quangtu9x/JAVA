@@ -288,7 +288,7 @@ public class CategoriesController extends BaseController {
 
             return ResponseEntity.ok()
                     .contentType(mediaType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + SafeFileResponse.headerFileName(fileName) + "\"")
                     .contentLength(fileMeta.getFileSize() != null ? fileMeta.getFileSize() : -1)
                     .body(new InputStreamResource(inputStream));
         } catch (Exception e) {

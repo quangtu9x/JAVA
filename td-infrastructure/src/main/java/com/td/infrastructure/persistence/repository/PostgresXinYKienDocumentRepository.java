@@ -273,7 +273,7 @@ public class PostgresXinYKienDocumentRepository implements XinYKienDocumentRepos
                 paramRefs.add(":" + parameterName);
                 parameters.put(parameterName, values.get(valueIndex) == null ? "" : values.get(valueIndex));
             }
-            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(entry.getKey()).append("', '')")
+            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(KeywordSql.requireSafeFieldName(entry.getKey())).append("', '')")
                 .append(include ? " IN (" : " NOT IN (")
                 .append(String.join(",", paramRefs)).append(")");
         }
@@ -281,7 +281,13 @@ public class PostgresXinYKienDocumentRepository implements XinYKienDocumentRepos
 
     private void appendKeywordPredicate(
             StringBuilder sql, Map<String, Object> parameters, String keyword, List<String> keywordColumns) {
-        if (keyword == null || keyword.isBlank() || keywordColumns == null || keywordColumns.isEmpty()) {
+        if (keyword == null || keyword.isBlank() || keywordColumns == null) {
+            return;
+        }
+        // 28/10/2026 (rà soát bảo mật): request.columns đến TỪ CLIENT (vbden GetView các view xin ý kiến)
+        // và bị nối thẳng vào SQL — trước đây không lọc => SQL injection. Chỉ nhận định danh an toàn.
+        keywordColumns = keywordColumns.stream().filter(KeywordSql::isSafeFieldName).toList();
+        if (keywordColumns.isEmpty()) {
             return;
         }
         String likeValue = SearchTextSql.containsLike(keyword); // 20/10/2026: không phân biệt dấu

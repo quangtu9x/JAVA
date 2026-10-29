@@ -26,6 +26,24 @@ final class KeywordSql {
         return name != null && SAFE_FIELD_NAME.matcher(name).matches();
     }
 
+    /**
+     * Ký tự không thể thoát khỏi chuỗi SQL {@code '...'} (không có {@code '}/{@code \}), rộng hơn
+     * {@link #SAFE_FIELD_NAME} để không làm hỏng tên field Domino có {@code $ . -}.
+     */
+    private static final Pattern SQL_LITERAL_SAFE_KEY = Pattern.compile("^[A-Za-z0-9_$.\\-]{1,100}$");
+
+    /**
+     * 28/10/2026 (rà soát bảo mật): chốt chặn cho tên field DO SERVER DỰNG (map điều kiện lọc của view) bị
+     * nối thẳng vào {@code dynamic_fields->>'...'}. Ném lỗi thay vì bỏ qua: bỏ qua 1 điều kiện lọc sẽ NỚI
+     * RỘNG kết quả (rò rỉ dữ liệu) — với tên cột tìm kiếm từ client thì dùng {@link #isSafeFieldName} để lọc.
+     */
+    static String requireSafeFieldName(String name) {
+        if (name == null || !SQL_LITERAL_SAFE_KEY.matcher(name).matches()) {
+            throw new IllegalArgumentException("Tên trường không hợp lệ");
+        }
+        return name;
+    }
+
     static void append(StringBuilder sql, Map<String, Object> parameters, String keyword, List<String> keywordColumns,
                        String alias) {
         if (keyword == null || keyword.isBlank() || keywordColumns == null) {

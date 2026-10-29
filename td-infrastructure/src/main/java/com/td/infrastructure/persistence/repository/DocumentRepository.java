@@ -386,7 +386,7 @@ public abstract class DocumentRepository implements com.td.application.documents
                 sql.append(" OR ");
             }
             String fieldName = fieldNames.get(index);
-            String column = "LOWER(COALESCE(d.dynamic_fields->>'" + fieldName + "', ''))";
+            String column = "LOWER(COALESCE(d.dynamic_fields->>'" + KeywordSql.requireSafeFieldName(fieldName) + "', ''))";
             String exactParam = "listFieldExact" + index;
             String prefixParam = "listFieldPrefix" + index;
             String suffixParam = "listFieldSuffix" + index;

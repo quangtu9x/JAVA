@@ -7,6 +7,8 @@ import com.td.application.documents.AddDynamicDocumentRequest;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.vbdi.DeleteVbdiDocumentUseCase;
 import com.td.application.vbdi.VbdiDocumentRepository;
 import com.td.application.vbdi.VbdiStatus;
@@ -97,6 +99,7 @@ public class ThuHoiVanBanDiUseCase {
     private final CurrentUserProvider currentUserProvider;
     // 25/09/2026: creator = tên đầy đủ, user_creator = tài khoản (xem javadoc DraftProcessActorFields).
     private final DraftProcessActorFields draftProcessActorFields;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(ThuHoiVanBanDiRequest request) {
         var draftOptional = duThaoDocumentRepository.findById(request.getId());
@@ -138,6 +141,10 @@ public class ThuHoiVanBanDiUseCase {
         String previousStatus = draft.getStatus();
         reopenDraft(draft, draftFields, vbdiIdStr);
         writeProcessTrail(draft.getId(), previousStatus, request.getOpinion());
+        // DraftToDocumentOut.java dong 596-597: senThongBao(unit_publish_identifier, "thuhoi") - báo văn thư.
+        realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "thuhoi", draft.getId(), draft.getTitle())
+            .to(asString(draftFields.get("unit_publish_identifier")))
+            .opinion(request.getOpinion()));
 
         return Result.success(draft.getId());
     }

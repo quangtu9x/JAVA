@@ -149,7 +149,7 @@ public class PostgresHoSoLuuTruPhieuYeuCauDocumentRepository implements HoSoLuuT
             if (allowedValues == null || allowedValues.isEmpty()) {
                 continue;
             }
-            String column = "LOWER(COALESCE(d.dynamic_fields->>'" + entry.getKey() + "', ''))";
+            String column = "LOWER(COALESCE(d.dynamic_fields->>'" + KeywordSql.requireSafeFieldName(entry.getKey()) + "', ''))";
             List<String> paramRefs = new ArrayList<>();
             String prefix = "fieldValueIn" + (fieldIndex++);
             for (int valueIndex = 0; valueIndex < allowedValues.size(); valueIndex++) {

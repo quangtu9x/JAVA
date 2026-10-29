@@ -85,7 +85,39 @@ class ChuyenXuLyVbdenUseCaseTest {
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
             processDiagramService, resolveIdentifierByLevelUseCase, publishVbdiReplyStatusUseCase,
             organizationRepository, currentTenantProvider, outboxPublisherService, getDocumentFileRefsUseCase,
-            authorAclFieldsService, com.td.application.sharedcore.UserDelegationTestSupport.resolverWith(delegations));
+            authorAclFieldsService, com.td.application.sharedcore.UserDelegationTestSupport.resolverWith(delegations), com.td.application.realtime.RealtimeNotifierTestSupport.recording(sent));
+    }
+
+    private final java.util.List<com.td.application.realtime.RealtimeNotification> sent = new java.util.ArrayList<>();
+
+    // 27/10/2026: thông báo socket cho chủ trì + phối hợp do backend gửi (trước đây FE gửi sai đường dẫn).
+    @Test
+    void execute_chuyenxuly_shouldNotifyChutriCoordinatorsAndUnitWithoutReceiver() {
+        BusinessDocument parent = newDocument("vbden", "{\"code\":\"125/UBND-VP\"}", "2");
+        when(documentRepository.findById(parent.getId())).thenReturn(Optional.of(parent));
+        when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));
+        when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
+
+        var request = new ChuyenXuLyVbdenRequest();
+        request.setParentid(parent.getId());
+        request.setAction("phanxuly");
+        request.setUserProcess("truongphong;vanthu01");
+        request.setUserCoordinate("chuyenvien1");
+        request.setUserCoordinateObj("[{\"identifier\":\"H56.09\",\"name\":\"Phong CN\"},"
+            + "{\"identifier\":\"H56.10\",\"user_receiver\":\"daidien10\"},{\"username\":\"chuyenvien1\"}]");
+        request.setOpinion("Xử lý gấp");
+        request.setDeadlineDate("30/10/2026");
+
+        useCase.execute(request);
+
+        assertThat(sent).hasSize(1);
+        var n = sent.get(0);
+        assertThat(n.getAction()).isEqualTo("chuyenxuly");
+        assertThat(n.getCode()).isEqualTo("125/UBND-VP");
+        assertThat(n.getRecipients()).containsExactlyInAnyOrder("truongphong", "chuyenvien1", "H56.09");
+        assertThat(n.getDeadline()).isEqualTo("30/10/2026");
+        assertThat(n.getOpinion()).isEqualTo("Xử lý gấp");
     }
 
     // 09/10/2026 (port Ủy quyền): ủy quyền dùng chung cho test, mặc định rỗng.

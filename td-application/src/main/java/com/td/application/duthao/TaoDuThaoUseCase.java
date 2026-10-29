@@ -3,6 +3,8 @@ package com.td.application.duthao;
 import com.td.application.common.models.Result;
 import com.td.application.common.security.CurrentUserProvider;
 import com.td.application.documents.AddDynamicDocumentRequest;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -54,6 +56,7 @@ public class TaoDuThaoUseCase {
     private final com.td.application.documentlinks.RelatedDocumentSnapshots relatedDocumentSnapshots;
     // 19/10/2026: xem LuuDuThaoUseCase#coordinatorDelegations.
     private final DuThaoCoordinatorDelegations coordinatorDelegations;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(TaoDuThaoRequest request) {
         var addRequest = new AddDynamicDocumentRequest();
@@ -75,6 +78,11 @@ public class TaoDuThaoUseCase {
         Result<UUID> result = addDuThaoDynamicDocumentUseCase.execute(addRequest);
         if (result.isSuccess()) {
             relatedDocumentSnapshots.importFromPayload(relatedPayload, result.getData(), com.td.application.documentlinks.RelatedDocumentSnapshots.SOURCE_DUTHAO);
+            // TDDocument.java dong 664-666 (DraftingCoordinatorInit): tạo dự thảo có sẵn người phối hợp -> báo họ.
+            realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "chuyenphoihop", result.getData(),
+                    request.getSubject())
+                .to(fields.get("user_coordinator"))
+                .exclude(fields.get(USER_CREATOR_FIELD)));
         }
         return result;
     }

@@ -7,6 +7,8 @@ import com.td.application.documents.AddDynamicDocumentRequest;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.vbdi.SoanThaoVbdiUseCase;
 import com.td.application.vbdi.VbdiDocumentRepository;
 import com.td.application.vbdi.VbdiStatus;
@@ -95,6 +97,7 @@ class TraLaiDuThaoSupport {
     private final DraftProcessActorFields draftProcessActorFields;
     // 01/10/2026: tra nguoi trinh (vet chuyenkyduyet gan nhat) cho dich NGUOI_TRINH.
     private final DraftProcessDocumentRepository draftProcessDocumentRepository;
+    private final RealtimeNotifier realtimeNotifier;
 
     Result<UUID> execute(TraLaiDuThaoRequest request, TraLaiDuThaoTarget target) {
         if (request == null || request.getVbdiId() == null) {
@@ -138,6 +141,15 @@ class TraLaiDuThaoSupport {
         UUID savedDraftId = updateDraft(draft, target, receiver);
         writeProcessTrail(draft, target, receiver, opinion, actingUsername);
         updateVbdi(vbdi, vbdiFields, opinion, actingUsername);
+        // vbdi/XuLyDuThao.java dong 262-266 (trả lãnh đạo: báo người soạn + người ký) / 372-376 (trả người
+        // soạn): báo người nhận dự thảo trả lại; trả lãnh đạo báo thêm người soạn như Domino.
+        Object creator = target == TraLaiDuThaoTarget.LANH_DAO
+            ? dynamicDocumentFieldsService.parseDynamicFields(draft.getDynamicFieldsJson()).get("user_creator") : null;
+        realtimeNotifier.notify(RealtimeNotification.of(ChuyenThanhVanBanDiUseCase.DOCUMENT_TYPE, "tralai",
+                draft.getId(), draft.getTitle())
+            .to(receiver.username(), creator == null ? null : String.valueOf(creator))
+            .exclude(actingUsername)
+            .opinion(opinion));
 
         return Result.success(savedDraftId);
     }

@@ -9,6 +9,8 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.processdiagram.ProcessDiagramService;
 import com.td.application.sharedcore.AppUserRepository;
 import com.td.application.sharedcore.GetUserOrganizationProfileUseCase;
@@ -143,6 +145,7 @@ public class LayLaiVanBanUseCase {
     // Bo sung 08/09/2026 (giai doan 2 vbden.forward_unit - xem javadoc lop).
     private final PublishForwardUnitRevokeUseCase publishForwardUnitRevokeUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(LayLaiVanBanRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -166,7 +169,17 @@ public class LayLaiVanBanUseCase {
         Set<String> revoked = updateParentDocument(parent, actingUser, actingUsername, request.getOpinion());
         removeDiagramNodes(request.getParentid(), revoked);
 
-        return createProcessingRecord(request, actingUsername);
+        var result = createProcessingRecord(request, actingUsername);
+        if (result.isSuccess()) {
+            // VanThuThuHoiVanBan.java#sendSocket ("laylaivanban"): báo người bị lấy lại.
+            realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "laylaivanban", parent.getId(),
+                    java.util.Objects.toString(dynamicDocumentFieldsService.parseDynamicFields(
+                        parent.getDynamicFieldsJson()).get("code"), null))
+                .to(revoked)
+                .exclude(actingUsername)
+                .opinion(request.getOpinion()));
+        }
+        return result;
     }
 
     // Domino VanThuThuHoiVanBan.java: removeUsers()+findUser_revoked() (nhanh sơ đồ theo identifier

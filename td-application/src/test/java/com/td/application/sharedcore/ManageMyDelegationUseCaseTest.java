@@ -40,7 +40,7 @@ class ManageMyDelegationUseCaseTest {
             public java.util.Set<String> currentRoles() {
                 return java.util.Set.of();
             }
-        });
+        }, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
 
     private SaveMyDelegationRequest request(String delegate, int fromOffset, int toOffset) {
         var today = UserDelegationResolver.today();

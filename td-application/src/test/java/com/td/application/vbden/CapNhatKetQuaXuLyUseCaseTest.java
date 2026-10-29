@@ -67,7 +67,7 @@ class CapNhatKetQuaXuLyUseCaseTest {
             documentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
             resolveIdentifierByLevelUseCase, appUserRepository, getUserOrganizationProfileUseCase,
-            authorAclFieldsService);
+            authorAclFieldsService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu01"));

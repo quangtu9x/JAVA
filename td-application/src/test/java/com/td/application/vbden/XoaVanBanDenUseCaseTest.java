@@ -58,7 +58,7 @@ class XoaVanBanDenUseCaseTest {
     void setUp() {
         useCase = new XoaVanBanDenUseCase(
             documentRepository, dynamicDocumentFieldsService, resolveIdentifierByLevelUseCase,
-            currentUserProvider, appUserRepository, documentCacheService, documentLogService);
+            currentUserProvider, appUserRepository, documentCacheService, documentLogService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.empty());
     }

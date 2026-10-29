@@ -64,7 +64,7 @@ class ThuHoiVanBanDiUseCaseTest {
         useCase = new ThuHoiVanBanDiUseCase(
             documentRepository, duThaoDocumentRepository, dynamicDocumentFieldsService, deleteDocumentUseCase,
             documentLogService, documentCacheService, addDraftProcessDocumentUseCase, currentUserProvider,
-            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)));
+            new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)), com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     @Test

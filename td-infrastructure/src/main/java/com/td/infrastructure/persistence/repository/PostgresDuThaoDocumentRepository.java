@@ -574,7 +574,7 @@ public class PostgresDuThaoDocumentRepository implements DuThaoDocumentRepositor
                 paramRefs.add(":" + parameterName);
                 parameters.put(parameterName, values.get(valueIndex) == null ? "" : values.get(valueIndex));
             }
-            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(entry.getKey()).append("', '')")
+            sql.append(" AND COALESCE(d.dynamic_fields->>'").append(KeywordSql.requireSafeFieldName(entry.getKey())).append("', '')")
                 .append(include ? " IN (" : " NOT IN (")
                 .append(String.join(",", paramRefs)).append(")");
         }

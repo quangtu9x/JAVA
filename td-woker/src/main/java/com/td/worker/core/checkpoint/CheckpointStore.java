@@ -37,6 +37,14 @@ public interface CheckpointStore {
      */
     Optional<UnitRecord> claim(String uniqueKey, String workerId, int leaseSeconds);
 
+    /**
+     * Gia hạn lease (heartbeat) cho các unit worker này ĐANG xử lý — lease hết hạn chỉ khi worker chết
+     * thật / treo quá {@code max-processing-time}, không phải vì handler chạy lâu hơn lease.
+     *
+     * @return các uniqueKey KHÔNG gia hạn được (đã mất claim: worker khác nhận lại / đã settle)
+     */
+    List<String> renewLeases(String workerId, List<String> uniqueKeys, int leaseSeconds);
+
     /** Đánh dấu thành công — chỉ hiệu lực nếu đúng worker đang giữ claim. */
     boolean complete(String uniqueKey, String workerId);
 

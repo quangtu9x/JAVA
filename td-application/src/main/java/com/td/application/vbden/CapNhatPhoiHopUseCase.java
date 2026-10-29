@@ -9,6 +9,8 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
 import com.td.domain.documents.BusinessDocument;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +81,7 @@ public class CapNhatPhoiHopUseCase {
     private final DocumentCacheService documentCacheService;
     private final ResolveIdentifierByLevelUseCase resolveIdentifierByLevelUseCase;
     private final AuthorAclFieldsService authorAclFieldsService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(CapNhatPhoiHopRequest request) {
         var parentOptional = documentRepository.findById(request.getParentid());
@@ -95,19 +98,28 @@ public class CapNhatPhoiHopUseCase {
             return Result.failure("Khong xac dinh duoc nguoi dung hien tai");
         }
 
-        updateParentDocumentIfCoordinating(parent, actingUsername);
+        boolean coordinating = updateParentDocumentIfCoordinating(parent, actingUsername);
 
-        return createProcessingRecord(request, actingUsername);
+        var result = createProcessingRecord(request, actingUsername);
+        if (coordinating && result.isSuccess()) {
+            // CapNhatVanBanDen.java#capnhatphoihop dong 428-443: báo người chủ trì có ý kiến phối hợp mới.
+            Map<String, Object> saved = dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson());
+            realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "capnhatphoihopxuly", parent.getId(),
+                    java.util.Objects.toString(saved.get("code"), null))
+                .toValues(saved.get("user_process"))
+                .exclude(actingUsername));
+        }
+        return result;
     }
 
     // Domino capnhatphoihop() dong 426-449: chi chay khi user_coordinate KHONG rong.
-    private void updateParentDocumentIfCoordinating(BusinessDocument parent, String actingUsername) {
+    private boolean updateParentDocumentIfCoordinating(BusinessDocument parent, String actingUsername) {
         Map<String, Object> fields = new LinkedHashMap<>(
             dynamicDocumentFieldsService.parseDynamicFields(parent.getDynamicFieldsJson()));
 
         List<String> userCoordinate = toStringList(fields.get(USER_COORDINATE_FIELD));
         if (userCoordinate.isEmpty()) {
-            return;
+            return false;
         }
 
         var before = buildSnapshot(parent);
@@ -123,6 +135,7 @@ public class CapNhatPhoiHopUseCase {
         documentCacheService.evict(saved.getId());
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
+        return true;
     }
 
     // Domino CapNhatThongTin(): docQTXL = CreateOrUpdateDocument()... docQTXL.save() - chay TRUOC

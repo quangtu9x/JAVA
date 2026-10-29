@@ -145,25 +145,54 @@ public class JdbcCheckpointStore implements CheckpointStore {
         }
         return inserted;
     }
-@Override
+    // 23/10/2026: moi moc thoi gian lease tinh bang DONG HO DB (CURRENT_TIMESTAMP +/- n giay) - truoc day
+    // lease_expires_at = Instant.now() cua JVM nhung lai so voi CURRENT_TIMESTAMP cua DB, cac may chu
+    // lech gio lam lease het som -> worker khac giut unit dang chay (xu ly kep).
+    private static final String SECONDS = " CAST(? AS INTEGER) * INTERVAL '1' SECOND ";
+
+    @Override
     public Optional<UnitRecord> claim(String uniqueKey, String workerId, int leaseSeconds) {
-        Timestamp leaseExpiry = Timestamp.from(Instant.now().plusSeconds(leaseSeconds));
         int updated = jdbc.update("""
                 UPDATE worker_units
                 SET status = 'PROCESSING',
                     claimed_by = ?,
                     claimed_at = CURRENT_TIMESTAMP,
-                    lease_expires_at = ?,
+                    lease_expires_at = CURRENT_TIMESTAMP + %s,
                     attempts = attempts + 1,
                     last_error = NULL,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE unique_key = ? AND ( %s )
-                """.formatted(CLAIM_CONDITION),
-            workerId, leaseExpiry, uniqueKey);
+                """.formatted(SECONDS, CLAIM_CONDITION),
+            workerId, leaseSeconds, uniqueKey);
         if (updated == 0) {
             return Optional.empty();
         }
         return findByUniqueKey(uniqueKey);
+    }
+
+    @Override
+    public List<String> renewLeases(String workerId, List<String> uniqueKeys, int leaseSeconds) {
+        if (uniqueKeys.isEmpty()) {
+            return List.of();
+        }
+        String sql = """
+                UPDATE worker_units
+                SET lease_expires_at = CURRENT_TIMESTAMP + %s
+                WHERE unique_key = ? AND claimed_by = ? AND status = 'PROCESSING'
+                """.formatted(SECONDS);
+        List<Object[]> args = new ArrayList<>(uniqueKeys.size());
+        for (String key : uniqueKeys) {
+            args.add(new Object[] {leaseSeconds, key, workerId});
+        }
+        int[] counts = jdbc.batchUpdate(sql, args);
+        List<String> lost = new ArrayList<>();
+        for (int i = 0; i < counts.length; i++) {
+            // SUCCESS_NO_INFO (-2): driver khong bao so dong - coi nhu da gia han.
+            if (counts[i] == 0) {
+                lost.add(uniqueKeys.get(i));
+            }
+        }
+        return lost;
     }
 
     @Override
@@ -227,29 +256,31 @@ public class JdbcCheckpointStore implements CheckpointStore {
 
     @Override
     public int requeueExpiredLeases(Duration grace, int limit) {
-        Timestamp cutoff = Timestamp.from(Instant.now().minus(grace));
+        int graceSeconds = (int) Math.max(0, grace.toSeconds());
         return jdbc.update("""
                 UPDATE worker_units
                 SET status = 'RETRY',
                     next_retry_at = CURRENT_TIMESTAMP,
                     claimed_by = NULL, claimed_at = NULL, lease_expires_at = NULL,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE status = 'PROCESSING' AND lease_expires_at < ?
-                  AND id IN (SELECT id FROM worker_units WHERE status='PROCESSING' AND lease_expires_at < ? LIMIT ?)
-                """, cutoff, cutoff, limit);
+                WHERE status = 'PROCESSING' AND lease_expires_at < CURRENT_TIMESTAMP - %1$s
+                  AND id IN (SELECT id FROM worker_units
+                             WHERE status='PROCESSING' AND lease_expires_at < CURRENT_TIMESTAMP - %1$s LIMIT ?)
+                """.formatted(SECONDS), graceSeconds, graceSeconds, limit);
     }
 
     @Override
     public int requeueStalePending(Duration age, int limit) {
-        Timestamp cutoff = Timestamp.from(Instant.now().minus(age));
+        int ageSeconds = (int) Math.max(0, age.toSeconds());
         return jdbc.update("""
                 UPDATE worker_units
                 SET status = 'RETRY',
                     next_retry_at = CURRENT_TIMESTAMP,
                     updated_at = CURRENT_TIMESTAMP
-                WHERE status = 'PENDING' AND updated_at < ?
-                  AND id IN (SELECT id FROM worker_units WHERE status='PENDING' AND updated_at < ? LIMIT ?)
-                """, cutoff, cutoff, limit);
+                WHERE status = 'PENDING' AND updated_at < CURRENT_TIMESTAMP - %1$s
+                  AND id IN (SELECT id FROM worker_units
+                             WHERE status='PENDING' AND updated_at < CURRENT_TIMESTAMP - %1$s LIMIT ?)
+                """.formatted(SECONDS), ageSeconds, ageSeconds, limit);
     }
 
     @Override

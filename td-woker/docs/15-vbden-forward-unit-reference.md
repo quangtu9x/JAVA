@@ -98,6 +98,15 @@ nhân ra mà đọc chung với đơn vị chuyển xử lý luôn"**:
   UNIQUE constraint, cùng bugfix đã áp dụng ở `VbdenIncomingDocumentWriter#insertFileMetadata`), và
   ghi `dynamic_fields.files` (`{name,size,type,file_id}`) để FE hiển thị được ngay.
 
+**Idempotent 23/10/2026 (chạy nhiều máy chủ td-woker)**: trước đây id bản sao, id `file_metadata` và
+unitId của reply đều `UUID.randomUUID()` ⇒ unit chạy lại (crash sau commit, lease hết hạn, timeout rồi
+máy khác nhận lại) sinh **bản sao thứ 2** ở đơn vị nhận. Nay cả 3 id suy ra TẤT ĐỊNH:
+`VbdenTaskConstants.unitScopedId(ctx, "document")` = `UUID.nameUUIDFromBytes("vbden.forward_unit|document|<tenant>|<unitId>")`;
+id tệp = hash(id bản sao + thứ tự + objectKey); unitId reply = hash("vbden.forward_unit.reply|<id bản
+sao>"). `INSERT documents … ON CONFLICT (id) DO NOTHING` — đã có thì bỏ qua cả `file_metadata`, chỉ
+gửi lại reply. unitId do `ChuyenXuLyVbdenUseCase` sinh 1 lần, lưu trong outbox ⇒ mỗi lượt "Chuyển xử
+lý" MỚI vẫn tạo bản sao mới như trước. Không cần migration.
+
 ## 5. `VbdenForwardUnitReplyTaskHandler` (chạy tại tenant GỐC)
 
 1. Đọc `dynamic_fields` văn bản gốc, loại `targetIdentifier` khỏi mảng `unit_process` (đọc khoan
@@ -114,6 +123,15 @@ lý"**: bước 2 (ghi `forwarded_units`) chạy CÙNG transaction với `insert
 1 dòng `vbden_res_documents` (`parentid = originDocumentId`, `action = "da_den_don_vi_khac"`,
 `opinion = "Đã đến đơn vị " + targetName`) để tab "Quá trình xử lý" của văn bản gốc hiện được sự kiện
 này ngay, không cần đăng nhập sang tenant khác. Xem thêm §6b.
+
+**Sửa 23/10/2026 — mất cập nhật + ghi trùng**: đọc `dynamic_fields` bằng `SELECT … FOR UPDATE` (khoá
+dòng văn bản gốc tới hết giao dịch) — trước đây 2 reply đồng thời cho cùng 1 văn bản gốc (chuyển cho
+nhiều đơn vị con, xử lý trên 2 thread/2 máy) đọc cùng bản cũ rồi ghi đè nhau, mất phần tử
+`forwarded_units` / đơn vị không được gỡ khỏi `unit_process`. Đồng thời: bản sao (`createdDocumentId`)
+đã có trong `forwarded_units` ⇒ coi là reply gửi lại, bỏ qua — không thêm dòng "Đã đến" trùng.
+`vbden.forward_unit.status`/`.revoke` (§6, §6b): id dòng `vbden_res_documents` tất định theo unit +
+`ON CONFLICT (id) DO NOTHING`; revoke thấy dòng lịch sử của unit đã có thì bỏ qua cả UPDATE (không ghi
+đè `delete_date`).
 
 ## 6. Giai đoạn 2 — ĐÃ PORT 08/09/2026 ("giai đoạn 1 cơ bản đã xong, làm giai đoạn 2
 LayLaiVanBanUseCase/ThuHoiVanBanUseCase")

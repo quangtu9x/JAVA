@@ -199,6 +199,23 @@ class VbdenForwardUnitRevokeTaskHandlerIntegrationTest {
         assertThat(fields.get("nguoi_thuc_hien")).isEqualTo("vanthu01");
     }
 
+    /** 23/10/2026: cùng unit chạy lại — bỏ qua, không thêm dòng audit trùng, không ghi đè delete_date. */
+    @Test
+    void rerunOfSameUnit_isSkipped() throws Exception {
+        UUID targetId = insertTargetDocument("{}");
+        JsonNode payload = basePayload(targetId);
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+
+        assertThat(handler.execute(context(), payload).isSuccess()).isTrue();
+        String firstFields = jdbc.queryForObject(
+            "SELECT dynamic_fields::text FROM documents WHERE id = ?", String.class, targetId);
+        assertThat(handler.execute(context(), payload).isSuccess()).isTrue();
+
+        assertThat(jdbc.queryForList("SELECT id FROM vbden_res_documents")).hasSize(1);
+        assertThat(jdbc.queryForObject("SELECT dynamic_fields::text FROM documents WHERE id = ?", String.class, targetId))
+            .isEqualTo(firstFields);
+    }
+
     /** {@code reason = "thuhoi"} — nhãn audit khác, xem javadoc handler. */
     @Test
     void thuHoiReason_usesThuHoiLabel() throws Exception {

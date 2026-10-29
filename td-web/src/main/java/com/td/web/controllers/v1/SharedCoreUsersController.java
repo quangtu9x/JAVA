@@ -183,7 +183,8 @@ public class SharedCoreUsersController extends BaseController {
     // ================= Ảnh chữ ký người dùng (chữ ký chính/chữ ký nháy) =================
 
     @PostMapping(value = "/{id}/signature-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    // 28/10/2026 (rà soát bảo mật): trước đây ROLE_USER là đủ — ai cũng thay được ảnh chữ ký chính của người khác.
+    @PreAuthorize("@userAdministrationAccess.isSelfOrCanManageUsers(authentication, #id)")
     @Operation(summary = "Gắn ảnh chữ ký cho người dùng",
         description = "type=OFFICIAL tương ứng field Domino cũ \"anhkyso\" (chữ ký số/chữ ký chính), "
             + "type=DRAFT tương ứng \"anhkynhay\" (chữ ký nháy/tắt). Ảnh mới thay thế ảnh hiện hành "
@@ -243,7 +244,7 @@ public class SharedCoreUsersController extends BaseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @PreAuthorize("@userAdministrationAccess.canManageUsers(authentication)") // 28/10/2026: chặn tự nâng quyền (xem UserAdministrationAccess)
     @Operation(summary = "Tạo mới người dùng shared core")
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -279,7 +280,7 @@ public class SharedCoreUsersController extends BaseController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @PreAuthorize("@userAdministrationAccess.canManageUsers(authentication)") // 28/10/2026: chặn tự nâng quyền (xem UserAdministrationAccess)
     @Operation(summary = "Cập nhật người dùng shared core",
         description = "Partial update — field null trong body nghĩa là không đổi.")
     public ResponseEntity<ApiResponse<UUID>> updateUser(
@@ -313,7 +314,7 @@ public class SharedCoreUsersController extends BaseController {
     }
 
     @PostMapping("/transfer")
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN', 'PRODUCT_MANAGER', 'BRAND_MANAGER')")
+    @PreAuthorize("@userAdministrationAccess.canManageUsers(authentication)") // 28/10/2026: chặn tự nâng quyền (xem UserAdministrationAccess)
     @Operation(summary = "Chuyển đơn vị hàng loạt",
         description = "1 transaction rõ ràng: tất cả người dùng được chuyển thành công hoặc "
             + "không ai bị đổi (khác luồng FE cũ dùng forEach không rollback).")

@@ -114,6 +114,9 @@ public class UploadFileUseCaseImpl implements UploadFileUseCase {
     private String extractExtension(String fileName) {
         if (fileName == null) return "";
         int dot = fileName.lastIndexOf('.');
-        return dot >= 0 ? fileName.substring(dot + 1).toLowerCase() : "";
+        String extension = dot >= 0 ? fileName.substring(dot + 1).toLowerCase() : "";
+        // 28/10/2026 (rà soát bảo mật): phần mở rộng đi vào object key MinIO ("tenant/module/docId/uuid.<ext>")
+        // — tên tệp do client gửi, "a.x/../../b" từng lọt nguyên "/" và ".." vào key. Chỉ nhận [a-z0-9]{1,10}.
+        return extension.matches("[a-z0-9]{1,10}") ? extension : "";
     }
 }

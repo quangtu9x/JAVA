@@ -33,8 +33,9 @@ public class SwaggerOAuthConfigController {
         config.put("tokenEndpoint", keycloakProperties.getTokenUri());
         config.put("authorizationEndpoint", keycloakProperties.getAuthorizationUri());
         config.put("clientId", keycloakProperties.getClientId());
-        String clientSecret = keycloakProperties.getClientSecret();
-        config.put("clientSecret", clientSecret == null ? "" : clientSecret);
+        // 28/10/2026 (rà soát bảo mật): KHÔNG trả clientSecret — route này permitAll, trước đây ai cũng
+        // đọc được secret của confidential client rồi gọi thẳng Keycloak (password grant/client_credentials).
+        // Người dùng Swagger tự nhập secret vào ô "Client Secret" khi cần.
         return config;
     }
 }

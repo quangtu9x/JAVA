@@ -5,6 +5,8 @@ import com.td.application.common.models.Result;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.duthao.DuThaoDocument;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,7 @@ public class DuThaoVanThuKhongBanHanhUseCase {
     private final DynamicDocumentFieldsService dynamicDocumentFieldsService;
     private final DocumentLogService documentLogService;
     private final DocumentCacheService documentCacheService;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(DuThaoVanThuKhongBanHanhRequest request) {
         if (request == null || request.getId() == null) {
@@ -72,6 +75,12 @@ public class DuThaoVanThuKhongBanHanhUseCase {
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
         log.info("Van thu khong ban hanh - danh dau du thao {} hoan tat", saved.getId());
+        // vbdi/XuLyDuThao.java dong 91-96: báo người soạn + người ký + người xử lý khác.
+        realtimeNotifier.notify(RealtimeNotification.of(ChuyenThanhVanBanDiUseCase.DOCUMENT_TYPE, "xoavanbandi",
+                saved.getId(), saved.getTitle())
+            .to(text(fields.get("user_creator")), text(fields.get("user_signer")),
+                text(fields.get("user_other_process_handler")))
+            .message("Không ban hành dự thảo"));
         return Result.success(saved.getId());
     }
 
@@ -82,6 +91,10 @@ public class DuThaoVanThuKhongBanHanhUseCase {
         snapshot.put("status", document.getStatus());
         snapshot.putAll(dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson()));
         return snapshot;
+    }
+
+    private static String text(Object value) {
+        return value == null ? "" : String.valueOf(value).trim();
     }
 
     private String toJson(Map<String, Object> value) {

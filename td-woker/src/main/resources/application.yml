@@ -47,7 +47,8 @@ spring:
 #     để biết danh sách tenant + credential - CÙNG key mã hoá với td-web là bắt buộc.
 # =====================================================================
 worker:
-  # Định danh instance - nhiều instance phải khác nhau (dùng cho claim lease).
+  # Tiền tố định danh instance (trống = hostname). Worker LUÔN tự nối thêm hậu tố ngẫu nhiên mỗi lần
+  # khởi động -> các máy/replica copy cùng giá trị vẫn KHÔNG đụng nhau (claimed_by, lease GC).
   instance-id: ${WORKER_INSTANCE_ID:}
 
   core:
@@ -66,8 +67,14 @@ worker:
     # Chu kỳ poller retry + sweep lease hết hạn.
     retry-poll-interval: ${WORKER_RETRY_POLL_INTERVAL:5s}
     retry-poll-batch-size: ${WORKER_RETRY_POLL_BATCH_SIZE:100}
-    # Thời gian lease 1 claim (quá hạn -> worker khác được claim lại - crash recovery).
+    # Thời gian lease 1 claim (quá hạn -> worker khác được claim lại - crash recovery). Tính theo
+    # đồng hồ DB; unit đang chạy được GIA HẠN định kỳ nên lease chỉ hết khi worker chết/treo thật.
     claim-lease-seconds: ${WORKER_CLAIM_LEASE_SECONDS:120}
+    # Chu kỳ gia hạn lease (heartbeat). Trống = claim-lease-seconds/3.
+    lease-renew-interval: ${WORKER_LEASE_RENEW_INTERVAL:}
+    # Trần giữ lease 1 unit: quá trần (handler treo, bỏ qua interrupt) thì ngừng gia hạn để máy khác
+    # nhận lại. Phải lớn hơn hẳn unit-timeout.
+    max-processing-time: ${WORKER_MAX_PROCESSING_TIME:15m}
     # Unit PENDING quá lâu (do crash trước khi dispatch) sẽ được RETRY.
     pending-stale-timeout: ${WORKER_PENDING_STALE_TIMEOUT:5m}
     # Lỗi thiếu handler/phụ thuộc: không mất task, kiểm tra lại sau khi deploy/khôi phục.

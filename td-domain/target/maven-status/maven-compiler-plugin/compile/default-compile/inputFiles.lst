@@ -30,6 +30,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contract
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\dbserver\DbServer.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\workcalendars\WorkCalendar.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\RoleGroup.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\notifications\UserNotification.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbden\VbdenResDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\events\EntityDeletedEvent.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\hosoluutru\HoSoLuuTruDanhMucDocument.java

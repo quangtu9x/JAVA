@@ -62,7 +62,7 @@ class TraLaiDuThaoUseCaseTest {
             vbdiDocumentRepository, duThaoDocumentRepository, dynamicDocumentFieldsService,
             addDraftProcessDocumentUseCase, currentUserProvider, documentLogService, documentCacheService,
             new DraftProcessActorFields(org.mockito.Mockito.mock(com.td.application.sharedcore.AppUserRepository.class)),
-            draftProcessDocumentRepository);
+            draftProcessDocumentRepository, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(currentUserProvider.currentUsername()).thenReturn(Optional.of("vanthu1"));
         lenient().when(addDraftProcessDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         lenient().when(vbdiDocumentRepository.save(any())).thenAnswer(i -> i.getArgument(0));

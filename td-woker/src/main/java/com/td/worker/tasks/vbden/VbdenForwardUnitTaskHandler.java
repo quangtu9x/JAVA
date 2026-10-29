@@ -70,6 +70,16 @@ import java.util.UUID;
  * <p><b>Giai đoạn 1/2 đã port</b> — xem javadoc {@code ChuyenXuLyVbdenUseCase
  * #publishForwardUnitIfCrossTenant} (td-application) về gap giai đoạn 2 (revoke cascade khi "Lấy lại
  * VB"/"Thu hồi" tác động lên bản sao này) — CHƯA port, chờ xác nhận giai đoạn 1 hoạt động đúng.
+ *
+ * <p><b>Idempotent 23/10/2026 (chạy nhiều instance td-woker)</b>: trước đây MỖI lần chạy lại unit
+ * (crash sau commit nhưng trước {@code complete}, lease hết hạn, timeout rồi worker khác nhận lại)
+ * đều sinh 1 bản sao MỚI (id ngẫu nhiên) — đơn vị nhận thấy 2 văn bản giống hệt. Nay id bản sao,
+ * id {@code file_metadata} và {@code unitId} của reply đều SUY RA TẤT ĐỊNH từ
+ * {@code tenant + unitId} ({@link #forwardedCopyId}) — unitId do {@code ChuyenXuLyVbdenUseCase} sinh
+ * 1 lần, lưu trong outbox nên giữ nguyên qua mọi lần giao lại; {@code INSERT ... ON CONFLICT (id)
+ * DO NOTHING} ⇒ lần chạy lại không tạo gì mới, chỉ gửi lại reply (cùng unitId; phía
+ * {@link VbdenForwardUnitReplyTaskHandler} cũng idempotent). Mỗi lượt "Chuyển xử lý" MỚI vẫn có
+ * unitId mới nên vẫn tạo bản sao mới như trước — KHÔNG đổi nghiệp vụ. Không cần migration.</p>
  */
 @Slf4j
 @Component
@@ -122,23 +132,29 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
         DataSource ds = dsOpt.get();
         JdbcTemplate jdbc = new JdbcTemplate(ds);
 
-        // Bo sung 08/09/2026 (3): sinh id MOI cho MOI tep TRUOC (dung chung giua buoc ghi dynamic_
+        // Bo sung 08/09/2026 (3): sinh id cho MOI tep TRUOC (tu 23/10/2026 la id tat dinh) (dung chung giua buoc ghi dynamic_
         // fields.files va buoc INSERT file_metadata - 2 noi PHAI khop 1 gia tri duy nhat, xem javadoc
         // lop). Chi tao 1 lan, truyen vao ca 2 ham - KHONG dung field instance (handler la Spring
         // singleton, khong an toan giu state per-request tren field).
-        List<PreparedFile> preparedFiles = prepareFiles(p.getFiles());
+        // 23/10/2026: id tat dinh theo unit -> chay lai (redelivery/lease het han) khong nhan ban.
+        UUID createdId = forwardedCopyId(context);
+        List<PreparedFile> preparedFiles = prepareFiles(createdId, p.getFiles());
 
         var tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
-        UUID createdId = tx.execute(status -> {
-            UUID id = insertForwardedCopy(jdbc, p, preparedFiles);
-            insertFileMetadataRefs(jdbc, id, preparedFiles);
-            return id;
+        Boolean inserted = tx.execute(status -> {
+            boolean fresh = insertForwardedCopy(jdbc, createdId, p, preparedFiles);
+            if (fresh) {
+                insertFileMetadataRefs(jdbc, createdId, preparedFiles);
+            }
+            return fresh;
         });
-        if (createdId == null) {
-            return UnitResult.failure("Khong tao duoc ban sao van ban den tai tenant " + context.tenantId());
+        if (Boolean.TRUE.equals(inserted)) {
+            log.info("Đã tạo bản sao văn bản đến id={} tại tenant {} (từ tenant {}, văn bản gốc {})",
+                createdId, context.tenantId(), p.getOriginTenantId(), p.getOriginDocumentId());
+        } else {
+            log.info("Bản sao văn bản đến id={} đã có tại tenant {} (unit {} chạy lại) - không tạo thêm, "
+                    + "chỉ gửi lại xác nhận", createdId, context.tenantId(), context.unitId());
         }
-        log.info("Đã tạo bản sao văn bản đến id={} tại tenant {} (từ tenant {}, văn bản gốc {})",
-            createdId, context.tenantId(), p.getOriginTenantId(), p.getOriginDocumentId());
         // 22/10/2026: ghi tham chieu tep dung chung SAU commit - object goc chi bi xoa khi het don vi tham chieu
         // (SharedFileGcJob); loi chi log, xem SharedFileRegistry#registerQuietly.
         String defaultBucket = props.getMinio().getBucketName();
@@ -157,7 +173,12 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
                                  Long size, String contentType, String fileExtension) {
     }
 
-    private List<PreparedFile> prepareFiles(List<VbdenForwardUnitPayload.VbdenFileRef> files) {
+    /** Id bản sao TẤT ĐỊNH theo unit (23/10/2026, xem javadoc lớp). */
+    static UUID forwardedCopyId(TaskContext context) {
+        return VbdenTaskConstants.unitScopedId(context, "document");
+    }
+
+    private List<PreparedFile> prepareFiles(UUID documentId, List<VbdenForwardUnitPayload.VbdenFileRef> files) {
         if (files == null || files.isEmpty()) {
             return List.of();
         }
@@ -166,14 +187,17 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
             if (file == null || file.getObjectKey() == null || file.getObjectKey().isBlank()) {
                 continue;
             }
-            prepared.add(new PreparedFile(UUID.randomUUID(), file.getObjectKey(), file.getBucketName(),
+            // 23/10/2026: id tep cung tat dinh (theo id ban sao + thu tu) - chay lai khop dung dong cu.
+            UUID fileId = VbdenTaskConstants.deterministicUuid(documentId + "|file|" + prepared.size() + "|" + file.getObjectKey());
+            prepared.add(new PreparedFile(fileId, file.getObjectKey(), file.getBucketName(),
                 file.getOriginalFilename(), file.getSize(), file.getContentType(), file.getFileExtension()));
         }
         return prepared;
     }
 
-    private UUID insertForwardedCopy(JdbcTemplate jdbc, VbdenForwardUnitPayload p, List<PreparedFile> preparedFiles) {
-        UUID id = UUID.randomUUID();
+    /** @return true nếu vừa tạo mới; false nếu bản sao (cùng id tất định) đã có từ lần chạy trước. */
+    private boolean insertForwardedCopy(JdbcTemplate jdbc, UUID id, VbdenForwardUnitPayload p,
+                                        List<PreparedFile> preparedFiles) {
         String title = (p.getSubject() == null || p.getSubject().isBlank())
             ? "Văn bản đến (chuyển xử lý) - " + p.getOriginDocumentId() : p.getSubject();
         Map<String, Object> fields = new LinkedHashMap<>();
@@ -223,14 +247,15 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
         } catch (Exception ex) {
             dynamicFieldsJson = "{}";
         }
-        jdbc.update("""
+        int inserted = jdbc.update("""
                 INSERT INTO documents
                  (id, title, document_type, status, tags_json, attributes_json, metadata_json,
                   dynamic_fields, version_no, created_on)
                 VALUES (?, ?, ?, ?, '[]', '{}', '{}', ?::jsonb, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT (id) DO NOTHING
                 """,
             id, title, DOCUMENT_TYPE_VBDEN, STATUS_MOI, dynamicFieldsJson);
-        return id;
+        return inserted > 0;
     }
 
     /**
@@ -289,7 +314,9 @@ public class VbdenForwardUnitTaskHandler implements TaskHandler {
 
             String messageId = UUID.randomUUID().toString();
             Map<String, Object> unit = new LinkedHashMap<>();
-            unit.put("unitId", UUID.randomUUID().toString());
+            // 23/10/2026: unitId tat dinh theo ban sao - gui lai nhieu lan van la CUNG 1 xac nhan.
+            unit.put("unitId", VbdenTaskConstants.deterministicUuid(VbdenTaskConstants.TASK_FORWARD_UNIT_REPLY + "|"
+                + createdDocumentId).toString());
             unit.put("tenantId", p.getOriginTenantId());
             unit.put("payload", reply);
             unit.put("target", Map.of());

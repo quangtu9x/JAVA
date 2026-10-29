@@ -47,11 +47,12 @@ class SwaggerOAuthConfigControllerTest {
             .andExpect(jsonPath("$.tokenEndpoint")
                 .value("http://10.10.10.116:9014/keycloak/realms/td-webapi-realm/protocol/openid-connect/token"))
             .andExpect(jsonPath("$.clientId").value("td-webapi-client"))
-            .andExpect(jsonPath("$.clientSecret").value("td-webapi-secret-2024"));
+            // 28/10/2026 (rà soát bảo mật): route permitAll — TUYỆT ĐỐI không trả client secret.
+            .andExpect(jsonPath("$.clientSecret").doesNotExist());
     }
 
     @Test
-    void oauthConfig_whenClientSecretUnset_shouldReturnEmptyString() throws Exception {
+    void oauthConfig_whenClientSecretUnset_shouldStillDeriveEndpoints() throws Exception {
         keycloakProperties.setServerUrl("http://localhost:8180");
         keycloakProperties.setRealm("td-webapi-realm");
         keycloakProperties.setClientId("td-webapi-client");
@@ -59,7 +60,7 @@ class SwaggerOAuthConfigControllerTest {
 
         mockMvc.perform(get("/swagger-oauth-config"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.clientSecret").value(""))
+            .andExpect(jsonPath("$.clientSecret").doesNotExist())
             .andExpect(jsonPath("$.tokenEndpoint")
                 .value("http://localhost:8180/realms/td-webapi-realm/protocol/openid-connect/token"));
     }

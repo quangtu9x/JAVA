@@ -266,6 +266,61 @@ class VbdenForwardUnitReplyTaskHandlerIntegrationTest {
         assertThat((List<Map<String, Object>>) dynamicFields.get("forwarded_units")).hasSize(2);
     }
 
+    /** 23/10/2026: reply gửi lại (unit chạy lại) — không ghi trùng forwarded_units, không thêm dòng "Đã đến". */
+    @Test
+    void duplicateReplyForSameCopy_isIdempotent() throws Exception {
+        UUID originId = insertOriginDocument("""
+            {"unit_process": ["H05.02", "H05.03"]}
+            """);
+        JsonNode payload = basePayload(originId);
+
+        assertThat(handler.execute(context(), payload).isSuccess()).isTrue();
+        assertThat(handler.execute(context(), payload).isSuccess()).isTrue();
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        Map<String, Object> dynamicFields = objectMapper.readValue(
+            jdbc.queryForObject("SELECT dynamic_fields::text FROM documents WHERE id = ?", String.class, originId),
+            Map.class);
+        assertThat((List<Map<String, Object>>) dynamicFields.get("forwarded_units")).hasSize(1);
+        assertThat((List<String>) dynamicFields.get("unit_process")).containsExactly("H05.03");
+        assertThat(jdbc.queryForList("SELECT id FROM vbden_res_documents")).hasSize(1);
+    }
+
+    /** 23/10/2026: nhiều reply ĐỒNG THỜI cho cùng văn bản gốc — FOR UPDATE, không mất cập nhật. */
+    @Test
+    void concurrentRepliesForDifferentTargets_doNotLoseUpdates() throws Exception {
+        List<String> targets = List.of("H05.02", "H05.03", "H05.04", "H05.05", "H05.06", "H05.07");
+        UUID originId = insertOriginDocument("{\"unit_process\": "
+            + objectMapper.writeValueAsString(targets) + "}");
+
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(targets.size());
+        try {
+            var start = new java.util.concurrent.CountDownLatch(1);
+            List<java.util.concurrent.Future<UnitResult>> futures = new java.util.ArrayList<>();
+            for (String target : targets) {
+                ObjectNode payload = basePayload(originId);
+                payload.put("targetIdentifier", target);
+                futures.add(pool.submit(() -> {
+                    start.await();
+                    return handler.execute(context(), payload);
+                }));
+            }
+            start.countDown();
+            for (var f : futures) {
+                assertThat(f.get(30, java.util.concurrent.TimeUnit.SECONDS).isSuccess()).isTrue();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        Map<String, Object> dynamicFields = objectMapper.readValue(
+            new JdbcTemplate(dataSource).queryForObject(
+                "SELECT dynamic_fields::text FROM documents WHERE id = ?", String.class, originId),
+            Map.class);
+        assertThat((List<String>) dynamicFields.get("unit_process")).isEmpty();
+        assertThat((List<Map<String, Object>>) dynamicFields.get("forwarded_units")).hasSize(targets.size());
+    }
+
     @Test
     void originDocumentNotFound_noOpWithoutFailingUnit() {
         JsonNode payload = basePayload(UUID.randomUUID()); // khong ton tai

@@ -80,7 +80,7 @@ class ThuHoiVanBanUseCaseTest {
             documentRepository, vbdenResDocumentRepository, addVbdenResDocumentUseCase, dynamicDocumentFieldsService,
             currentUserProvider, documentLogService, documentCacheService, vbdenStatusService,
             processDiagramService, resolveIdentifierByLevelUseCase, publishForwardUnitRevokeUseCase,
-            authorAclFieldsService, new VbdenRevokeRecipientMatcher(orgLookup));
+            authorAclFieldsService, new VbdenRevokeRecipientMatcher(orgLookup), com.td.application.realtime.RealtimeNotifierTestSupport.noop());
         lenient().when(documentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         lenient().when(addVbdenResDocumentUseCase.execute(any())).thenReturn(Result.success(UUID.randomUUID()));
         lenient().when(vbdenResDocumentRepository.findByParentId(any(), any()))

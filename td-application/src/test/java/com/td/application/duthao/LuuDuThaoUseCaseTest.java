@@ -229,7 +229,7 @@ class LuuDuThaoUseCaseTest {
         return new LuuDuThaoUseCase(
             duThaoDocumentRepository, dynamicDocumentFieldsService, currentUserProvider, authorAclFieldsService,
             com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
-            new DuThaoCoordinatorDelegations(com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver()));
+            new DuThaoCoordinatorDelegations(com.td.application.sharedcore.UserDelegationTestSupport.emptyResolver()), com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     private DuThaoDocument newDocument(String documentType, String dynamicFieldsJson) {

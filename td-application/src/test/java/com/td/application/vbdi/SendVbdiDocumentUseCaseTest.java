@@ -63,7 +63,7 @@ class SendVbdiDocumentUseCaseTest {
             com.td.application.documentlinks.InMemoryDocumentLinkRepository.newSnapshots(linkRepository),
             documentId -> new com.td.application.common.models.PaginationResponse<>(documentFiles, 1, 20,
                 documentFiles.size(), 1, true, true),
-            publishNationalExchangeSendUseCase);
+            publishNationalExchangeSendUseCase, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     // 09/10/2026 (báo lỗi snnmt): văn bản sao chép không có tệp -> lần gửi đầu bị từ chối, không ghi log gửi.

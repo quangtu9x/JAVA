@@ -105,10 +105,18 @@ public class VbdenForwardUnitRevokeTaskHandler implements TaskHandler {
 
         var tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
         UUID targetId = targetDocumentId;
+        // 23/10/2026: id tat dinh theo unit - unit chay lai (dong lich su da co) thi bo qua toan bo, khong
+        // ghi de delete_date va khong them dong audit trung.
+        UUID historyId = VbdenTaskConstants.unitScopedId(context, "history");
         Boolean revokedOne = tx.execute(status -> {
+            if (historyExists(jdbc, historyId)) {
+                log.info("vbden.forward_unit.revoke: unit {} da xu ly truoc do (ban sao {}) - bo qua",
+                    context.unitId(), targetId);
+                return true;
+            }
             boolean ok = revokeIncomingDocument(jdbc, targetId);
             if (ok) {
-                insertRevokedHistoryRow(jdbc, targetId, p);
+                insertRevokedHistoryRow(jdbc, historyId, targetId, p);
             }
             return ok;
         });
@@ -136,7 +144,14 @@ public class VbdenForwardUnitRevokeTaskHandler implements TaskHandler {
         return updated > 0;
     }
 
-    private void insertRevokedHistoryRow(JdbcTemplate jdbc, UUID targetDocumentId, VbdenForwardUnitRevokePayload p) {
+    private boolean historyExists(JdbcTemplate jdbc, UUID historyId) {
+        Integer count = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM vbden_res_documents WHERE id = ?", Integer.class, historyId);
+        return count != null && count > 0;
+    }
+
+    private void insertRevokedHistoryRow(JdbcTemplate jdbc, UUID historyId, UUID targetDocumentId,
+                                         VbdenForwardUnitRevokePayload p) {
         String label = "laylaivanban".equals(p.getReason()) ? "Lấy lại VB"
             : "thuhoi".equals(p.getReason()) ? "Thu hồi" : "lấy lại/thu hồi";
         StringBuilder opinion = new StringBuilder("Văn bản đã bị \"").append(label)
@@ -163,7 +178,8 @@ public class VbdenForwardUnitRevokeTaskHandler implements TaskHandler {
                  (id, title, document_type, status, tags_json, attributes_json, metadata_json,
                   dynamic_fields, version_no, created_on)
                 VALUES (?, ?, 'vbden_res', 'DRAFT', '[]', '{}', '{}', ?::jsonb, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT (id) DO NOTHING
                 """,
-            UUID.randomUUID(), label, dynamicFieldsJson);
+            historyId, label, dynamicFieldsJson);
     }
 }

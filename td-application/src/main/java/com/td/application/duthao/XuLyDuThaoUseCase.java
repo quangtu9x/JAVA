@@ -9,6 +9,8 @@ import com.td.application.documents.AuthorAclFieldsService;
 import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.domain.duthao.DuThaoDocument;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -206,6 +208,7 @@ public class XuLyDuThaoUseCase {
     private final DuThaoSignSubmissionInspector signSubmissionInspector;
     // 19/10/2026: xác minh ủy quyền khi chuyển xử lý/chuyển người khác (xem XuLyDuThaoRequest#delegatedFromUsername).
     private final com.td.application.sharedcore.UserDelegationResolver userDelegationResolver;
+    private final RealtimeNotifier realtimeNotifier;
 
     private static String text(Object value) {
         return value == null ? "" : String.valueOf(value).trim();
@@ -252,6 +255,9 @@ public class XuLyDuThaoUseCase {
         String actingUsername = currentUserProvider.currentUsername().orElse(FALLBACK_USERNAME);
         var before = buildSnapshot(document);
         String previousStatus = document.getStatus();
+        // Người đang giữ TRƯỚC khi đổi field - nhận thông báo Thu hồi (Domino DraftRetrievalProcessing đọc temp_doc).
+        String holdersBefore = String.join(";", text(fields.get(USER_SIGNER_FIELD)),
+            text(fields.get(USER_OTHER_PROCESS_HANDLER_FIELD)), text(fields.get(USER_PROCESS_HANDLER_FIELD)));
 
         applySelfProcessedMarker(fields, actingUsername);
         if (ACTION_KET_THUC.equals(action)) {
@@ -284,8 +290,43 @@ public class XuLyDuThaoUseCase {
         documentCacheService.evict(saved.getId());
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
+        notifyRealtime(saved, action, fields, holdersBefore, request, actingUsername);
 
         return Result.success(saved.getId());
+    }
+
+    /**
+     * Thông báo socket — port {@code DraftProcesses#senThongBao}. Mở rộng thêm "Chuyển xử lý"
+     * ({@code chuyenduyet}) và "Chuyển phối hợp" (Domino gửi {@code chuyenduthao4} - FE không có nhãn)
+     * cho người nhận được chọn.
+     */
+    private void notifyRealtime(DuThaoDocument saved, String action, Map<String, Object> fields,
+            String holdersBefore, XuLyDuThaoRequest request, String actingUsername) {
+        String recipients;
+        String notifyAction = action;
+        switch (action) {
+            case ACTION_CHUYEN_KY_DUYET -> recipients = text(fields.get(USER_SIGNER_FIELD));
+            case ACTION_TRA_LAI, ACTION_CHON_NGUOI_TRA_LAI -> {
+                recipients = text(request.getReceiverUsername());
+                if (recipients.isEmpty()) {
+                    recipients = text(fields.get(DraftProcessActorFields.USER_CREATOR_FIELD));
+                }
+                notifyAction = ACTION_TRA_LAI;
+            }
+            case ACTION_THU_HOI -> recipients = holdersBefore;
+            case ACTION_CHUYEN_DUYET, ACTION_CHUYEN_NGUOI_KHAC -> {
+                recipients = text(request.getReceiverUsername());
+                notifyAction = "chuyenduthao";
+            }
+            case ACTION_CHUYEN_PHOI_HOP -> recipients = text(request.getReceiverUsername());
+            default -> {
+                return;
+            }
+        }
+        realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, notifyAction, saved.getId(), saved.getTitle())
+            .to(recipients)
+            .exclude(actingUsername)
+            .opinion(request.getOpinion()));
     }
 
     /**

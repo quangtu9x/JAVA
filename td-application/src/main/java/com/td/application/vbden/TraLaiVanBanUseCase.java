@@ -11,6 +11,8 @@ import com.td.application.documents.DocumentCacheService;
 import com.td.application.documents.DocumentLogService;
 import com.td.application.documents.DocumentRepository;
 import com.td.application.documents.DynamicDocumentFieldsService;
+import com.td.application.realtime.RealtimeNotification;
+import com.td.application.realtime.RealtimeNotifier;
 import com.td.application.processdiagram.ProcessDiagramService;
 import com.td.application.sharedcore.ResolveIdentifierByLevelUseCase;
 import com.td.domain.documents.BusinessDocument;
@@ -93,6 +95,7 @@ public class TraLaiVanBanUseCase {
     private final ProcessDiagramService processDiagramService;
     private final AuthorAclFieldsService authorAclFieldsService;
     private final com.td.application.sharedcore.UserFullNameResolver userFullNameResolver;
+    private final RealtimeNotifier realtimeNotifier;
 
     public Result<UUID> execute(TraLaiVanBanRequest request) {
         if (request == null || request.getParentid() == null || isBlank(request.getUserProcess())) {
@@ -115,7 +118,17 @@ public class TraLaiVanBanUseCase {
         updateParentDocument(parent, actingUsername, request.getUserProcess());
         removeDiagramNode(parent.getId(), actingUsername);
 
-        return createProcessingRecord(request, actingUsername);
+        var result = createProcessingRecord(request, actingUsername);
+        if (result.isSuccess()) {
+            // TraLaiVanBan.java#sendSocketNotSave (action "tralai" + ý kiến) - báo người NHẬN văn bản trả lại.
+            realtimeNotifier.notify(RealtimeNotification.of(DOCUMENT_TYPE, "tralai", parent.getId(),
+                    java.util.Objects.toString(dynamicDocumentFieldsService.parseDynamicFields(
+                        parent.getDynamicFieldsJson()).get("code"), null))
+                .to(request.getUserProcess())
+                .exclude(actingUsername)
+                .opinion(request.getOpinion()));
+        }
+        return result;
     }
 
     // Domino TraLaiVanBan(): removeToFieldListStringHideVBden(user_process, actingUsername) +

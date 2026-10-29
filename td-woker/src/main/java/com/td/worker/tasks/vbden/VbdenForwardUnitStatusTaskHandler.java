@@ -93,11 +93,14 @@ public class VbdenForwardUnitStatusTaskHandler implements TaskHandler {
         DataSource ds = dsOpt.get();
         JdbcTemplate jdbc = new JdbcTemplate(ds);
         var tx = new TransactionTemplate(new DataSourceTransactionManager(ds));
-        tx.executeWithoutResult(status -> insertProcessingHistoryRow(jdbc, originDocumentId, p));
+        // 23/10/2026: id tat dinh theo unit + ON CONFLICT -> unit chay lai khong nhan doi dong lich su.
+        UUID historyId = VbdenTaskConstants.unitScopedId(context, "history");
+        tx.executeWithoutResult(status -> insertProcessingHistoryRow(jdbc, historyId, originDocumentId, p));
         return UnitResult.success();
     }
 
-    private void insertProcessingHistoryRow(JdbcTemplate jdbc, UUID originDocumentId, VbdenForwardUnitStatusPayload p) {
+    private void insertProcessingHistoryRow(JdbcTemplate jdbc, UUID historyId, UUID originDocumentId,
+                                            VbdenForwardUnitStatusPayload p) {
         Map<String, Object> fields = new LinkedHashMap<>();
         fields.put("parentid", originDocumentId.toString());
         fields.put("action", p.getAction());
@@ -121,8 +124,9 @@ public class VbdenForwardUnitStatusTaskHandler implements TaskHandler {
                  (id, title, document_type, status, tags_json, attributes_json, metadata_json,
                   dynamic_fields, version_no, created_on)
                 VALUES (?, ?, 'vbden_res', 'DRAFT', '[]', '{}', '{}', ?::jsonb, 1, CURRENT_TIMESTAMP)
+                ON CONFLICT (id) DO NOTHING
                 """,
-            UUID.randomUUID(), title, dynamicFieldsJson);
+            historyId, title, dynamicFieldsJson);
     }
 
     private String buildOpinionText(VbdenForwardUnitStatusPayload p) {

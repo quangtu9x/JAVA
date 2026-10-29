@@ -35,4 +35,20 @@ public final class VbdenTaskConstants {
      * tác động lên bản sao) → đơn vị con ĐANG GIỮ bản sao — xem {@link VbdenForwardUnitRevokeTaskHandler}.
      */
     public static final String TASK_FORWARD_UNIT_REVOKE = "vbden.forward_unit.revoke";
+
+    /**
+     * 23/10/2026 (chạy nhiều instance td-woker): id TẤT ĐỊNH cho bản ghi do 1 unit tạo ra — cùng
+     * {@code taskType + tenant + unitId} (unitId sinh 1 lần ở outbox td-web, giữ nguyên qua mọi lần giao
+     * lại) ⇒ cùng id ⇒ {@code ON CONFLICT (id) DO NOTHING} chặn ghi trùng khi unit chạy lại. unitId trống
+     * thì lùi về messageId.
+     */
+    public static java.util.UUID unitScopedId(com.td.worker.core.task.TaskContext context, String purpose) {
+        String unitKey = context.unitId() == null || context.unitId().isBlank()
+            ? "msg:" + context.messageId() : context.unitId();
+        return deterministicUuid(context.taskType() + "|" + purpose + "|" + context.tenantId() + "|" + unitKey);
+    }
+
+    public static java.util.UUID deterministicUuid(String seed) {
+        return java.util.UUID.nameUUIDFromBytes(seed.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
 }

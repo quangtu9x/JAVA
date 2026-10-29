@@ -534,7 +534,7 @@ class LuuVanBanDenUseCaseTest {
     private LuuVanBanDenUseCase newUseCase() {
         return new LuuVanBanDenUseCase(documentRepository, dynamicDocumentFieldsService,
             documentRegisterRepository, addDynamicDocumentUseCase, publishVbdiReplyStatusUseCase,
-            currentUserProvider, authorAclFieldsService);
+            currentUserProvider, authorAclFieldsService, com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     private BusinessDocument newDocument(String documentType, String dynamicFieldsJson) {

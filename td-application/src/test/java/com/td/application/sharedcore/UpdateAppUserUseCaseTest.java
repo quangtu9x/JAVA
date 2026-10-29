@@ -44,7 +44,7 @@ class UpdateAppUserUseCaseTest {
     private UpdateAppUserUseCase newUseCase() {
         return new UpdateAppUserUseCase(appUserRepository, organizationRepository, roleGroupRepository,
             appUserRoleGroupRepository, currentUserProvider, dynamicDocumentFieldsService,
-            new AppUserDeactivationGuard(appUserRepository, organizationRepository));
+            new AppUserDeactivationGuard(appUserRepository, organizationRepository), com.td.application.realtime.RealtimeNotifierTestSupport.noop());
     }
 
     @Test
