@@ -2,9 +2,12 @@ package com.td.application.documentlinks;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.td.application.documents.FileDto;
+import com.td.application.documents.ListDocumentFilesUseCase;
 import com.td.domain.documentlinks.DocumentLink;
 import com.td.domain.documentlinks.DocumentLinkType;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -27,6 +30,7 @@ import java.util.UUID;
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RelatedDocumentSnapshots {
 
     public static final String DOCUMENTIN_OBJ = "documentin_obj";
@@ -34,9 +38,11 @@ public class RelatedDocumentSnapshots {
     public static final String SOURCE_VBDI = "vbdi";
     public static final String SOURCE_DUTHAO = "duthao";
     private static final String DATABASE_TYPE_KEY = "database_type";
+    private static final String FILES_KEY = "files";
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final DocumentLinkService documentLinkService;
+    private final ListDocumentFilesUseCase listDocumentFilesUseCase;
 
     // ---------- loại liên kết ----------
 
@@ -140,7 +146,43 @@ public class RelatedDocumentSnapshots {
         }
         Map<String, Object> data = new LinkedHashMap<>(item);
         data.put("id", targetId.get().toString());
+        fillFilesIfMissing(data, targetId.get());
         return documentLinkService.link(type, sourceId, targetId.get(), toJson(data));
+    }
+
+    /**
+     * 09/11/2026 (người dùng: "Trả lời cho văn bản đến" / "Tạo dự thảo" từ VB đến không thấy tệp đính kèm): bản
+     * chụp FE gửi chỉ có số, ngày, trích yếu... - không có {@code files}. Bổ sung tệp của văn bản đích lúc gắn
+     * (khuôn {name,size,type,file_id,is_primary} như GetVbdenDetailUseCase#toFileMap) để FE hiện cột đính kèm
+     * mà không phải gọi lại chi tiết từng văn bản. Bản chụp đã có tệp thì giữ nguyên; lỗi đọc tệp không chặn gắn.
+     */
+    private void fillFilesIfMissing(Map<String, Object> data, UUID targetId) {
+        if (data.get(FILES_KEY) instanceof List<?> existing && !existing.isEmpty()) {
+            return;
+        }
+        try {
+            var page = listDocumentFilesUseCase.execute(targetId);
+            if (page == null || page.getItems() == null || page.getItems().isEmpty()) {
+                return;
+            }
+            List<Map<String, Object>> files = new ArrayList<>();
+            page.getItems().forEach(file -> files.add(toFileMap(file)));
+            data.put(FILES_KEY, files);
+        } catch (Exception ex) {
+            log.warn("Khong lay duoc tep cua van ban {} khi gan lien ket - ban chup khong co files", targetId, ex);
+        }
+    }
+
+    private static Map<String, Object> toFileMap(FileDto fileDto) {
+        Map<String, Object> file = new LinkedHashMap<>();
+        String name = fileDto.getOriginalFileName();
+        int dot = name == null ? -1 : name.lastIndexOf('.');
+        file.put("name", name);
+        file.put("size", fileDto.getFileSize());
+        file.put("type", dot >= 0 && dot < name.length() - 1 ? name.substring(dot + 1).toLowerCase() : "");
+        file.put("file_id", fileDto.getFileId());
+        file.put("is_primary", Boolean.TRUE.equals(fileDto.getIsPrimary()));
+        return file;
     }
 
     /** Chuyển liên kết + bản chụp từ dự thảo sang văn bản đi được phát hành (ChuyenThanhVanBanDi). */

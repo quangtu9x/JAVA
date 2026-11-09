@@ -35,7 +35,9 @@ public class InMemoryDocumentLinkRepository implements DocumentLinkRepository {
 
     /** RelatedDocumentSnapshots thật trên fake này. */
     public static RelatedDocumentSnapshots newSnapshots(InMemoryDocumentLinkRepository repository) {
-        return new RelatedDocumentSnapshots(newService(repository));
+        // không có tệp nào (mock trả null) -> bản chụp giữ nguyên như payload
+        return new RelatedDocumentSnapshots(newService(repository),
+            Mockito.mock(com.td.application.documents.ListDocumentFilesUseCase.class));
     }
 
     public InMemoryDocumentLinkRepository seed(DocumentLinkType type, UUID sourceId, UUID targetId) {

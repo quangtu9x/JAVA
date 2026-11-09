@@ -1,7 +1,11 @@
 package com.td.application.documentlinks;
 
+import com.td.application.common.models.PaginationResponse;
+import com.td.application.documents.FileDto;
+import com.td.application.documents.ListDocumentFilesUseCase;
 import com.td.domain.documentlinks.DocumentLinkType;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,5 +75,40 @@ class RelatedDocumentSnapshotsTest {
             .extracting(link -> link.getLinkType() + ":" + link.getTargetId())
             .containsExactlyInAnyOrder("duthao_traloi_vbden:" + vbden, "duthao_kemtheo_vbdi:" + vbdi);
         assertThat(RelatedDocumentSnapshots.toItems("[{id=1, code=rac}]")).isEmpty();
+    }
+
+    // 09/11/2026: bản chụp FE gửi không có files -> lấy tệp của văn bản đích lúc gắn; đã có files thì giữ nguyên.
+    @Test
+    void linkItem_shouldFillFilesOfTarget_whenSnapshotHasNone() {
+        ListDocumentFilesUseCase listFiles = Mockito.mock(ListDocumentFilesUseCase.class);
+        RelatedDocumentSnapshots withFiles = new RelatedDocumentSnapshots(
+            InMemoryDocumentLinkRepository.newService(repository), listFiles);
+        UUID draft = UUID.randomUUID();
+        UUID vbden = UUID.randomUUID();
+        UUID vbdenCoTep = UUID.randomUUID();
+        UUID fileId = UUID.randomUUID();
+        FileDto file = FileDto.builder().fileId(fileId).originalFileName("CongVan.PDF").fileSize(10L).isPrimary(true).build();
+        Mockito.when(listFiles.execute(vbden)).thenReturn(new PaginationResponse<>(List.of(file), 1, 1, 1, 1, true, true));
+
+        withFiles.linkItem(DocumentLinkType.DUTHAO_TRALOI_VBDEN, draft, Map.of("id", vbden.toString(), "code", "A"));
+        withFiles.linkItem(DocumentLinkType.DUTHAO_TRALOI_VBDEN, draft,
+            Map.of("id", vbdenCoTep.toString(), "files", List.of(Map.of("name", "san.pdf"))));
+
+        List<Map<String, Object>> items = withFiles.replyItems(draft, RelatedDocumentSnapshots.SOURCE_DUTHAO);
+        assertThat(items).hasSize(2);
+        assertThat(firstFile(items.get(0)))
+            .containsEntry("name", "CongVan.PDF")
+            .containsEntry("type", "pdf")
+            .containsEntry("file_id", fileId.toString())
+            .containsEntry("is_primary", true);
+        assertThat(firstFile(items.get(1))).containsEntry("name", "san.pdf");
+        Mockito.verify(listFiles, Mockito.never()).execute(vbdenCoTep);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> firstFile(Map<String, Object> item) {
+        List<Map<String, Object>> files = (List<Map<String, Object>>) item.get("files");
+        assertThat(files).hasSize(1);
+        return files.get(0);
     }
 }
