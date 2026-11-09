@@ -22,6 +22,10 @@ public class SearchAppUsersRequest {
     // PostgresAppUserRepository#usernamesFilter.
     private java.util.List<String> usernames;
 
+    // 30/10/2026: true = CHỈ người dùng đã xoá mềm (tab "Đã xoá" màn Người dùng, thay view Domino
+    // nguoidung_daxoa); null/false = như cũ (chỉ người chưa xoá).
+    private Boolean deleted;
+
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
 

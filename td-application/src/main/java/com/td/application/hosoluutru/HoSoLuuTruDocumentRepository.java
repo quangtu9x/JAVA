@@ -41,4 +41,20 @@ public interface HoSoLuuTruDocumentRepository extends IRepository<HoSoLuuTruDocu
 
     /** {@code vwTrash} — hồ sơ lưu trữ đã xoá mềm ({@code deleted_on IS NOT NULL}). */
     Page<HoSoLuuTruDocument> findDeleted(String documentType, Pageable pageable);
+
+    /**
+     * 30/10/2026 — tìm kiếm nâng cao hồ sơ lưu trữ (thay {@code qlvb/search?databasetype=hosoluutru}).
+     * Mọi điều kiện tuỳ chọn, AND với nhau: {@code scopeFieldNames}/{@code scopeValue} (OR khớp khoá cá
+     * nhân như {@link #findByCriteria}); {@code containsFields} chứa không dấu trên field động;
+     * {@code exactFields} bằng (không phân biệt hoa thường); {@code keyword} chứa không dấu trên
+     * {@code keywordFields} (OR, có cả cột title); khoảng ngày trên field dd/MM/yyyy {@code dateField}.
+     */
+    Page<HoSoLuuTruDocument> search(
+            String documentType,
+            List<String> scopeFieldNames, String scopeValue,
+            Map<String, String> containsFields,
+            Map<String, String> exactFields,
+            String keyword, List<String> keywordFields,
+            String dateField, java.time.LocalDate dateFrom, java.time.LocalDate dateTo,
+            Pageable pageable);
 }

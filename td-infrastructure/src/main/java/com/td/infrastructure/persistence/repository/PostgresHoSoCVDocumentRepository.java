@@ -122,11 +122,12 @@ public class PostgresHoSoCVDocumentRepository implements HoSoCVDocumentRepositor
     @Override
     public Page<HoSoCVDocument> findByVbdenOrgView(
             String documentType, VbdenOrgViewFilter filter, Pageable pageable) {
+        // 30/10/2026: deletedOnly = thùng rác theo khoá cá nhân (vwTrash_Create_From_*).
         StringBuilder sql = new StringBuilder("""
             SELECT d.*
             FROM hosocv_documents d
-            WHERE d.deleted_on IS NULL
-            """);
+            """)
+            .append(filter.isDeletedOnly() ? "WHERE d.deleted_on IS NOT NULL\n" : "WHERE d.deleted_on IS NULL\n");
 
         Map<String, Object> parameters = new LinkedHashMap<>();
         boolean hasOrgFields = filter.getOrgFieldNames() != null && !filter.getOrgFieldNames().isEmpty();

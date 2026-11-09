@@ -110,6 +110,7 @@ com\td\infrastructure\errortracking\ErrorTrackingService.class
 com\td\infrastructure\persistence\repository\PostgresHoSoLuuTruPhieuYeuCauDocumentRepository.class
 com\td\infrastructure\tenant\TenantContext.class
 com\td\infrastructure\persistence\repository\DocumentRepository.class
+com\td\infrastructure\persistence\repository\VbpqDocumentJpaRepository.class
 com\td\infrastructure\persistence\identity\PostgresOrganizationRepository.class
 com\td\infrastructure\persistence\repository\PostgresVbdiEditHistoryDocumentRepository.class
 com\td\infrastructure\messaging\MessagingProperties$Outbox.class
@@ -117,6 +118,7 @@ com\td\infrastructure\simpki\TdSimPkiException.class
 com\td\infrastructure\persistence\repository\FileAccessLogJpaRepository.class
 com\td\infrastructure\onlyoffice\OnlyOfficeDocumentJwtService$1.class
 com\td\infrastructure\documents\SupersedeDocumentFilesUseCaseImpl.class
+com\td\infrastructure\persistence\repository\PostgresEditHistoryDocumentRepository.class
 com\td\infrastructure\search\AdvancedSearchProperties.class
 com\td\infrastructure\config\MinIOConfig.class
 com\td\infrastructure\persistence\repository\PostgresHoSoLuuTruVanBanDocumentRepository.class
@@ -142,6 +144,7 @@ template\department\infrastructure\DepartmentJpaRepository.class
 com\td\infrastructure\persistence\repository\TextContainsSql.class
 com\td\infrastructure\persistence\repository\PhieuTrinhTdProcessDocumentJpaRepository.class
 com\td\infrastructure\persistence\repository\DocumentRegisterJpaRepository.class
+com\td\infrastructure\persistence\repository\PostgresNhatKyQuanTriRepository.class
 com\td\infrastructure\security\AuthenticatedUser$AuthenticatedUserBuilder.class
 com\td\infrastructure\security\SecurityResponseWriter.class
 com\td\infrastructure\persistence\repository\BaseRepository.class
@@ -196,6 +199,7 @@ com\td\infrastructure\persistence\controlplane\DbServerJpaRepository.class
 com\td\infrastructure\config\MinIOProperties$Http.class
 com\td\infrastructure\tenant\controlplane\ControlPlaneDataSourceConfig.class
 com\td\infrastructure\persistence\repository\PostgresVbdiSendLogDocumentRepository.class
+com\td\infrastructure\persistence\repository\PostgresVbpqDocumentRepository.class
 com\td\infrastructure\security\ApiResponseAccessDeniedHandler.class
 com\td\infrastructure\persistence\repository\DocumentLogJpaRepository.class
 com\td\infrastructure\config\AuditingConfig.class
@@ -246,6 +250,7 @@ com\td\infrastructure\persistence\identity\PostgresAppUserRepository.class
 com\td\infrastructure\documents\UploadFileUseCaseImpl.class
 com\td\infrastructure\realtime\RealtimeNotificationConfig.class
 com\td\infrastructure\categories\ListCategoryFilesUseCaseImpl.class
+com\td\infrastructure\vbden\VbdenOverdueStatusScheduler.class
 com\td\infrastructure\documents\DeleteFileUseCaseImpl.class
 com\td\infrastructure\hosocv\HttpLgspTokenClient.class
 com\td\infrastructure\identityfiles\ListIdentityFilesUseCaseImpl.class
@@ -261,6 +266,7 @@ com\td\infrastructure\errortracking\Severity.class
 com\td\infrastructure\simpki\LocateTextSlotsUseCaseImpl.class
 com\td\infrastructure\persistence\identity\PostgresAppRoleRepository.class
 com\td\infrastructure\documents\JdbcFileContentExtractRepository.class
+com\td\infrastructure\persistence\repository\EditHistoryDocumentJpaRepository.class
 com\td\infrastructure\config\MinioService.class
 com\td\infrastructure\fileregistry\FileRegistryProperties.class
 com\td\infrastructure\persistence\repository\HoSoCVDocumentJpaRepository.class
@@ -277,6 +283,8 @@ com\td\infrastructure\messaging\OutboxDeliveryFeedbackHandler.class
 com\td\infrastructure\security\KeycloakProperties.class
 com\td\infrastructure\persistence\repository\VbdiEditHistoryDocumentJpaRepository.class
 com\td\infrastructure\errortracking\LogType.class
+com\td\infrastructure\persistence\repository\ChiaSeTepDocumentJpaRepository.class
+com\td\infrastructure\persistence\repository\PostgresChiaSeTepDocumentRepository.class
 com\td\infrastructure\errortracking\ErrorTrackingProperties.class
 com\td\infrastructure\fileregistry\SharedFileRegistryClient.class
 com\td\infrastructure\messaging\OutboxTenantDispatcher.class

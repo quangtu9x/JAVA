@@ -109,6 +109,26 @@ public class HoSoCVController extends BaseController {
     private final LuuVanBanKhacUseCase luuVanBanKhacUseCase;
     private final XemVanBanKhacUseCase xemVanBanKhacUseCase;
     private final XoaVanBanKhacUseCase xoaVanBanKhacUseCase;
+    // 30/10/2026: thu hồi trình duyệt + panel quá trình duyệt/chuyển lưu trữ (thay Domino qlvb/add, qlvb/view/query).
+    private final com.td.application.hosocv.ThuHoiTrinhDuyetHoSoUseCase thuHoiTrinhDuyetHoSoUseCase;
+    private final com.td.application.hosocv.GetQuaTrinhHoSoUseCase getQuaTrinhHoSoUseCase;
+
+    @PostMapping("/ThuHoiTrinhDuyet")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Thu hồi hồ sơ đã trình lãnh đạo duyệt",
+        description = "trinhlanhdaoduyet: \"2\" → \"0\"; chỉ người tạo/chủ trì; body {hosocvId}")
+    public ResponseEntity<ApiResponse<UUID>> thuHoiTrinhDuyet(@RequestBody Map<String, String> body) {
+        return ok(thuHoiTrinhDuyetHoSoUseCase.execute(parseUuidOrNull(body == null ? null : body.get("hosocvId"))));
+    }
+
+    @PostMapping("/QuaTrinhXuLy")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Quá trình duyệt / chuyển lưu trữ của hồ sơ",
+        description = "body {hosocvId, loai: duyet|chuyenluutru} — trả {create_date, creator, receiver, action_type, subject}")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> quaTrinhXuLy(@RequestBody Map<String, String> body) {
+        return ok(getQuaTrinhHoSoUseCase.execute(
+            parseUuidOrNull(body == null ? null : body.get("hosocvId")), body == null ? null : body.get("loai")));
+    }
 
     @PostMapping("/TaoHoSo")
     @PreAuthorize("isAuthenticated()")

@@ -14,6 +14,7 @@ C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\Shared
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\PrivateCategoriesController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\TdWebApiApplication.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\SimPkiSignController.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\VanBanPhapQuyController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\BaseController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\CategoriesController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\VbdiController.java
@@ -33,8 +34,11 @@ C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\Shared
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\SharedCorePermissionsController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\SafeFileResponse.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\NumberingConfigController.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\EditHistoryController.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\ChiaSeTepController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\FileController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\StringNormalizationConfig.java
+C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\controllers\v1\NhatKyHeThongController.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\RedisOrganizationTreeCacheStore.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\OpenApiConfig.java
 C:\code_projects\HSCV\JAVA\td-web\src\main\java\com\td\web\config\RequestBodyCachingFilter.java

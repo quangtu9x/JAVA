@@ -114,7 +114,7 @@ public class PostgresAppUserRepository implements AppUserRepository {
     @Override
     public Page<AppUser> search(SearchAppUsersRequest request, Pageable pageable) {
         Specification<AppUser> spec = Specification
-            .where(notDeleted())
+            .where(Boolean.TRUE.equals(request.getDeleted()) ? deletedOnly() : notDeleted())
             .and(keywordFilter(request))
             .and(organizationFilter(request))
             .and(activeFilter(request))
@@ -130,6 +130,11 @@ public class PostgresAppUserRepository implements AppUserRepository {
             return null;
         }
         return (root, q, cb) -> root.get("username").in(req.getUsernames());
+    }
+
+    // 30/10/2026: tab "Đã xoá" màn Người dùng.
+    private static Specification<AppUser> deletedOnly() {
+        return (root, q, cb) -> cb.isNotNull(root.get("deletedOn"));
     }
 
     private static Specification<AppUser> notDeleted() {

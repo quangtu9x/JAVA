@@ -167,6 +167,16 @@ public class ViewQueryService {
     // va "@IsUnavailable($Conflict)" (khai niem replication conflict cua Domino, khong ton tai o Java/Postgres).
     static final String VIEW_VBDI_SIGNER_DOCUMENTOUT_WAITINGTOSEND = "vwsigner_documentout_waitingtosend";
     static final String VIEW_VBDI_SIGNER_DOCUMENTOUT_SENT = "vwsigner_documentout_sent";
+    // 30/10/2026: "dabanhanh"/"chuabanhanh" (dxl 2886-2960) - nhu 2 view Signer nhung khoa user_draft
+    // (nguoi dang dang nhap, resolve server-side).
+    static final String VIEW_VBDI_USERDRAFT_DOCUMENTOUT_WAITINGTOSEND = "vwuserdraft_documentout_waitingtosend";
+    static final String VIEW_VBDI_USERDRAFT_DOCUMENTOUT_SENT = "vwuserdraft_documentout_sent";
+    // 30/10/2026: "Đơn vị soạn" (tracuu/lienquan donvisoan, danh sach phang) - cung loc voi
+    // vwGroup_Is_Unit_In_Charge_by_Identifier.
+    static final String VIEW_VBDI_GROUP_BY_UNIT_IN_CHARGE_FLAT = "vwgroup_by_unit_in_charge";
+    // 30/10/2026: cac man "Thong ke" van ban di (vbdi/tracuu/baocao/thongke*, thongkesoluongkyso) - thay
+    // Domino qlvb/search?databasetype=vbdi (search=dataFilter). Xem buildVbdiThongKeFilter.
+    static final String VIEW_VBDI_THONGKE = "vbdi_thongke";
     static final String VIEW_VBDI_REVOKE = "vwcreator_documentout_revoke"; // "vanbandathuhoi"
     static final String VIEW_VBDI_REPLY_REFUSE = "vwcreator_documentout_replyrefuse"; // "tralai-tuchoi"
     static final String VIEW_VBDI_REPLY_DRAFTOR = "vwcreator_documentout_reply_draftor"; // "datralai"
@@ -321,6 +331,24 @@ public class ViewQueryService {
     static final String VIEW_HOSOCV_END_DATE = "vwend_date";
     static final String VIEW_HOSOCV_OVERDUE_PROCESSING = "vwoverdue_processing";
     static final String VIEW_HOSOCV_USER_OVERDUE_PROCESSING = "vwuser_overdue_processing";
+    // 30/10/2026: hồ sơ tạo từ VB đến/VB đi/phiếu trình (docs/views_domino/view_hosocv.dxl) — xem
+    // queryHoSoCVCreateFrom. Khoá cá nhân user_creator|user_process_handler (Storaged_Status: chỉ
+    // user_process_handler, khoá thứ 2 "cho"/"da").
+    static final String VIEW_HOSOCV_CF_DOCUMENT_IN = "vwuser_create_from_document_in";
+    static final String VIEW_HOSOCV_CF_DOCUMENT_IN_STORAGED = "vwuser_create_from_document_in_storaged_status";
+    static final String VIEW_HOSOCV_CF_DOCUMENT_IN_NO_DEADLINE = "vwuser_create_from_document_in_no_deadline";
+    static final String VIEW_HOSOCV_CF_DOCUMENT_IN_DEADLINE_TODAY = "vwuser_create_from_document_in_deadline_today";
+    static final String VIEW_HOSOCV_CF_DOCUMENT_IN_TODAY = "vwuser_create_from_document_in_today";
+    static final String VIEW_HOSOCV_CF_DOCUMENT_OUT = "vwuser_create_from_document_out";
+    static final String VIEW_HOSOCV_CF_DOCUMENT_OUT_STORAGED = "vwuser_create_from_document_out_storaged_status";
+    static final String VIEW_HOSOCV_CF_SUBMISSION = "vwuser_create_from_submission_dossier";
+    static final String VIEW_HOSOCV_CF_SUBMISSION_STORAGED = "vwuser_create_from_submission_dossier_storaged_status";
+    static final String VIEW_HOSOCV_TRASH_CF_DOCUMENT_IN = "vwtrash_create_from_document_in";
+    static final String VIEW_HOSOCV_TRASH_CF_DOCUMENT_OUT = "vwtrash_create_from_document_out";
+    static final String VIEW_HOSOCV_TRASH_CF_SUBMISSION = "vwtrash_create_from_submission_dossier";
+    private static final String HOSOCV_CF_DOCUMENT_IN_FIELD = "create_from_document_in";
+    private static final String HOSOCV_CF_DOCUMENT_OUT_FIELD = "create_from_document_out";
+    private static final String HOSOCV_CF_SUBMISSION_FIELD = "create_from_submission_dossier";
 
     private static final String HOSOCV_USER_CREATOR_FIELD = "user_creator";
     private static final String HOSOCV_USER_PROCESS_HANDLER_FIELD = "user_process_handler";
@@ -348,6 +376,8 @@ public class ViewQueryService {
     static final String VIEW_HOSOLUUTRU_DA_CHUYEN_LUU_TRU = "hoso_dachuyenluutru_by_identifier";
     static final String VIEW_HOSOLUUTRU_CHUYEN_LTLS_0 = "hoso_chuyenltls0_by_identifier";
     static final String VIEW_HOSOLUUTRU_CHUYEN_LTLS_2 = "hoso_chuyenltls2_by_identifier";
+    static final String VIEW_HOSOLUUTRU_CHUYEN_LTLS_1 = "hoso_chuyenltls1_by_identifier";
+    static final String VIEW_HOSOLUUTRU_CHUYEN_LTLS_3 = "hoso_chuyenltls3_by_identifier";
     // "vwtrash" TRUNG ten voi VIEW_HOSOCV_TRASH - xu ly gop trong case cua hang so do (nhanh theo
     // dbType), dung khuon collision VIEW_DUTHAO_USER_COORDINATOR da dung.
     static final String VIEW_HOSOLUUTRU_PHIEU_YEU_CAU_0 = "phieuyeucau0_by_identifier";
@@ -1665,9 +1695,30 @@ public class ViewQueryService {
             case VIEW_VBDI_GROUP_BY_DRAFTOR ->
                 queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, key, List.of("user_draft"), VbdiStatus.ISSUED,
                     null, request.getItems(), keyword, keywordColumns, pageable);
-            case VIEW_VBDI_GROUP_UNIT_IN_CHARGE ->
+            case VIEW_VBDI_GROUP_UNIT_IN_CHARGE, VIEW_VBDI_GROUP_BY_UNIT_IN_CHARGE_FLAT ->
                 queryVbdiByFieldsEquals(dbType, vbdiSearch, key, List.of("unit_in_charge_identifier", "unit_identifier"),
                     VbdiStatus.ISSUED, null, request.getItems(), keyword, keywordColumns, pageable);
+            // 30/10/2026 - xem javadoc VIEW_VBDI_USERDRAFT_DOCUMENTOUT_*.
+            case VIEW_VBDI_USERDRAFT_DOCUMENTOUT_WAITINGTOSEND ->
+                queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, resolveUsernameToken(key), List.of("user_draft"),
+                    VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'send_agent', '') = '0'",
+                    request.getItems(), keyword, keywordColumns, pageable);
+            case VIEW_VBDI_USERDRAFT_DOCUMENTOUT_SENT ->
+                queryVbdiByFieldsEqualsUnvalidated(dbType, vbdiSearch, resolveUsernameToken(key), List.of("user_draft"),
+                    VbdiStatus.ISSUED, "COALESCE(d.dynamic_fields->>'send_agent', '') = '1'",
+                    request.getItems(), keyword, keywordColumns, pageable);
+            // 30/10/2026: thong ke van ban di - pham vi to chuc (4 field identifier, resolve server-side),
+            // status "0" = cho vao so (DRAFT), con lai da ban hanh. Bo qua vbdiSearch (search la dataFilter
+            // cua man thong ke, khong phai form CollapseVBdi).
+            case VIEW_VBDI_THONGKE -> {
+                Map<String, Object> thongKeSearch = request.getSearch();
+                boolean choVaoSo = "0".equals(asString(thongKeSearch == null ? null : thongKeSearch.get("status")));
+                yield queryVbdiByFieldsEquals(dbType, null, resolveCurrentIdentifier(),
+                    VBDI_DOCUMENTOUT_ALL_IDENTIFIER_FIELDS,
+                    choVaoSo ? VbdiStatus.DRAFT : VbdiStatus.ISSUED,
+                    vbdiThongKeExtraPredicate(thongKeSearch), buildVbdiThongKeFilter(thongKeSearch),
+                    request.getItems(), null, null, pageable);
+            }
             case VIEW_VBDI_TRASH ->
                 queryVbdiTrash(dbType, request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_VBDI_PRIVATE_IMPORTANT ->
@@ -1778,6 +1829,14 @@ public class ViewQueryService {
             case VIEW_HOSOCV_TRASH -> "hosoluutru".equalsIgnoreCase(dbType)
                 ? queryHoSoLuuTruTrash(request.getItems(), pageable)
                 : queryHoSoCVTrash(dbType, request.getItems(), keyword, keywordColumns, pageable);
+            // 30/10/2026: hồ sơ tạo từ VB đến/đi/phiếu trình (+ thùng rác) - xem queryHoSoCVCreateFrom.
+            case VIEW_HOSOCV_CF_DOCUMENT_IN, VIEW_HOSOCV_CF_DOCUMENT_IN_STORAGED, VIEW_HOSOCV_CF_DOCUMENT_IN_NO_DEADLINE,
+                 VIEW_HOSOCV_CF_DOCUMENT_IN_DEADLINE_TODAY, VIEW_HOSOCV_CF_DOCUMENT_IN_TODAY,
+                 VIEW_HOSOCV_CF_DOCUMENT_OUT, VIEW_HOSOCV_CF_DOCUMENT_OUT_STORAGED,
+                 VIEW_HOSOCV_CF_SUBMISSION, VIEW_HOSOCV_CF_SUBMISSION_STORAGED,
+                 VIEW_HOSOCV_TRASH_CF_DOCUMENT_IN, VIEW_HOSOCV_TRASH_CF_DOCUMENT_OUT, VIEW_HOSOCV_TRASH_CF_SUBMISSION ->
+                queryHoSoCVCreateFrom(dbType, viewname, hoSoCVSearch, resolveUsernameToken(key), request.getKeys(),
+                    request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_BY_PROCESS_HANDLER, VIEW_HOSOCV_END_DATE ->
                 queryHoSoCVPersonalQueue(dbType, hoSoCVSearch, HOSOCV_USER_PROCESS_HANDLER_FIELD, resolveUsernameToken(key), request.getItems(), keyword, keywordColumns, pageable);
             case VIEW_HOSOCV_BY_DOCUMENT_PROFILES_TYPE ->
@@ -1842,6 +1901,12 @@ public class ViewQueryService {
             case VIEW_HOSOLUUTRU_CHUYEN_LTLS_2 -> queryHoSoLuuTruByIdentifier(
                 key, Map.of(HOSOLUUTRU_CHUYENLUUTRUTINH_FIELD, List.of(HoSoLuuTruLifecycleStatus.CHUYENLUUTRUTINH_CHO_DUYET)),
                 request.getItems(), pageable);
+            // 30/10/2026: 2 menu "LTLS đã duyệt"/"bị từ chối" (chuyenluutrutinh "1"/"3") — trước rơi Domino
+            // chết; hiện chưa luồng nào ghi 2 giá trị này nên thường rỗng, nhưng không còn lỗi.
+            case VIEW_HOSOLUUTRU_CHUYEN_LTLS_1 -> queryHoSoLuuTruByIdentifier(
+                key, Map.of(HOSOLUUTRU_CHUYENLUUTRUTINH_FIELD, List.of("1")), request.getItems(), pageable);
+            case VIEW_HOSOLUUTRU_CHUYEN_LTLS_3 -> queryHoSoLuuTruByIdentifier(
+                key, Map.of(HOSOLUUTRU_CHUYENLUUTRUTINH_FIELD, List.of("3")), request.getItems(), pageable);
             case VIEW_HOSOLUUTRU_PHIEU_YEU_CAU_0 -> queryPhieuYeuCau(
                 key, Map.of("status", List.of(HoSoLuuTruLifecycleStatus.PHIEU_CHO_GIAI_QUYET)), request.getItems(), pageable);
             case VIEW_HOSOLUUTRU_PHIEU_YEU_CAU_1 -> queryPhieuYeuCau(
@@ -3094,6 +3159,60 @@ public class ViewQueryService {
 
     private static final DateTimeFormatter VBDI_IN_SO_MM_DD_YYYY = DateTimeFormatter.ofPattern("MM/dd/yyyy");
 
+    // 30/10/2026: hang so noi bo cho "Chưa ký số" (dakyso khac "1") - khong ghep tu input client.
+    private static final String VBDI_THONGKE_CHUA_KY_SO = "COALESCE(d.dynamic_fields->>'dakyso', '') != '1'";
+
+    private String vbdiThongKeExtraPredicate(Map<String, Object> search) {
+        return search != null && "0".equals(asString(search.get("dakyso"))) ? VBDI_THONGKE_CHUA_KY_SO : null;
+    }
+
+    /**
+     * 30/10/2026 — các màn "Thống kê" văn bản đi (FE {@code vbdi/thongkechovaoso/components/ItemsListFilter.jsx}
+     * và {@code vbdi/soluongkyso}, object {@code dataFilter}) thay Domino {@code qlvb/search} (TDQuery.createQuery
+     * khớp từng field; templateQuery "thongkedonvisoanthao" = TDQueryVBDI#reportDonViSoanThao cùng tiêu chí):
+     * {@code promulgation_date} = [dd/MM/yyyy, dd/MM/yyyy] (hoặc {@code ngaybanhanh} {fromDate,toDate} MM/dd/yyyy);
+     * field chọn danh mục/tổ chức so khớp chính xác; trích yếu + nơi nhận (*_rtext, unit_reply_refuse) chứa chuỗi;
+     * {@code dakyso}="1" đã ký số, "0" chưa ký số (xem {@link #vbdiThongKeExtraPredicate}); {@code ldkyso}="1".
+     */
+    private VbdiDocumentOutFilter buildVbdiThongKeFilter(Map<String, Object> search) {
+        VbdiDocumentOutFilter.VbdiDocumentOutFilterBuilder builder = VbdiDocumentOutFilter.builder();
+        if (search == null || search.isEmpty()) {
+            return builder.build();
+        }
+        if (search.get("promulgation_date") instanceof List<?> range && !range.isEmpty()) {
+            builder.promulgationDateFrom(parseAdvancedSearchDate(asString(range.get(0))));
+            if (range.size() > 1) {
+                builder.promulgationDateTo(parseAdvancedSearchDate(asString(range.get(1))));
+            }
+        } else if (search.get("ngaybanhanh") instanceof Map<?, ?> dateRange) {
+            builder.promulgationDateFrom(parseMmDdYyyy(asString(dateRange.get("fromDate"))));
+            builder.promulgationDateTo(parseMmDdYyyy(asString(dateRange.get("toDate"))));
+        }
+        Map<String, List<String>> includeFieldValues = new LinkedHashMap<>();
+        for (String field : List.of("document_type", "sector", "signer", "user_signer", "confidentiality",
+                "delivery_method", "draftor", "unit_publish", "unit_in_charge_identifier", "unit_promulgate",
+                "unit_publish_identifier", "ldkyso")) {
+            putIfNonBlank(includeFieldValues, field, asString(search.get(field)));
+        }
+        putIfNonBlank(includeFieldValues, "priority", asString(search.get("dokhan")));
+        putIfNonBlank(includeFieldValues, "document_register", asString(search.get("sovanban")));
+        if ("1".equals(asString(search.get("dakyso")))) {
+            includeFieldValues.put("dakyso", List.of("1"));
+        }
+        Map<String, String> textContains = new LinkedHashMap<>();
+        for (String field : List.of("subject", "external_unit_rtext", "contact_unit_rtext", "internal_unit_rtext",
+                "unit_reply_refuse")) {
+            String value = asString(search.get(field));
+            if (value != null && !value.isBlank()) {
+                textContains.put(field, value.trim());
+            }
+        }
+        return builder
+            .includeFieldValues(includeFieldValues.isEmpty() ? null : includeFieldValues)
+            .textContainsFieldValues(textContains.isEmpty() ? null : textContains)
+            .build();
+    }
+
     /**
      * 10/10/2026 — "In sổ văn bản đi" (FE {@code vbdi/insovanban/components/ItemsList.jsx}, object
      * {@code dataFilter}), đúng các khoá Domino {@code TDQueryVBDI#reportDocumentRegister}:
@@ -4303,6 +4422,22 @@ public class ViewQueryService {
         return toFilteredDocumentFields(document, items);
     }
 
+    /** 30/10/2026: văn bản đi đã ban hành của tổ chức người đang đăng nhập (4 field identifier) — VbdiGroupViewQuery. */
+    public List<VbdiDocument> findVbdiOrgIssuedDocuments(int limit) {
+        String identifier = resolveCurrentIdentifier();
+        if (identifier == null || identifier.isBlank()) {
+            return List.of();
+        }
+        return vbdiDocumentRepository.findByAnyFieldEqualsIdentifier(
+            "vbdi", VbdiStatus.ISSUED, VBDI_DOCUMENTOUT_ALL_IDENTIFIER_FIELDS, identifier.trim(),
+            VbdiDocumentOutFilter.builder().build(), PageRequest.of(0, Math.max(1, limit))).getContent();
+    }
+
+    /** 30/10/2026: cùng shape 1 dòng danh sách văn bản đi của GetView. */
+    public Map<String, Object> toVbdiListFields(VbdiDocument document, String items) {
+        return toFilteredDocumentFields(document, items);
+    }
+
     // 22/10/2026 - xem javadoc VIEW_DUTHAO_CHODUYETKYBANHANH: nhánh người ký (status 1/3) OR nhánh người xử lý
     // khác (status 9); mc = true chỉ dự thảo có mc_mahs (một cửa), false chỉ dự thảo không có.
     private PaginationResponse<Map<String, Object>> queryDuThaoChoDuyetKyBanHanh(
@@ -4643,6 +4778,48 @@ public class ViewQueryService {
                 dbType, includeField, excludeField, username, keyword, hoSoCVKeywordColumns(keywordColumns), pageable)
             : hoSoCVDocumentRepository.findByListFieldMemberExcludingOther(
                 dbType, includeField, excludeField, username, pageable);
+        List<Map<String, Object>> content = page.getContent().stream()
+            .map(document -> toFilteredDocumentFields(document, items))
+            .toList();
+        return toPaginationResponse(content, page);
+    }
+
+    // 30/10/2026: vwUser_Create_From_* / vwTrash_Create_From_* (view_hosocv.dxl). Cờ create_from_* do
+    // ChiTietPage.jsx ghi khi tạo hồ sơ từ VB đến/đi/phiếu trình. Storaged_Status: status="1" & category
+    // khác rỗng, khoá thứ 2 "cho" (storaged rỗng/"0") hoặc "da" (storaged="1"), chỉ người chủ trì.
+    private PaginationResponse<Map<String, Object>> queryHoSoCVCreateFrom(
+            String dbType, String viewname, VbdenOrgViewFilter search, String username, List<String> keys,
+            String items, String keyword, List<String> keywordColumns, Pageable pageable) {
+        if (username == null || username.isBlank()) {
+            return emptyPage(pageable);
+        }
+        String flagField = viewname.contains("submission_dossier") ? HOSOCV_CF_SUBMISSION_FIELD
+            : viewname.contains("document_out") ? HOSOCV_CF_DOCUMENT_OUT_FIELD : HOSOCV_CF_DOCUMENT_IN_FIELD;
+        boolean storagedStatus = viewname.endsWith("_storaged_status");
+        Map<String, List<String>> include = new LinkedHashMap<>();
+        include.put(flagField, List.of("1"));
+        VbdenOrgViewFilter.VbdenOrgViewFilterBuilder builder = VbdenOrgViewFilter.builder()
+            .orgFieldNames(storagedStatus ? List.of(HOSOCV_USER_PROCESS_HANDLER_FIELD)
+                : List.of(HOSOCV_USER_CREATOR_FIELD, HOSOCV_USER_PROCESS_HANDLER_FIELD))
+            .orgValue(username.trim())
+            .deletedOnly(viewname.startsWith("vwtrash_"))
+            .keyword(keyword)
+            .keywordColumns(hoSoCVKeywordColumns(keywordColumns));
+        if (storagedStatus) {
+            String trangThaiLuuTru = keys != null && keys.size() > 1 && keys.get(1) != null ? keys.get(1).trim() : "";
+            include.put(HOSOCV_STATUS_STATIC_FIELD, List.of(HoSoCVStatus.DA_KET_THUC));
+            include.put(HOSOCV_STORAGED_FIELD, "da".equalsIgnoreCase(trangThaiLuuTru) ? List.of("1") : List.of("", "0"));
+            builder.requireNonEmptyFieldName(HOSOCV_CATEGORY_FIELD);
+        } else if (VIEW_HOSOCV_CF_DOCUMENT_IN_NO_DEADLINE.equals(viewname)) {
+            builder.requireEmptyFieldName(HOSOCV_DEADLINE_DATE_FIELD);
+        } else if (VIEW_HOSOCV_CF_DOCUMENT_IN_DEADLINE_TODAY.equals(viewname)) {
+            include.put(HOSOCV_STATUS_STATIC_FIELD, List.of(HOSOCV_STATUS_DANG_XU_LY));
+            include.put(HOSOCV_DEADLINE_DATE_FIELD, List.of(VBDEN_DD_MM_YYYY_FORMATTER.format(LocalDate.now())));
+        } else if (VIEW_HOSOCV_CF_DOCUMENT_IN_TODAY.equals(viewname)) {
+            builder.minCreatedOn(LocalDate.now()).maxCreatedOn(LocalDate.now());
+        }
+        VbdenOrgViewFilter filter = builder.includeFieldValues(include).build();
+        Page<HoSoCVDocument> page = hoSoCVDocumentRepository.findByVbdenOrgView(dbType, withAdvancedSearch(filter, search), pageable);
         List<Map<String, Object>> content = page.getContent().stream()
             .map(document -> toFilteredDocumentFields(document, items))
             .toList();

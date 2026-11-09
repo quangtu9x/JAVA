@@ -58,11 +58,16 @@ public class PostgresAppRoleRepository implements AppRoleRepository {
     @Override
     public Page<AppRole> search(SearchAppRolesRequest request, Pageable pageable) {
         Specification<AppRole> spec = Specification
-            .where(notDeleted())
+            .where(Boolean.TRUE.equals(request.getDeleted()) ? deletedOnly() : notDeleted())
             .and(keywordFilter(request))
             .and(systemRoleFilter(request))
             .and(activeFilter(request));
         return jpa.findAll(spec, pageable);
+    }
+
+    // 30/10/2026: tab "Danh sách vai trò đã xoá".
+    private static Specification<AppRole> deletedOnly() {
+        return (root, q, cb) -> cb.isNotNull(root.get("deletedOn"));
     }
 
     private static Specification<AppRole> notDeleted() {

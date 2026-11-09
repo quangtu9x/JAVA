@@ -31,6 +31,7 @@ public class WorkerProperties {
     private Kafka kafka = new Kafka();
     private Tasks tasks = new Tasks();
     private FileRegistry fileRegistry = new FileRegistry();
+    private Realtime realtime = new Realtime();
 
     /** Định danh thực dùng cho {@code claimed_by}/lease — sinh 1 lần cho mỗi tiến trình. */
     @lombok.Getter(lombok.AccessLevel.NONE)
@@ -164,6 +165,18 @@ public class WorkerProperties {
         private Duration connectTimeout = Duration.ofSeconds(10);
         private Duration socketTimeout = Duration.ofSeconds(120);
         private Duration connectionTtl = Duration.ofMinutes(5);
+    }
+
+    /**
+     * Thông báo người dùng (hộp thư user_notifications + đẩy server socket.io) khi worker tạo văn bản đến ở đơn vị
+     * nhận - cùng server socket với td-web ({@code REALTIME_SOCKET_*}). base-url rỗng = chỉ ghi hộp thư.
+     */
+    @Data
+    public static class Realtime {
+        private boolean enabled = true;
+        private String baseUrl = "";
+        private String apiKey = "";
+        private Duration requestTimeout = Duration.ofSeconds(3);
     }
 
     /** MinIO client (tùy chọn — chỉ khi handler cần kiểm tra objectKey tham chiếu). */

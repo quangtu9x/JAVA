@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
@@ -150,6 +151,21 @@ public class GlobalExceptionHandler {
         log.warn("Resource not found: {}", message);
         String errorId = track(request, HttpStatus.NOT_FOUND, ex);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error(HttpStatus.NOT_FOUND.value(), message, errorId));
+    }
+
+    /**
+     * 30/10/2026: URL không có handler (điển hình FE còn gọi API Domino cũ {@code qlvb/*}) — trước đây
+     * rơi {@link #handleGeneral} thành 500 + stack trace vô ích. Trả 404 và log kèm query + trang FE +
+     * nơi gọi để biết ngay chức năng nào cần cutover (Error Tracking lưu đủ ở cột request_context).
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex, HttpServletRequest request) {
+        String errorId = track(request, HttpStatus.NOT_FOUND, ex);
+        log.warn("API khong ton tai [{}] {} {}?{} | fePage={} | feCaller={} | referer={}",
+            errorId, request.getMethod(), request.getRequestURI(), request.getQueryString(),
+            request.getHeader("X-FE-Page"), request.getHeader("X-FE-Caller"), request.getHeader("Referer"));
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(ApiResponse.error(HttpStatus.NOT_FOUND.value(), "API khong ton tai: " + request.getRequestURI(), errorId));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

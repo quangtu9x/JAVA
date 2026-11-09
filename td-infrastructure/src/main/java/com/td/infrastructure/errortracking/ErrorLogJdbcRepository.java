@@ -22,7 +22,7 @@ class ErrorLogJdbcRepository {
 
     private static final String SELECT_COLUMNS = "error_id, log_type, severity, occurred_at, http_status, " +
         "http_method, request_path, trace_id, username, remote_addr, exception_class, message, stack_trace, " +
-        "request_body, duration_ms";
+        "request_body, duration_ms, request_context";
 
     private static final RowMapper<ErrorLogEntity> ROW_MAPPER = (rs, rowNum) -> ErrorLogEntity.builder()
         .errorId(rs.getString("error_id"))
@@ -40,6 +40,7 @@ class ErrorLogJdbcRepository {
         .stackTrace(rs.getString("stack_trace"))
         .requestBody(rs.getString("request_body"))
         .durationMs((Long) rs.getObject("duration_ms"))
+        .requestContext(rs.getString("request_context"))
         .build();
 
     private final JdbcTemplate jdbcTemplate;
@@ -54,7 +55,7 @@ class ErrorLogJdbcRepository {
 
     void save(ErrorLogEntity entity) {
         jdbcTemplate.update(
-            "INSERT INTO error_log (" + SELECT_COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO error_log (" + SELECT_COLUMNS + ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             entity.getErrorId(),
             entity.getLogType().name(),
             entity.getSeverity().name(),
@@ -69,7 +70,8 @@ class ErrorLogJdbcRepository {
             entity.getMessage(),
             entity.getStackTrace(),
             entity.getRequestBody(),
-            entity.getDurationMs());
+            entity.getDurationMs(),
+            entity.getRequestContext());
     }
 
     Optional<ErrorLogEntity> findById(String errorId) {

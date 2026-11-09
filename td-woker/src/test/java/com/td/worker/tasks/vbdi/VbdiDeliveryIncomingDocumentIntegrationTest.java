@@ -188,7 +188,8 @@ class VbdiDeliveryIncomingDocumentIntegrationTest {
         props.getTasks().getVbdi().setVerifyObjectExists(false);
         sharedFileRegistry = mock(SharedFileRegistry.class);
         handler = new VbdiDeliveryTaskHandler(
-            props, tenantDataSources, mock(WorkerMinioClient.class), objectMapper, rabbitPublisher, sharedFileRegistry);
+            props, tenantDataSources, mock(WorkerMinioClient.class), objectMapper, rabbitPublisher, sharedFileRegistry,
+            new com.td.worker.infrastructure.realtime.IncomingDocumentNotifier(props, objectMapper));
     }
 
     @AfterEach

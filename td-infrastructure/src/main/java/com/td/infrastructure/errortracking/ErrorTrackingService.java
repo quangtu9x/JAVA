@@ -9,13 +9,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 import org.springframework.web.util.ContentCachingRequestWrapper;
+import org.springframework.web.util.WebUtils;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
@@ -51,6 +59,13 @@ import java.util.UUID;
 public class ErrorTrackingService {
 
     private static final String ERROR_ID_PREFIX = "ERR-";
+    /** Header FE gắn ở mọi request (xem ThanhHoaDEV AuthHelpers.setupAxios): trang đang mở + nơi gọi. */
+    public static final String HEADER_FE_PAGE = "X-FE-Page";
+    public static final String HEADER_FE_CALLER = "X-FE-Caller";
+    private static final int MAX_UNREAD_BODY_BYTES = 8192;
+    private static final int MAX_CONTEXT_PARAMS = 50;
+    private static final int MAX_CONTEXT_PARAM_LENGTH = 500;
+    private static final ObjectMapper CONTEXT_MAPPER = new ObjectMapper();
 
     private final ErrorLogJdbcRepository errorLogRepository;
     private final ErrorTrackingProperties errorTrackingProperties;
@@ -83,6 +98,7 @@ public class ErrorTrackingService {
             .message(SensitiveDataSanitizer.sanitizeMessage(exception != null ? exception.getMessage() : null))
             .stackTrace(SensitiveDataSanitizer.sanitizeStackTrace(toStackTraceString(exception)))
             .requestBody(extractRequestBody(request))
+            .requestContext(buildRequestContext(request))
             .build());
 
         return errorId;
@@ -119,6 +135,7 @@ public class ErrorTrackingService {
             .remoteAddr(request != null ? request.getRemoteAddr() : null)
             .message(message)
             .requestBody(extractRequestBody(request))
+            .requestContext(buildRequestContext(request))
             .durationMs(durationMs)
             .build());
 
@@ -213,14 +230,99 @@ public class ErrorTrackingService {
      * không có body/không phải kiểu được cache/chưa từng bị đọc bởi tầng nào phía trên.
      */
     private String extractRequestBody(HttpServletRequest request) {
-        if (!(request instanceof ContentCachingRequestWrapper wrapper)) {
+        // 30/10/2026: request tới đây có thể đã bị filter khác bọc ngoài wrapper cache -> tìm wrapper
+        // trong chuỗi bọc thay vì instanceof trực tiếp (trước đây request_body luôn rỗng).
+        ContentCachingRequestWrapper wrapper = request == null ? null
+            : WebUtils.getNativeRequest(request, ContentCachingRequestWrapper.class);
+        if (wrapper == null) {
             return null;
         }
         byte[] content = wrapper.getContentAsByteArray();
         if (content.length == 0) {
-            return null;
+            // Body chưa từng bị đọc (vd lỗi "No static resource" xảy ra trước khi binding body) —
+            // đọc bù tối đa MAX_UNREAD_BODY_BYTES ngay lúc ghi lỗi (handler đã xong, không ảnh hưởng).
+            content = readUnconsumedBody(wrapper);
+            if (content.length == 0) {
+                return null;
+            }
         }
         return SensitiveDataSanitizer.sanitizeRequestBody(new String(content, StandardCharsets.UTF_8));
+    }
+
+    private byte[] readUnconsumedBody(HttpServletRequest request) {
+        try {
+            return request.getInputStream().readNBytes(MAX_UNREAD_BODY_BYTES);
+        } catch (Exception ex) {
+            log.debug("Khong doc bu duoc request body cho Error Tracking: {}", ex.getMessage());
+            return new byte[0];
+        }
+    }
+
+    /**
+     * 30/10/2026 ("thêm chẩn đoán, chi tiết để dễ debug"): JSON ngữ cảnh request để biết màn hình/chức
+     * năng nào gây lỗi — query string, content type, X-FE-Page/X-FE-Caller (FE baseAPI gắn: trang đang
+     * mở + component gọi), Referer, User-Agent, tham số form/multipart (giá trị cắt ngắn, tệp chỉ ghi
+     * tên). KHÔNG ghi header Authorization/token; toàn bộ qua SensitiveDataSanitizer. Best-effort.
+     */
+    private String buildRequestContext(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> context = new LinkedHashMap<>();
+            putIfPresent(context, "query", request.getQueryString());
+            putIfPresent(context, "contentType", request.getContentType());
+            putIfPresent(context, "fePage", decodeHeader(request.getHeader(HEADER_FE_PAGE)));
+            putIfPresent(context, "feCaller", decodeHeader(request.getHeader(HEADER_FE_CALLER)));
+            putIfPresent(context, "referer", request.getHeader("Referer"));
+            putIfPresent(context, "userAgent", request.getHeader("User-Agent"));
+            putIfPresent(context, "forwardedFor", request.getHeader("X-Forwarded-For"));
+
+            Map<String, Object> params = new LinkedHashMap<>();
+            request.getParameterMap().forEach((name, values) -> {
+                if (params.size() >= MAX_CONTEXT_PARAMS || values == null) {
+                    return;
+                }
+                String joined = String.join(" | ", values);
+                params.put(name, joined.length() > MAX_CONTEXT_PARAM_LENGTH
+                    ? joined.substring(0, MAX_CONTEXT_PARAM_LENGTH) + "...[" + joined.length() + "]" : joined);
+            });
+            if (!params.isEmpty()) {
+                context.put("params", params);
+            }
+            MultipartHttpServletRequest multipart =
+                WebUtils.getNativeRequest(request, MultipartHttpServletRequest.class);
+            if (multipart != null && !multipart.getFileMap().isEmpty()) {
+                List<String> files = new ArrayList<>();
+                multipart.getMultiFileMap().forEach((field, list) -> list.forEach(file ->
+                    files.add(field + ":" + file.getOriginalFilename() + " (" + file.getSize() + "B)")));
+                context.put("files", files);
+            }
+            return context.isEmpty() ? null
+                : SensitiveDataSanitizer.sanitizeRequestContext(CONTEXT_MAPPER.writeValueAsString(context));
+        } catch (Exception ex) {
+            log.debug("Khong dung duoc request context cho Error Tracking: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private static void putIfPresent(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value.length() > MAX_CONTEXT_PARAM_LENGTH
+                ? value.substring(0, MAX_CONTEXT_PARAM_LENGTH) + "..." : value);
+        }
+    }
+
+    // FE gửi header đã encodeURIComponent (đường dẫn/tên component có thể chứa ký tự ngoài ASCII).
+    private static String decodeHeader(String value) {
+        if (value == null) {
+            return null;
+        }
+        try {
+            return URLDecoder.decode(value, StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            return value;
+        }
     }
 
     private String resolveTraceId() {

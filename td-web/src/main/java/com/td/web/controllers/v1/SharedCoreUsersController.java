@@ -23,6 +23,7 @@ import com.td.application.sharedcore.TransferAppUsersUseCase;
 import com.td.application.sharedcore.UnlockAppUsersUseCase;
 import com.td.application.sharedcore.UpdateAppUserRequest;
 import com.td.application.sharedcore.UpdateAppUserUseCase;
+import com.td.application.sharedcore.UpdateMyProfileUseCase;
 import com.td.application.sharedcore.UploadUserSignatureImageRequest;
 import com.td.application.sharedcore.UploadUserSignatureImageUseCase;
 import com.td.application.sharedcore.UserDirectoryEntryDto;
@@ -89,6 +90,8 @@ public class SharedCoreUsersController extends BaseController {
     // BL-108: User Management — Core CRUD
     private final CreateAppUserUseCase createAppUserUseCase;
     private final UpdateAppUserUseCase updateAppUserUseCase;
+    // 30/10/2026: người đăng nhập tự sửa hồ sơ (màn Thông tin tài khoản).
+    private final UpdateMyProfileUseCase updateMyProfileUseCase;
     private final DeleteAppUserUseCase deleteAppUserUseCase;
     private final LockAppUsersUseCase lockAppUsersUseCase;
     private final UnlockAppUsersUseCase unlockAppUsersUseCase;
@@ -139,10 +142,13 @@ public class SharedCoreUsersController extends BaseController {
                 + "\"Kiêm nhiệm\" của 1 người dùng (AppUser.parentUserId)")
             @RequestParam(required = false) UUID parentUserId,
             @Parameter(description = "06/10/2026: chỉ lấy các tài khoản này (lặp tham số hoặc phân tách dấu phẩy)")
-            @RequestParam(required = false) java.util.List<String> usernames) {
+            @RequestParam(required = false) java.util.List<String> usernames,
+            @Parameter(description = "30/10/2026: true = chỉ người dùng đã xoá mềm (tab \"Đã xoá\")")
+            @RequestParam(required = false) Boolean deleted) {
 
         var request = new SearchAppUsersRequest();
         request.setUsernames(usernames);
+        request.setDeleted(deleted);
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
         request.setSortBy(sortBy);
@@ -277,6 +283,15 @@ public class SharedCoreUsersController extends BaseController {
     public ResponseEntity<ApiResponse<UUID>> createUser(
             @Valid @RequestBody CreateAppUserRequest request) {
         return created(createAppUserUseCase.execute(request));
+    }
+
+    // 30/10/2026: màn "Thông tin tài khoản" thay Domino qlvb/add?databasetype=qlvb&id= — chỉ hồ sơ CỦA
+    // CHÍNH người đăng nhập (không nhận id), route 2 đoạn nên không đụng PUT /{id}.
+    @PutMapping("/me/profile")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Tự cập nhật hồ sơ cá nhân của người đăng nhập")
+    public ResponseEntity<ApiResponse<UUID>> updateMyProfile(@RequestBody UpdateMyProfileUseCase.Request request) {
+        return ok(updateMyProfileUseCase.execute(request));
     }
 
     @PutMapping("/{id}")

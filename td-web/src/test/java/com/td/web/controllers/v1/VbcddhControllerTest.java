@@ -53,6 +53,19 @@ class VbcddhControllerTest {
     private NhacViecUseCase nhacViecUseCase;
     @MockBean
     private ViewQueryService viewQueryService;
+    // 30/10/2026 (cutover FE vbcddh): dependency moi cua VbcddhController.
+    @MockBean
+    private com.td.application.vbcddh.VbcddhViewQuery vbcddhViewQuery;
+    @MockBean
+    private com.td.application.vbcddh.GetVbcddhChiTietUseCase getVbcddhChiTietUseCase;
+    @MockBean
+    private com.td.application.vbcddh.LuuVbcddhUseCase luuVbcddhUseCase;
+    @MockBean
+    private com.td.application.vbcddh.VbcddhTrashUseCase vbcddhTrashUseCase;
+    @MockBean
+    private com.td.application.vbcddh.TimKiemVbcddhUseCase timKiemVbcddhUseCase;
+    @MockBean
+    private com.td.application.vbcddh.DanhSachDonViThucHienUseCase danhSachDonViThucHienUseCase;
 
     @Test
     void phanCongNhiemVu_shouldDelegateToUseCaseAndReturn201() throws Exception {

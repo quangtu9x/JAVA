@@ -44,7 +44,11 @@ public class SocketIoRealtimeNotificationGateway implements RealtimeNotification
 
     public SocketIoRealtimeNotificationGateway(SocketIoProperties properties) {
         this.properties = properties;
+        // BẮT BUỘC HTTP/1.1 (30/10/2026): HttpClient mặc định HTTP_2 -> với http:// gửi kèm "Upgrade: h2c"; engine.io
+        // của socket.io bắt mọi request có Upgrade không phải websocket và đóng kết nối không trả lời ("HTTP/1.1
+        // header parser received no bytes") -> thông báo lưu hộp thư được nhưng không bao giờ đẩy realtime.
         this.httpClient = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofMillis(Math.max(200, properties.getConnectTimeoutMillis())))
             .build();
     }

@@ -55,9 +55,12 @@ public class SharedCoreRolesController extends BaseController {
             @RequestParam(defaultValue = "asc") String sortDirection,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isSystemRole,
-            @RequestParam(required = false) Boolean isActive) {
+            @RequestParam(required = false) Boolean isActive,
+            // 30/10/2026: true = chỉ vai trò đã xoá mềm (tab "Danh sách vai trò đã xoá").
+            @RequestParam(required = false) Boolean deleted) {
 
         var request = new SearchAppRolesRequest();
+        request.setDeleted(deleted);
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
         request.setSortBy(sortBy);

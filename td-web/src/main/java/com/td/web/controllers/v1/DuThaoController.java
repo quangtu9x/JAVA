@@ -117,6 +117,18 @@ public class DuThaoController extends BaseController {
     private final com.td.application.duthao.XoaDuThaoUseCase xoaDuThaoUseCase;
     // 22/10/2026: tra cứu nhóm + thống kê dự thảo (thay qlvb/view/query viewaction=group, qlvb/search reports).
     private final com.td.application.duthao.DuThaoGroupViewQuery duThaoGroupViewQuery;
+    // 30/10/2026: dự thảo tạo từ màn xử lý văn bản đi (thay qlvb/add?id={vbdiId}).
+    private final com.td.application.duthao.LienKetVanBanDiXuLyDuThaoUseCase lienKetVanBanDiXuLyDuThaoUseCase;
+
+    // 30/10/2026: sau khi lưu dự thảo tạo từ văn bản đi (prop idlink ở ChiTietPage.jsx) - ghi draft_id,
+    // draft_identifier_id, gỡ người dùng khỏi chuyenxuly/userchuyenxuly, thêm userdachuyenxuly.
+    @PostMapping("/LienKetVanBanDiXuLy")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Liên kết dự thảo với văn bản đi đang xử lý (thay qlvb/add?id={vbdiId})")
+    public ResponseEntity<ApiResponse<UUID>> lienKetVanBanDiXuLy(
+            @Valid @RequestBody com.td.application.duthao.LienKetVanBanDiXuLyDuThaoRequest request) {
+        return ok(lienKetVanBanDiXuLyDuThaoUseCase.execute(request));
+    }
 
     @PostMapping("/TaoDuThao")
     @PreAuthorize("isAuthenticated()")

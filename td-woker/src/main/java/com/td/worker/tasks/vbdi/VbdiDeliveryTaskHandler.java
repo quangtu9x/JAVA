@@ -77,6 +77,7 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
     private final ObjectMapper objectMapper;
     private final ObjectProvider<RabbitPublisher> rabbitPublisher;
     private final SharedFileRegistry sharedFileRegistry;
+    private final com.td.worker.infrastructure.realtime.IncomingDocumentNotifier incomingDocumentNotifier;
 
     @Override
     public String taskType() {
@@ -207,6 +208,14 @@ public class VbdiDeliveryTaskHandler implements TaskHandler {
         } else if (createDocument) {
             log.info("Đã tạo văn bản đến (chờ vào sổ) id={} cho sendLog={}, tenant={}",
                 createdDocumentId.get(), p.getSendLogId(), context.tenantId());
+            // 30/10/2026: báo "Văn bản đến mới" cho đơn vị nhận (docid = văn bản đến VỪA TẠO ở DB đơn vị nhận) - chỉ ở lần
+            // nhận đầu (dedup), lỗi chỉ log. Xem IncomingDocumentNotifier.
+            if (createdDocumentId.get() != null) {
+                incomingDocumentNotifier.notifyIncomingDocument(jdbc, tx, p.getRecipientIdentifier(), createdDocumentId.get(),
+                    p.getDocumentSnapshot() == null ? null : p.getDocumentSnapshot().getCode(),
+                    p.getDocumentSnapshot() == null ? null : p.getDocumentSnapshot().getSubject(),
+                    p.getSenderOrganName(), p.getOpinion());
+            }
         }
         // 22/10/2026: ghi tham chieu tep dung chung SAU commit (DB so dang ky rieng) - loi chi log, xem
         // SharedFileRegistry#registerQuietly.

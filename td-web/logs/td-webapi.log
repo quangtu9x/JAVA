@@ -1,1 +1,309 @@
-2026-10-30 03:00:01.497 [scheduling-1] INFO  c.t.i.e.ErrorLogCleanupScheduler - Error Tracking cleanup: da xoa 44 ban ghi cu hon 30 ngay (truoc 2026-09-29T20:00:01.465947200Z)
+2026-11-09 03:00:01.490 [scheduling-1] INFO  c.t.i.e.ErrorLogCleanupScheduler - Error Tracking cleanup: da xoa 106 ban ghi cu hon 30 ngay (truoc 2026-10-09T20:00:01.465203Z)
+2026-11-09 08:28:28.235 [http-nio-8111-exec-10] INFO  c.t.w.c.v1.QLVBCompatAuthController - Dang nhap thanh cong cho user 'demo6' (roles=[offline_access, uma_authorization, default-roles-td-webapi-realm])
+2026-11-09 08:29:59.700 [http-nio-8111-exec-8] INFO  c.t.a.d.AddDuThaoSeenDocumentUseCase - Ghi log xem du thao a1598a68-1339-482b-99d6-7c27986ac871 boi demo6
+2026-11-09 08:30:35.417 [http-nio-8111-exec-2] INFO  c.t.a.d.AddDuThaoSeenDocumentUseCase - Ghi log xem du thao a1598a68-1339-482b-99d6-7c27986ac871 boi demo6
+2026-11-09 08:30:35.773 [http-nio-8111-exec-9] INFO  c.t.a.d.AddDuThaoSeenDocumentUseCase - Ghi log xem du thao a1598a68-1339-482b-99d6-7c27986ac871 boi demo6
+2026-11-09 08:41:09.080 [http-nio-8111-exec-9] INFO  c.t.a.d.AddDuThaoSeenDocumentUseCase - Ghi log xem du thao a1598a68-1339-482b-99d6-7c27986ac871 boi demo6
+2026-11-09 09:03:56.507 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Shutdown initiated...
+2026-11-09 09:03:56.510 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Shutdown completed.
+2026-11-09 09:03:56.512 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Shutdown initiated...
+2026-11-09 09:03:56.513 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Shutdown completed.
+2026-11-09 09:03:56.532 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Shutdown initiated...
+2026-11-09 09:03:56.533 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Shutdown completed.
+2026-11-09 09:03:56.595 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Shutdown initiated...
+2026-11-09 09:03:56.598 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Shutdown completed.
+2026-11-09 09:03:56.608 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'controlPlane'
+2026-11-09 09:03:56.611 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-11-09 09:03:56.613 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'identity'
+2026-11-09 09:03:56.614 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Shutdown initiated...
+2026-11-09 09:03:56.615 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Shutdown completed.
+2026-11-09 09:03:56.618 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Shutdown initiated...
+2026-11-09 09:03:56.619 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Shutdown completed.
+2026-11-09 09:03:56.620 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Shutdown initiated...
+2026-11-09 09:03:56.622 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Shutdown completed.
+2026-11-09 09:03:56.623 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Shutdown initiated...
+2026-11-09 09:03:56.624 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Shutdown completed.
+2026-11-09 09:03:56.625 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Shutdown initiated...
+2026-11-09 09:03:56.628 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Shutdown completed.
+2026-11-09 09:05:23.723 [main] INFO  com.td.web.TdWebApiApplication - Starting TdWebApiApplication using Java 21.0.7 with PID 5128 (C:\code_projects\HSCV\JAVA\td-web\target\classes started by Administrator in C:\code_projects\HSCV\JAVA\td-web)
+2026-11-09 09:05:23.727 [main] INFO  com.td.web.TdWebApiApplication - The following 1 profile is active: "dev"
+2026-11-09 09:05:26.046 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 09:05:26.046 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-11-09 09:05:26.300 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 239 ms. Found 4 JPA repository interfaces.
+2026-11-09 09:05:26.301 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 09:05:26.302 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-11-09 09:05:26.348 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 45 ms. Found 11 JPA repository interfaces.
+2026-11-09 09:05:26.350 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 09:05:26.352 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-11-09 09:05:26.464 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 111 ms. Found 38 JPA repository interfaces.
+2026-11-09 09:05:27.488 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 09:05:27.489 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Elasticsearch repositories in DEFAULT mode.
+2026-11-09 09:05:27.514 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 23 ms. Found 0 Elasticsearch repository interfaces.
+2026-11-09 09:05:27.521 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 09:05:27.522 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Reactive Elasticsearch repositories in DEFAULT mode.
+2026-11-09 09:05:27.529 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 5 ms. Found 0 Reactive Elasticsearch repository interfaces.
+2026-11-09 09:05:27.549 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 09:05:27.552 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-09 09:05:27.567 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 4 ms. Found 0 Redis repository interfaces.
+2026-11-09 09:05:29.373 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8111 (http)
+2026-11-09 09:05:29.387 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-09 09:05:29.388 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2026-11-09 09:05:29.510 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-09 09:05:29.511 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 5708 ms
+2026-11-09 09:05:30.250 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Starting...
+2026-11-09 09:05:30.462 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-control-plane - Added connection org.postgresql.jdbc.PgConnection@14060410
+2026-11-09 09:05:30.464 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Start completed.
+2026-11-09 09:05:30.465 [main] INFO  c.t.i.t.c.ControlPlaneFlywayMigrationService - Chay Flyway migration cho database control-plane (BL-117)
+2026-11-09 09:05:30.572 [main] INFO  o.f.c.i.license.VersionPrinter - Flyway Community Edition 9.22.3 by Redgate
+2026-11-09 09:05:30.573 [main] INFO  o.f.c.i.license.VersionPrinter - See release notes here: https://rd.gt/416ObMi
+2026-11-09 09:05:30.576 [main] INFO  o.f.c.i.license.VersionPrinter - 
+2026-11-09 09:05:30.607 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tdwebapi_controlplane (PostgreSQL 16.11)
+2026-11-09 09:05:30.623 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 09:05:30.692 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 12 migrations (execution time 00:00.045s)
+2026-11-09 09:05:30.712 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 12
+2026-11-09 09:05:30.716 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:30.768 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05' (database=tdwebapi)
+2026-11-09 09:05:30.841 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tdwebapi (PostgreSQL 16.11)
+2026-11-09 09:05:30.848 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 09:05:30.957 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 82 migrations (execution time 00:00.101s)
+2026-11-09 09:05:31.003 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 09:05:31.005 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:31.010 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05 (database=tdwebapi)
+2026-11-09 09:05:31.012 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Starting...
+2026-11-09 09:05:31.047 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05 - Added connection org.postgresql.jdbc.PgConnection@3577e37c
+2026-11-09 09:05:31.048 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Start completed.
+2026-11-09 09:05:31.051 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05_01' (database=h05_01_sokhcn)
+2026-11-09 09:05:31.114 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/h05_01_sokhcn (PostgreSQL 16.11)
+2026-11-09 09:05:31.119 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 09:05:31.194 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 82 migrations (execution time 00:00.068s)
+2026-11-09 09:05:31.240 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 09:05:31.242 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:31.249 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05_01 (database=h05_01_sokhcn)
+2026-11-09 09:05:31.250 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Starting...
+2026-11-09 09:05:31.285 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05_01 - Added connection org.postgresql.jdbc.PgConnection@372c428
+2026-11-09 09:05:31.287 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Start completed.
+2026-11-09 09:05:31.289 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05_02' (database=snnmt)
+2026-11-09 09:05:31.317 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.107:5001/snnmt (PostgreSQL 15.19)
+2026-11-09 09:05:31.401 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 81 migrations (execution time 00:00.071s)
+2026-11-09 09:05:31.418 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 09:05:31.419 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:31.423 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05_02 (database=snnmt)
+2026-11-09 09:05:31.424 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Starting...
+2026-11-09 09:05:31.430 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05_02 - Added connection org.postgresql.jdbc.PgConnection@10b063fd
+2026-11-09 09:05:31.431 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Start completed.
+2026-11-09 09:05:31.433 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05_03' (database=h05_03_hdnd)
+2026-11-09 09:05:31.496 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/h05_03_hdnd (PostgreSQL 16.11)
+2026-11-09 09:05:31.502 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 09:05:31.558 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 81 migrations (execution time 00:00.050s)
+2026-11-09 09:05:31.609 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 09:05:31.610 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:31.616 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05_03 (database=h05_03_hdnd)
+2026-11-09 09:05:31.617 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Starting...
+2026-11-09 09:05:31.654 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05_03 - Added connection org.postgresql.jdbc.PgConnection@345f4e0d
+2026-11-09 09:05:31.655 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Start completed.
+2026-11-09 09:05:31.869 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: identity]
+2026-11-09 09:05:31.943 [main] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.3.1.Final
+2026-11-09 09:05:31.996 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-11-09 09:05:32.471 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-11-09 09:05:32.549 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-11-09 09:05:34.301 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-11-09 09:05:34.307 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'identity'
+2026-11-09 09:05:34.447 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-11-09 09:05:34.456 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-11-09 09:05:34.508 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-11-09 09:05:34.512 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-11-09 09:05:35.384 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-11-09 09:05:35.385 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-11-09 09:05:35.411 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: controlPlane]
+2026-11-09 09:05:35.420 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-11-09 09:05:35.463 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-11-09 09:05:35.472 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-11-09 09:05:35.624 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-11-09 09:05:35.626 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'controlPlane'
+2026-11-09 09:05:35.993 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-11-09 09:05:37.019 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Starting...
+2026-11-09 09:05:37.021 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Start completed.
+2026-11-09 09:05:49.387 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-11-09 09:05:49.537 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure Or [Mvc [pattern='/api/v1/onlyoffice/content'], Mvc [pattern='/api/v1/onlyoffice/callback']] with [org.springframework.security.web.session.DisableEncodeUrlFilter@509d927c, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@2421316e, org.springframework.security.web.context.SecurityContextHolderFilter@21c653ca, org.springframework.security.web.header.HeaderWriterFilter@32e4796c, org.springframework.web.filter.CorsFilter@2b9676ce, org.springframework.security.web.authentication.logout.LogoutFilter@1ab37f73, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@6fdf68a2, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@5f2ba7ac, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@1224fea8, org.springframework.security.web.session.SessionManagementFilter@2c79374f, org.springframework.security.web.access.ExceptionTranslationFilter@7a206aa, org.springframework.security.web.access.intercept.AuthorizationFilter@7da5b21d]
+2026-11-09 09:05:49.675 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@38e1aaa1, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@1f1bde6, org.springframework.security.web.context.SecurityContextHolderFilter@54201c6b, org.springframework.security.web.header.HeaderWriterFilter@6256303b, org.springframework.web.filter.CorsFilter@222302fe, org.springframework.security.web.authentication.logout.LogoutFilter@7340f13f, com.td.infrastructure.security.TdTokenAuthenticationFilter@1a334847, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter@7484648e, com.td.infrastructure.security.AccountProvisioningFilter@5b346ecd, com.td.infrastructure.tenant.TenantFilter@26949d82, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@339c8a67, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@6098b3c7, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@6bdf1b90, org.springframework.security.web.session.SessionManagementFilter@7f670dfb, org.springframework.security.web.access.ExceptionTranslationFilter@6e212f5f, org.springframework.security.web.access.intercept.AuthorizationFilter@17b1b45]
+2026-11-09 09:05:49.736 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Starting...
+2026-11-09 09:05:49.737 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Start completed.
+2026-11-09 09:05:49.752 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Starting...
+2026-11-09 09:05:49.753 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Start completed.
+2026-11-09 09:05:51.825 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8111 (http) with context path ''
+2026-11-09 09:05:51.862 [main] INFO  com.td.web.TdWebApiApplication - Started TdWebApiApplication in 28.928 seconds (process running for 29.544)
+2026-11-09 09:05:51.979 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tderrorlog (PostgreSQL 16.11)
+2026-11-09 09:05:51.987 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 09:05:52.002 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 2 migrations (execution time 00:00.010s)
+2026-11-09 09:05:52.051 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 2
+2026-11-09 09:05:52.052 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:52.057 [main] INFO  c.t.i.e.ErrorTrackingSchemaMigrator - Migrate schema Error Tracking DB thanh cong
+2026-11-09 09:05:52.058 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Starting...
+2026-11-09 09:05:52.059 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Start completed.
+2026-11-09 09:05:52.106 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tdfileregistry (PostgreSQL 16.11)
+2026-11-09 09:05:52.112 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 09:05:52.124 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 1 migration (execution time 00:00.007s)
+2026-11-09 09:05:52.178 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1
+2026-11-09 09:05:52.181 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 09:05:52.187 [main] INFO  c.t.i.f.FileRegistrySchemaMigrator - Migrate schema DB so dang ky tep dung chung thanh cong
+2026-11-09 09:19:56.357 [http-nio-8111-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-09 09:19:56.360 [http-nio-8111-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-09 09:19:56.373 [http-nio-8111-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 10 ms
+2026-11-09 09:19:56.394 [http-nio-8111-exec-1] WARN  o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/api/v1/notifications/summary' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
+2026-11-09 09:19:58.582 [http-nio-8111-exec-3] INFO  c.t.a.d.AddDuThaoSeenDocumentUseCase - Ghi log xem du thao a1598a68-1339-482b-99d6-7c27986ac871 boi demo6
+2026-11-09 10:58:52.632 [scheduling-1] WARN  com.zaxxer.hikari.pool.PoolBase - hikari-tenant-H05_01 - Failed to validate connection org.postgresql.jdbc.PgConnection@5a1ee74a (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-11-09 10:58:57.635 [scheduling-1] WARN  com.zaxxer.hikari.pool.PoolBase - hikari-tenant-H05_01 - Failed to validate connection org.postgresql.jdbc.PgConnection@2b59a47d (This connection has been closed.). Possibly consider using a shorter maxLifetime value.
+2026-11-09 13:39:23.609 [http-nio-8111-exec-5] INFO  c.t.w.c.v1.QLVBCompatAuthController - Dang nhap thanh cong cho user 'admin' (roles=[PRODUCT_MANAGER, ADMIN, USER, PLATFORM_ADMIN])
+2026-11-09 13:39:25.064 [http-nio-8111-exec-3] INFO  c.t.a.s.OrganizationTreeCache - Organization tree cache rebuilt: key=tree:v37:org, rootNodes=1, took=51ms
+2026-11-09 14:48:01.581 [http-nio-8111-exec-7] INFO  c.t.w.c.v1.QLVBCompatAuthController - Dang nhap thanh cong cho user 'admin' (roles=[PRODUCT_MANAGER, ADMIN, USER, PLATFORM_ADMIN])
+2026-11-09 14:49:18.739 [http-nio-8111-exec-7] INFO  c.t.w.c.v1.QLVBCompatAuthController - Dang nhap thanh cong cho user 'demo6' (roles=[offline_access, uma_authorization, default-roles-td-webapi-realm])
+2026-11-09 17:25:55.566 [http-nio-8111-exec-10] INFO  c.t.w.c.v1.QLVBCompatAuthController - Dang nhap thanh cong cho user 'demo6' (roles=[offline_access, uma_authorization, default-roles-td-webapi-realm])
+2026-11-09 17:32:47.709 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Shutdown initiated...
+2026-11-09 17:32:47.710 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Shutdown completed.
+2026-11-09 17:32:47.712 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Shutdown initiated...
+2026-11-09 17:32:47.713 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Shutdown completed.
+2026-11-09 17:32:47.732 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Shutdown initiated...
+2026-11-09 17:32:47.733 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Shutdown completed.
+2026-11-09 17:32:47.777 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Shutdown initiated...
+2026-11-09 17:32:47.780 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Shutdown completed.
+2026-11-09 17:32:47.786 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'controlPlane'
+2026-11-09 17:32:47.789 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-11-09 17:32:47.790 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'identity'
+2026-11-09 17:32:47.791 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Shutdown initiated...
+2026-11-09 17:32:47.794 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Shutdown completed.
+2026-11-09 17:32:47.795 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Shutdown initiated...
+2026-11-09 17:32:47.797 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Shutdown completed.
+2026-11-09 17:32:47.797 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Shutdown initiated...
+2026-11-09 17:32:47.801 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Shutdown completed.
+2026-11-09 17:32:47.802 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Shutdown initiated...
+2026-11-09 17:32:47.804 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Shutdown completed.
+2026-11-09 17:32:47.804 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Shutdown initiated...
+2026-11-09 17:32:47.806 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Shutdown completed.
+2026-11-09 17:34:09.566 [main] INFO  com.td.web.TdWebApiApplication - Starting TdWebApiApplication using Java 21.0.7 with PID 1124 (C:\code_projects\HSCV\JAVA\td-web\target\classes started by Administrator in C:\code_projects\HSCV\JAVA\td-web)
+2026-11-09 17:34:09.570 [main] INFO  com.td.web.TdWebApiApplication - The following 1 profile is active: "dev"
+2026-11-09 17:34:11.876 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 17:34:11.877 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-11-09 17:34:12.097 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 208 ms. Found 4 JPA repository interfaces.
+2026-11-09 17:34:12.100 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 17:34:12.101 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-11-09 17:34:12.142 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 40 ms. Found 11 JPA repository interfaces.
+2026-11-09 17:34:12.144 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 17:34:12.145 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-11-09 17:34:12.266 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 119 ms. Found 38 JPA repository interfaces.
+2026-11-09 17:34:13.270 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 17:34:13.272 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Elasticsearch repositories in DEFAULT mode.
+2026-11-09 17:34:13.296 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 21 ms. Found 0 Elasticsearch repository interfaces.
+2026-11-09 17:34:13.302 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 17:34:13.304 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Reactive Elasticsearch repositories in DEFAULT mode.
+2026-11-09 17:34:13.308 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 3 ms. Found 0 Reactive Elasticsearch repository interfaces.
+2026-11-09 17:34:13.329 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Multiple Spring Data modules found, entering strict repository configuration mode
+2026-11-09 17:34:13.331 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-11-09 17:34:13.353 [main] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 8 ms. Found 0 Redis repository interfaces.
+2026-11-09 17:34:15.047 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat initialized with port 8111 (http)
+2026-11-09 17:34:15.062 [main] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-11-09 17:34:15.063 [main] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/10.1.16]
+2026-11-09 17:34:15.171 [main] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring embedded WebApplicationContext
+2026-11-09 17:34:15.172 [main] INFO  o.s.b.w.s.c.ServletWebServerApplicationContext - Root WebApplicationContext: initialization completed in 5532 ms
+2026-11-09 17:34:15.843 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Starting...
+2026-11-09 17:34:16.061 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-control-plane - Added connection org.postgresql.jdbc.PgConnection@522221e1
+2026-11-09 17:34:16.063 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-control-plane - Start completed.
+2026-11-09 17:34:16.064 [main] INFO  c.t.i.t.c.ControlPlaneFlywayMigrationService - Chay Flyway migration cho database control-plane (BL-117)
+2026-11-09 17:34:16.165 [main] INFO  o.f.c.i.license.VersionPrinter - Flyway Community Edition 9.22.3 by Redgate
+2026-11-09 17:34:16.166 [main] INFO  o.f.c.i.license.VersionPrinter - See release notes here: https://rd.gt/416ObMi
+2026-11-09 17:34:16.169 [main] INFO  o.f.c.i.license.VersionPrinter - 
+2026-11-09 17:34:16.195 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tdwebapi_controlplane (PostgreSQL 16.11)
+2026-11-09 17:34:16.206 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 17:34:16.265 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 12 migrations (execution time 00:00.046s)
+2026-11-09 17:34:16.283 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 12
+2026-11-09 17:34:16.287 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:16.334 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05' (database=tdwebapi)
+2026-11-09 17:34:16.388 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tdwebapi (PostgreSQL 16.11)
+2026-11-09 17:34:16.393 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 17:34:16.477 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 82 migrations (execution time 00:00.078s)
+2026-11-09 17:34:16.523 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 17:34:16.525 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:16.532 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05 (database=tdwebapi)
+2026-11-09 17:34:16.534 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Starting...
+2026-11-09 17:34:16.576 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05 - Added connection org.postgresql.jdbc.PgConnection@7c424dfe
+2026-11-09 17:34:16.576 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05 - Start completed.
+2026-11-09 17:34:16.579 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05_01' (database=h05_01_sokhcn)
+2026-11-09 17:34:16.628 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/h05_01_sokhcn (PostgreSQL 16.11)
+2026-11-09 17:34:16.633 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 17:34:16.711 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 82 migrations (execution time 00:00.073s)
+2026-11-09 17:34:16.754 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 17:34:16.755 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:16.762 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05_01 (database=h05_01_sokhcn)
+2026-11-09 17:34:16.763 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Starting...
+2026-11-09 17:34:16.797 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05_01 - Added connection org.postgresql.jdbc.PgConnection@7a6078d
+2026-11-09 17:34:16.799 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_01 - Start completed.
+2026-11-09 17:34:16.802 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05_02' (database=snnmt)
+2026-11-09 17:34:16.825 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.107:5001/snnmt (PostgreSQL 15.19)
+2026-11-09 17:34:16.902 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 81 migrations (execution time 00:00.062s)
+2026-11-09 17:34:16.918 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 17:34:16.919 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:16.924 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05_02 (database=snnmt)
+2026-11-09 17:34:16.925 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Starting...
+2026-11-09 17:34:16.931 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05_02 - Added connection org.postgresql.jdbc.PgConnection@6d21a69f
+2026-11-09 17:34:16.932 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_02 - Start completed.
+2026-11-09 17:34:16.933 [main] INFO  c.t.i.t.TenantFlywayMigrationService - Chay Flyway migration cho tenant 'H05_03' (database=h05_03_hdnd)
+2026-11-09 17:34:16.984 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/h05_03_hdnd (PostgreSQL 16.11)
+2026-11-09 17:34:16.990 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 17:34:17.056 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 81 migrations (execution time 00:00.060s)
+2026-11-09 17:34:17.098 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1.0.92
+2026-11-09 17:34:17.099 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:17.105 [main] INFO  c.t.i.tenant.TenantDataSourceConfig - Khoi tao connection pool cho tenant H05_03 (database=h05_03_hdnd)
+2026-11-09 17:34:17.106 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Starting...
+2026-11-09 17:34:17.139 [main] INFO  com.zaxxer.hikari.pool.HikariPool - hikari-tenant-H05_03 - Added connection org.postgresql.jdbc.PgConnection@3eb6d7a9
+2026-11-09 17:34:17.140 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-tenant-H05_03 - Start completed.
+2026-11-09 17:34:17.329 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: identity]
+2026-11-09 17:34:17.407 [main] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 6.3.1.Final
+2026-11-09 17:34:17.467 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-11-09 17:34:17.938 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-11-09 17:34:18.010 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-11-09 17:34:19.695 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-11-09 17:34:19.700 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'identity'
+2026-11-09 17:34:19.829 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-11-09 17:34:19.837 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-11-09 17:34:19.893 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-11-09 17:34:19.897 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-11-09 17:34:20.760 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-11-09 17:34:20.762 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-11-09 17:34:20.779 [main] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: controlPlane]
+2026-11-09 17:34:20.790 [main] INFO  o.h.c.i.RegionFactoryInitiator - HHH000026: Second-level cache disabled
+2026-11-09 17:34:20.829 [main] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-11-09 17:34:20.837 [main] WARN  org.hibernate.orm.deprecation - HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-11-09 17:34:20.942 [main] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-11-09 17:34:20.943 [main] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'controlPlane'
+2026-11-09 17:34:21.285 [main] INFO  o.s.d.j.r.query.QueryEnhancerFactory - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-11-09 17:34:22.270 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Starting...
+2026-11-09 17:34:22.271 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-error-tracking - Start completed.
+2026-11-09 17:34:34.137 [main] INFO  o.s.b.a.e.web.EndpointLinksResolver - Exposing 3 endpoint(s) beneath base path '/actuator'
+2026-11-09 17:34:34.284 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure Or [Mvc [pattern='/api/v1/onlyoffice/content'], Mvc [pattern='/api/v1/onlyoffice/callback']] with [org.springframework.security.web.session.DisableEncodeUrlFilter@30d1d46d, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@5365c33b, org.springframework.security.web.context.SecurityContextHolderFilter@43edf1f2, org.springframework.security.web.header.HeaderWriterFilter@42cbc080, org.springframework.web.filter.CorsFilter@5faaf06d, org.springframework.security.web.authentication.logout.LogoutFilter@2421316e, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@7e286b87, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@1ab37f73, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@72c24d40, org.springframework.security.web.session.SessionManagementFilter@7857879c, org.springframework.security.web.access.ExceptionTranslationFilter@153fc2b1, org.springframework.security.web.access.intercept.AuthorizationFilter@7800114f]
+2026-11-09 17:34:34.403 [main] INFO  o.s.s.web.DefaultSecurityFilterChain - Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@75d74321, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@5822ba7, org.springframework.security.web.context.SecurityContextHolderFilter@9b9f11, org.springframework.security.web.header.HeaderWriterFilter@74b22125, org.springframework.web.filter.CorsFilter@7173247f, org.springframework.security.web.authentication.logout.LogoutFilter@11569216, com.td.infrastructure.security.TdTokenAuthenticationFilter@3774ea9a, org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter@6fe06834, com.td.infrastructure.security.AccountProvisioningFilter@323946d9, com.td.infrastructure.tenant.TenantFilter@373f0fd6, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@33605eb1, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@56befaf1, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@2e7020a, org.springframework.security.web.session.SessionManagementFilter@f5283d8, org.springframework.security.web.access.ExceptionTranslationFilter@198549aa, org.springframework.security.web.access.intercept.AuthorizationFilter@13adcd6]
+2026-11-09 17:34:34.470 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Starting...
+2026-11-09 17:34:34.471 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange - Start completed.
+2026-11-09 17:34:34.486 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Starting...
+2026-11-09 17:34:34.487 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-national-exchange-cmd - Start completed.
+2026-11-09 17:34:36.343 [main] INFO  o.s.b.w.e.tomcat.TomcatWebServer - Tomcat started on port 8111 (http) with context path ''
+2026-11-09 17:34:36.370 [main] INFO  com.td.web.TdWebApiApplication - Started TdWebApiApplication in 27.575 seconds (process running for 28.23)
+2026-11-09 17:34:36.476 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tderrorlog (PostgreSQL 16.11)
+2026-11-09 17:34:36.482 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 17:34:36.499 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 2 migrations (execution time 00:00.012s)
+2026-11-09 17:34:36.552 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 2
+2026-11-09 17:34:36.554 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:36.561 [main] INFO  c.t.i.e.ErrorTrackingSchemaMigrator - Migrate schema Error Tracking DB thanh cong
+2026-11-09 17:34:36.562 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Starting...
+2026-11-09 17:34:36.563 [main] INFO  com.zaxxer.hikari.HikariDataSource - hikari-file-registry - Start completed.
+2026-11-09 17:34:36.611 [main] INFO  org.flywaydb.core.FlywayExecutor - Database: jdbc:postgresql://10.10.10.116:15432/tdfileregistry (PostgreSQL 16.11)
+2026-11-09 17:34:36.616 [main] WARN  o.f.c.i.database.base.Database - Flyway upgrade recommended: PostgreSQL 16.11 is newer than this version of Flyway and support has not been tested. The latest supported version of PostgreSQL is 15.
+2026-11-09 17:34:36.630 [main] INFO  o.f.core.internal.command.DbValidate - Successfully validated 1 migration (execution time 00:00.009s)
+2026-11-09 17:34:36.680 [main] INFO  o.f.core.internal.command.DbMigrate - Current version of schema "public": 1
+2026-11-09 17:34:36.681 [main] INFO  o.f.core.internal.command.DbMigrate - Schema "public" is up to date. No migration necessary.
+2026-11-09 17:34:36.688 [main] INFO  c.t.i.f.FileRegistrySchemaMigrator - Migrate schema DB so dang ky tep dung chung thanh cong
+2026-11-09 17:35:12.430 [http-nio-8111-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-11-09 17:35:12.432 [http-nio-8111-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-11-09 17:35:12.442 [http-nio-8111-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 6 ms
+2026-11-09 17:35:12.458 [http-nio-8111-exec-1] WARN  o.s.w.s.h.HandlerMappingIntrospector - Cache miss for REQUEST dispatch to '/api/v1/notifications/summary' (previous null). Performing MatchableHandlerMapping lookup. This is logged once only at WARN level, and every time at TRACE.
+2026-11-09 17:36:06.397 [scheduling-1] INFO  c.t.i.v.VbdenOverdueStatusScheduler - vbden quá hạn tenant 'H05_01': 11 văn bản '2' -> '1'
+2026-11-09 21:39:51.974 [http-nio-8111-exec-9] INFO  c.t.w.c.v1.QLVBCompatAuthController - Dang nhap thanh cong cho user 'skhcn' (roles=[offline_access, uma_authorization, default-roles-td-webapi-realm])
+2026-11-09 21:40:44.157 [http-nio-8111-exec-6] INFO  c.t.a.s.OrganizationTreeCache - Organization tree cache rebuilt: key=tree:v38:org+users, rootNodes=1, took=30ms

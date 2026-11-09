@@ -54,7 +54,7 @@ class VbdiDeliveryTaskHandlerTest {
         props.getTasks().getVbdi().setEnabled(true);
         props.getTasks().getVbdi().setVerifyObjectExists(false);
         handler = new VbdiDeliveryTaskHandler(props, tenantDataSources, minio, objectMapper, rabbitPublisher,
-            mock(SharedFileRegistry.class));
+            mock(SharedFileRegistry.class), new com.td.worker.infrastructure.realtime.IncomingDocumentNotifier(props, objectMapper));
     }
 
     private ObjectNode basePayload(String recipientGroup) {

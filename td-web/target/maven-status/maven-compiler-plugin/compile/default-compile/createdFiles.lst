@@ -19,6 +19,7 @@ com\td\web\controllers\v1\VbdenController.class
 com\td\web\controllers\v1\FileController.class
 com\td\web\controllers\v1\QLVBCompatAuthController.class
 com\td\web\controllers\v1\UserDelegationsController.class
+com\td\web\controllers\v1\NhatKyHeThongController.class
 template\department\web\DepartmentsController.class
 com\td\web\config\FormDataToJsonFilter$JsonBodyWrapper$1.class
 com\td\web\controllers\v1\FileContentExtractsController.class
@@ -26,7 +27,9 @@ com\td\web\controllers\v1\SharedCorePermissionsController.class
 com\td\web\config\StringNormalizationConfig$StringNormalizationAdvice$1.class
 com\td\web\controllers\v1\DuThaoController.class
 com\td\web\controllers\v1\TongHopController.class
+com\td\web\controllers\v1\VanBanPhapQuyController.class
 com\td\web\controllers\v1\NumberingConfigController.class
+com\td\web\controllers\v1\EditHistoryController.class
 com\td\web\config\FormDataToJsonFilter$JsonBodyWrapper.class
 com\td\web\controllers\v1\ViewQueryController.class
 com\td\web\controllers\v1\DocumentRegistersController.class
@@ -47,6 +50,7 @@ com\td\web\controllers\v1\SharedCoreRoleGroupsController.class
 com\td\web\controllers\v1\CategoriesController.class
 com\td\web\config\FormDataToJsonFilter.class
 com\td\web\config\NormalizeStringDeserializer.class
+com\td\web\controllers\v1\ChiaSeTepController.class
 com\td\web\config\GlobalExceptionHandler.class
 com\td\web\controllers\v1\HoSoCVController.class
 com\td\web\controllers\v1\PlatformTenantsController.class

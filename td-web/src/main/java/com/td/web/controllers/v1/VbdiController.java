@@ -118,6 +118,8 @@ public class VbdiController extends BaseController {
     private final GuiEmailVbdiUseCase guiEmailVbdiUseCase;
     private final GetVbdiDetailUseCase getVbdiDetailUseCase;
     private final ViewQueryService viewQueryService;
+    // 30/10/2026: tra cứu nhóm văn bản đi (thay qlvb/view/query viewaction=group).
+    private final com.td.application.vbdi.VbdiGroupViewQuery vbdiGroupViewQuery;
     private final SendVbdiDocumentUseCase sendVbdiDocumentUseCase;
     private final ListVbdiSendLogUseCase listVbdiSendLogUseCase;
     private final GanVbdiDocumentUseCase ganVbdiDocumentUseCase;
@@ -360,6 +362,9 @@ public class VbdiController extends BaseController {
             + "user_process của vbden")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getView(
             @Valid @RequestBody ViewQueryRequest request) {
+        if (com.td.application.vbdi.VbdiGroupViewQuery.handles(request)) {
+            return ok(vbdiGroupViewQuery.execute(request));
+        }
         return ok(viewQueryService.execute(DB_TYPE, request));
     }
 

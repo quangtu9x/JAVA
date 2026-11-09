@@ -173,6 +173,8 @@ class DuThaoPermissionIntegrationTest {
     @MockBean
     private com.td.application.duthao.DuThaoGroupViewQuery duThaoGroupViewQuery;
     @MockBean
+    private com.td.application.duthao.LienKetVanBanDiXuLyDuThaoUseCase lienKetVanBanDiXuLyDuThaoUseCase;
+    @MockBean
     private ViewQueryService viewQueryService;
 
     @Test

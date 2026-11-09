@@ -141,7 +141,29 @@ Mọi API chỉ áp dụng cho **người đăng nhập** (username + hộp thư
 
 | Use case | Action | Người nhận |
 |---|---|---|
-| `SendVbdiDocumentUseCase` (chỉ các loại gửi, không gồm thu hồi) | `phathanhvanban` | coordinator (username), internal_unit / contact_unit (mã đơn vị). `creator` = đơn vị phát hành |
+| `SendVbdiDocumentUseCase` (chỉ các loại gửi, không gồm thu hồi) | `phathanhvanban` (`databasetype` = `vbdi`) | **chỉ** coordinator (người nhận để biết, username). `creator` = đơn vị phát hành |
+| **td-woker** `VbdiDeliveryTaskHandler` → `IncomingDocumentNotifier` | `vanbanden` (`databasetype` = `vbden`) — FE: "Có văn bản đến mới" | đơn vị nhận internal_unit / contact_unit (mã đơn vị → room `coquan_<mã>`). `docid` = văn bản đến **vừa tạo ở DB đơn vị nhận**, `creator` = đơn vị gửi, `message` = trích yếu |
+
+**Sửa 30/10/2026: thông báo phát hành sai bên nhận.**
+
+- **Lỗi:** trước đây td-web báo cả đơn vị nhận ngay lúc phát hành với `docid` = văn bản **đi** của đơn vị gửi.
+  Bên nhận (ví dụ Sở KH&CN nhận từ SNNMT) thấy thông báo "Văn bản đi"; bấm vào thì lỗi vì id đó không có ở DB
+  của họ.
+- **Cách sửa:** thông báo cho đơn vị nhận giờ do worker phát, sau khi văn bản đến đã commit ở DB đơn vị nhận.
+  - Ghi `user_notifications` trong transaction riêng; tenant chưa có bảng hoặc lỗi thì chỉ log, không làm hỏng
+    việc nhận văn bản.
+  - Chỉ chạy ở lần nhận đầu (theo dedup), nên retry không sinh thông báo trùng.
+  - Worker đọc `REALTIME_SOCKET_*` từ `td-woker/.env`, cấu hình `worker.realtime.*`.
+- **Dữ liệu cũ:** đúng một dòng bị lỗi (`23/GM-SNNMT` ở `h05_01_sokhcn`) đã được sửa tay thành `vanbanden`, trỏ tới
+  văn bản đến `2d1eabde…`.
+
+**Sửa 30/10/2026: đẩy socket thất bại (`HTTP/1.1 header parser received no bytes`).**
+
+- **Nguyên nhân:** `java.net.http.HttpClient` mặc định dùng HTTP/2, nên với `http://` nó gửi `Upgrade: h2c`.
+  engine.io (socket.io) gặp mọi request có `Upgrade` mà không phải websocket thì đóng kết nối, không trả lời.
+- **Hệ quả:** thông báo vẫn lưu được vào hộp thư nhưng không bao giờ đẩy realtime.
+- **Cách sửa:** gateway td-web và notifier của worker đều ép `HttpClient.Version.HTTP_1_1`. Có test hồi quy
+  khẳng định không gửi header `Upgrade`.
 
 ### Văn bản đến
 
@@ -214,6 +236,14 @@ assert.
   - Ngăn thông báo đang mở: các thay đổi được gom 600ms trước khi tải lại.
 - **Kiêm nhiệm:** thông báo của tài khoản kiêm nhiệm vẫn hiện toast nhưng không tính vào hộp thư của tài khoản
   chính, vì API chỉ trả hộp thư của người đăng nhập.
+- **Ẩn theo cấu hình phân hệ (02/11/2026):** `notificationUtils#isNotificationModuleEnabled`. Hiện chỉ áp dụng cho
+  Phiếu trình (`VITE_CONFIG_PHIEUTRINH=false`, dùng chung `isPhieuTrinhEnabled()`). Khi cờ tắt:
+  - ẩn chip lọc "Phiếu trình" và các dòng phiếu trình trong ngăn thông báo;
+  - không toast, không tăng số khi thông báo tới qua socket;
+  - số trên chuông và toast tổng hợp tính lại sau khi đã bỏ nhóm phiếu trình (`inboxStore.refresh`).
+
+  Server vẫn lưu dòng thông báo; bật lại cờ là thấy.
+- **Tab "Chưa đọc" đứng trước "Tất cả"** và là tab mặc định mỗi lần mở ngăn (02/11/2026).
 - **Thông báo quản trị** (`thongbao`, room `coquan_sys`): giữ cơ chế modal và localStorage cũ, hiện ở đầu ngăn.
   Các toast nghiệp vụ cũ còn trong localStorage (`type: "toast"`, trước 27/10) bị bỏ qua.
 

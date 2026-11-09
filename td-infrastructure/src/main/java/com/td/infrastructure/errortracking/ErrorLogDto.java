@@ -28,6 +28,7 @@ public class ErrorLogDto {
     private String message;
     private String stackTrace;
     private String requestBody;
+    private String requestContext;
     private Long durationMs;
 
     static ErrorLogDto from(ErrorLogEntity entity) {
@@ -46,6 +47,7 @@ public class ErrorLogDto {
             .message(entity.getMessage())
             .stackTrace(entity.getStackTrace())
             .requestBody(entity.getRequestBody())
+            .requestContext(entity.getRequestContext())
             .durationMs(entity.getDurationMs())
             .build();
     }

@@ -49,6 +49,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\Role
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\hosocv\HoSoCVProcessDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\phieutrinhtd\PhieuTrinhTdDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\recordsstorage\RecordsStorageCatalog.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vanbanphapquy\VbpqDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\numbering\NumberingCounter.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbdi\VbdiEditHistoryDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbcddh\VbcddhDocument.java
@@ -59,6 +60,7 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\categories\Cate
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\numbering\NumberingConfig.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\AuditCurrentUserHolder.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\duthao\DuThaoDocument.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\chiasetep\ChiaSeTepDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\contracts\AuditableEntityListener.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\documents\DocumentLog.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\common\events\EntityUpdatedEvent.java
@@ -66,5 +68,6 @@ C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\documents\Busin
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\sharedcore\Organization.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\categories\Category.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbden\VbdenEditHistoryDocument.java
+C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\edithistory\EditHistoryDocument.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\documentregister\DocumentRegister.java
 C:\code_projects\HSCV\JAVA\td-domain\src\main\java\com\td\domain\vbdi\VbdiUserActionLog.java

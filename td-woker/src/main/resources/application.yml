@@ -138,6 +138,13 @@ worker:
     socket-timeout: ${WORKER_HTTP_SOCKET_TIMEOUT:120s}
     connection-ttl: ${WORKER_HTTP_CONNECTION_TTL:5m}
 
+  # Thong bao nguoi dung khi tao van ban den o don vi nhan (hop thu user_notifications + day socket.io) - CUNG
+  # server socket voi td-web. base-url GOM /api, rong = chi ghi hop thu (khong day realtime).
+  realtime:
+    enabled: ${REALTIME_SOCKET_ENABLED:true}
+    base-url: ${REALTIME_SOCKET_BASE_URL:}
+    api-key: ${REALTIME_SOCKET_API_KEY:}
+
   # MinIO - chỉ dùng khi handler cần kiểm tra tệp tham chiếu (optional).
   minio:
     enabled: ${MINIO_ENABLED:false}

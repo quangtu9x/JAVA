@@ -81,6 +81,8 @@ class VbdiControllerTest {
     @MockBean
     private GetVbdiDetailUseCase getVbdiDetailUseCase;
     @MockBean
+    private com.td.application.vbdi.VbdiGroupViewQuery vbdiGroupViewQuery;
+    @MockBean
     private ViewQueryService viewQueryService;
     @MockBean
     private SendVbdiDocumentUseCase sendVbdiDocumentUseCase;

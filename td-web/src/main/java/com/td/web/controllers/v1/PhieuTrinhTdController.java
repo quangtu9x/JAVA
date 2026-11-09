@@ -63,6 +63,7 @@ public class PhieuTrinhTdController extends BaseController {
     private final ChuyenTrangThaiPhieuTrinhTdUseCase chuyenTrangThaiPhieuTrinhTdUseCase;
     private final ViewQueryService viewQueryService;
     private final com.td.application.phieutrinhtd.ChoYKienPhieuTrinhTdUseCase choYKienPhieuTrinhTdUseCase;
+    private final com.td.application.phieutrinhtd.GetPhieuTrinhTdAnhChuKyUseCase getPhieuTrinhTdAnhChuKyUseCase;
 
     @PostMapping("/TaoPhieuTrinh")
     @PreAuthorize("isAuthenticated()")
@@ -127,6 +128,16 @@ public class PhieuTrinhTdController extends BaseController {
     public ResponseEntity<ApiResponse<com.td.application.phieutrinhtd.ChuyenTrangThaiPhieuTrinhTdResult>> choYKien(
             @Valid @RequestBody com.td.application.phieutrinhtd.ChoYKienPhieuTrinhTdRequest request) {
         return ok(choYKienPhieuTrinhTdUseCase.execute(request));
+    }
+
+    // 30/10/2026: ảnh chữ ký người liên quan (khối chữ ký ChiTietPage) - thay qlvb/get items=anhkyso + qlvb/getfile.
+    @PostMapping("/AnhChuKy")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Ảnh chữ ký chính của người liên quan phiếu trình",
+        description = "Trả {documentId, fileId,...} (null = chưa gắn ảnh) - tải qua api/v1/identity-documents/{documentId}/files/{fileId}/download")
+    public ResponseEntity<ApiResponse<com.td.application.sharedcore.UserSignatureImageDto>> anhChuKy(
+            @RequestBody com.td.application.phieutrinhtd.GetPhieuTrinhTdAnhChuKyRequest request) {
+        return ok(getPhieuTrinhTdAnhChuKyUseCase.execute(request));
     }
 
     @PostMapping("/GetView")

@@ -116,4 +116,11 @@ public interface VbcddhDocumentRepository extends IRepository<VbcddhDocument> {
      */
     Page<VbcddhDocument> findByAnyFieldContainsMember(
         String documentType, List<String> fieldNames, String member, Pageable pageable);
+
+    /**
+     * 30/10/2026 (cutover FE vbcddh khỏi Domino): lọc tổng quát theo {@link VbcddhListCriteria}
+     * (form, khoá thành viên, field bằng/chứa, khoảng ngày, từ khoá không dấu), mới nhất trước.
+     * Không lấy bản ghi đã xoá mềm ({@code deleted_on}).
+     */
+    Page<VbcddhDocument> findByCriteria(VbcddhListCriteria criteria, Pageable pageable);
 }

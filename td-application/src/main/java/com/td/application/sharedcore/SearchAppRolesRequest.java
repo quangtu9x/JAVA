@@ -11,6 +11,9 @@ public class SearchAppRolesRequest {
     private Boolean isSystemRole;
     private Boolean isActive;
 
+    // 30/10/2026: true = CHỈ vai trò đã xoá mềm (thay Domino form role_Deleted); null/false = như cũ.
+    private Boolean deleted;
+
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
 

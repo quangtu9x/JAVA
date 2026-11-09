@@ -1,6 +1,9 @@
 package com.td.application.hosoluutru;
 
 import com.td.application.common.models.Result;
+import com.td.application.common.security.CurrentUserProvider;
+import com.td.application.sharedcore.AppUserRepository;
+import com.td.domain.sharedcore.AppUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -8,9 +11,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 /**
- * Port module "Hồ sơ lưu trữ" — xoá 1 danh mục dùng chung. Đúng bằng chứng FE thật
- * ({@code danhmuc/ItemsList.jsx:157-163}, {@code deleteoption:"empty"}) — xoá VĨNH VIỄN (hard
- * delete), KHÁC hẳn xoá mềm của hồ sơ/văn bản/phiếu yêu cầu trong cùng module.
+ * Port module "Hồ sơ lưu trữ" — xoá 1 danh mục dùng chung. FE gốc gửi {@code deleteoption:"empty"}
+ * nhưng 30/10/2026 đổi sang XOÁ MỀM (markAsDeleted) theo luật chung "xoá = luôn xoá mềm";
+ * {@code findByDocumentType} đã lọc {@code deleted_on IS NULL} nên danh mục biến khỏi danh sách.
  */
 @Service
 @RequiredArgsConstructor
@@ -20,6 +23,8 @@ public class XoaDanhMucLuuTruUseCase {
     private static final String NOT_FOUND_MESSAGE = "Không tìm thấy danh mục";
 
     private final HoSoLuuTruDanhMucDocumentRepository hoSoLuuTruDanhMucDocumentRepository;
+    private final CurrentUserProvider currentUserProvider;
+    private final AppUserRepository appUserRepository;
 
     public Result<UUID> execute(UUID id) {
         if (id == null) {
@@ -29,7 +34,13 @@ public class XoaDanhMucLuuTruUseCase {
         if (document == null) {
             return Result.failure(NOT_FOUND_MESSAGE);
         }
-        hoSoLuuTruDanhMucDocumentRepository.delete(document);
+        if (!document.isDeleted()) {
+            document.markAsDeleted(currentUserProvider.currentUsername()
+                .flatMap(appUserRepository::findByUsernameAndDeletedOnIsNull)
+                .map(AppUser::getId)
+                .orElse(null));
+            hoSoLuuTruDanhMucDocumentRepository.save(document);
+        }
         return Result.success(id);
     }
 }

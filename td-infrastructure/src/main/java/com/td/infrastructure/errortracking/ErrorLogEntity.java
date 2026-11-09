@@ -75,6 +75,9 @@ public class ErrorLogEntity {
     /** Request body (nếu có, không phải multipart) — đã sanitize + cắt độ dài, xem javadoc class. */
     private String requestBody;
 
+    /** 30/10/2026: JSON ngữ cảnh request (query, trang FE, nơi gọi FE, referer, tham số form/multipart) — đã sanitize, xem ErrorTrackingService#buildRequestContext. */
+    private String requestContext;
+
     /** Thời gian xử lý request (ms) — chỉ có giá trị cho log SYSTEM loại "request chậm". */
     private Long durationMs;
 }

@@ -49,6 +49,10 @@ final class SensitiveDataSanitizer {
         return sanitizeAndTruncate(message, DEFAULT_MESSAGE_MAX_LENGTH);
     }
 
+    static String sanitizeRequestContext(String context) {
+        return sanitizeAndTruncate(context, DEFAULT_REQUEST_BODY_MAX_LENGTH);
+    }
+
     static String sanitizeStackTrace(String stackTrace) {
         return sanitizeAndTruncate(stackTrace, DEFAULT_STACK_TRACE_MAX_LENGTH);
     }

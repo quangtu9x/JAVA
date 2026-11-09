@@ -2,6 +2,14 @@ package com.td.web.controllers.v1;
 
 import com.td.application.common.models.ApiResponse;
 import com.td.application.vbcddh.CapNhatTienDoRequest;
+import com.td.application.vbcddh.DanhSachDonViThucHienUseCase;
+import com.td.application.vbcddh.GetVbcddhChiTietUseCase;
+import com.td.application.vbcddh.LuuVbcddhRequest;
+import com.td.application.vbcddh.LuuVbcddhUseCase;
+import com.td.application.vbcddh.TimKiemVbcddhRequest;
+import com.td.application.vbcddh.TimKiemVbcddhUseCase;
+import com.td.application.vbcddh.VbcddhTrashUseCase;
+import com.td.application.vbcddh.VbcddhViewQuery;
 import com.td.application.vbcddh.CapNhatTienDoUseCase;
 import com.td.application.vbcddh.NhacViecResponseDto;
 import com.td.application.vbcddh.NhacViecUseCase;
@@ -24,6 +32,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -64,6 +73,13 @@ public class VbcddhController extends BaseController {
     private final ThongKeNhiemVuUseCase thongKeNhiemVuUseCase;
     private final NhacViecUseCase nhacViecUseCase;
     private final ViewQueryService viewQueryService;
+    // 30/10/2026 (cutover FE vbcddh khoi Domino qlvb/get|add|delete|restore|search|view/query).
+    private final VbcddhViewQuery vbcddhViewQuery;
+    private final GetVbcddhChiTietUseCase getVbcddhChiTietUseCase;
+    private final LuuVbcddhUseCase luuVbcddhUseCase;
+    private final VbcddhTrashUseCase vbcddhTrashUseCase;
+    private final TimKiemVbcddhUseCase timKiemVbcddhUseCase;
+    private final DanhSachDonViThucHienUseCase danhSachDonViThucHienUseCase;
 
     @PostMapping("/PhanCongNhiemVu")
     @PreAuthorize(PHAN_CONG_ROLES)
@@ -122,6 +138,57 @@ public class VbcddhController extends BaseController {
             + "sinh từ văn bản qlvb gốc, văn bản đi, văn bản đến, hoặc dự thảo)")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getView(
             @Valid @RequestBody ViewQueryRequest request) {
-        return ok(viewQueryService.execute(DB_TYPE, request));
+        // 30/10/2026: qua VbcddhViewQuery ($username$, view moi theo idnhiemvu/idvanban, trang > 200)
+        // truoc khi uy quyen ViewQueryService.
+        return ok(vbcddhViewQuery.execute(request));
+    }
+
+    // ===== 30/10/2026 (cutover FE vbcddh khoi Domino - xem javadoc tung use case) =====
+
+    @PostMapping("/XemChiTiet")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Chi tiết văn bản CĐĐH/nhiệm vụ/tiến độ (thay qlvb/get?databasetype=vbcddh|vbcddh_res)")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> xemChiTiet(@RequestBody Map<String, Object> body) {
+        Object id = body == null ? null : body.get("id");
+        Object items = body == null ? null : body.get("items");
+        return ok(getVbcddhChiTietUseCase.execute(id == null ? null : String.valueOf(id),
+            items == null ? null : String.valueOf(items)));
+    }
+
+    @PostMapping("/Luu")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Tạo/hiệu chỉnh văn bản CĐĐH, nhiệm vụ, vết tiến độ (thay qlvb/add?databasetype=vbcddh|vbcddh_res)")
+    public ResponseEntity<ApiResponse<UUID>> luu(@RequestBody LuuVbcddhRequest request) {
+        return created(luuVbcddhUseCase.execute(request));
+    }
+
+    @PostMapping("/Xoa")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Chuyển vào thùng rác (form=*_Deleted) / xoá mềm nếu đã ở thùng rác (thay qlvb/delete?databasetype=vbcddh)")
+    public ResponseEntity<ApiResponse<List<UUID>>> xoa(@RequestBody List<String> ids) {
+        return ok(vbcddhTrashUseCase.xoa(ids));
+    }
+
+    @PostMapping("/KhoiPhuc")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Phục hồi từ thùng rác (thay qlvb/restore?databasetype=vbcddh)")
+    public ResponseEntity<ApiResponse<List<UUID>>> khoiPhuc(@RequestBody List<String> ids) {
+        return ok(vbcddhTrashUseCase.khoiPhuc(ids));
+    }
+
+    @PostMapping("/TimKiem")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Tìm kiếm nâng cao văn bản CĐĐH/nhiệm vụ (thay qlvb/search?databasetype=vbcddh)")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> timKiem(@RequestBody TimKiemVbcddhRequest request) {
+        return ok(timKiemVbcddhUseCase.execute(request));
+    }
+
+    @PostMapping("/DanhSachDonViThucHien")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Cây đơn vị thực hiện (thay qlvb/vbcddh/danhsachdonvithuchien)")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> danhSachDonViThucHien(
+            @RequestParam(value = "addchildren", defaultValue = "false") boolean addChildren,
+            @RequestParam(value = "addnhansu", defaultValue = "false") boolean addNhanSu) {
+        return ok(danhSachDonViThucHienUseCase.execute(addChildren, addNhanSu));
     }
 }

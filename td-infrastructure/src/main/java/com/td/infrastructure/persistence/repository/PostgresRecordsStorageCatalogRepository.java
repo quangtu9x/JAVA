@@ -45,8 +45,18 @@ public class PostgresRecordsStorageCatalogRepository implements RecordsStorageCa
             .and(keywordFilter(request))
             .and(identifierFilter(request))
             .and(selectedNodeFilter(request))
-            .and(yearFilter(request));
+            .and(yearFilter(request))
+            .and(individualFilter(request));
         return jpa.findAll(spec, pageable);
+    }
+
+    // 30/10/2026: individual_obj (JSON do FE ghi) chứa đúng "<username>" (có dấu nháy, không phân biệt hoa thường).
+    private static Specification<RecordsStorageCatalog> individualFilter(SearchRecordsStorageCatalogsRequest req) {
+        if (req.getIndividualUsername() == null || req.getIndividualUsername().isBlank()) return null;
+        String escaped = req.getIndividualUsername().trim().toLowerCase()
+            .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+        String pattern = "%\"" + escaped + "\"%";
+        return (root, q, cb) -> cb.like(cb.lower(root.get("individualObj")), pattern, '\\');
     }
 
     private static Specification<RecordsStorageCatalog> notDeleted() {

@@ -57,6 +57,9 @@ class PhieuTrinhTdControllerTest {
     // 06/10/2026: dependency moi cua controller (MockBean drift - thieu la sap ca context WebMvcTest).
     @MockBean
     private com.td.application.phieutrinhtd.ChoYKienPhieuTrinhTdUseCase choYKienPhieuTrinhTdUseCase;
+    // 30/10/2026: endpoint AnhChuKy (MockBean drift).
+    @MockBean
+    private com.td.application.phieutrinhtd.GetPhieuTrinhTdAnhChuKyUseCase getPhieuTrinhTdAnhChuKyUseCase;
     @MockBean
     private ViewQueryService viewQueryService;
 

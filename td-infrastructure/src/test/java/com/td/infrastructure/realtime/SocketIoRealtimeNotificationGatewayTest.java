@@ -28,6 +28,7 @@ class SocketIoRealtimeNotificationGatewayTest {
     private final Map<String, String> queriesByPath = new ConcurrentHashMap<>();
     private final List<String> batchBodies = new CopyOnWriteArrayList<>();
     private volatile boolean batchSupported = true;
+    private final List<String> upgradeHeaders = new CopyOnWriteArrayList<>();
     private CountDownLatch received;
 
     @BeforeEach
@@ -41,6 +42,10 @@ class SocketIoRealtimeNotificationGatewayTest {
             received.countDown();
         });
         server.createContext("/api/socket-batch", exchange -> {
+            String upgrade = exchange.getRequestHeaders().getFirst("Upgrade");
+            if (upgrade != null) {
+                upgradeHeaders.add(upgrade);
+            }
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             if (!batchSupported) {
                 respond(exchange, 404);
@@ -89,6 +94,8 @@ class SocketIoRealtimeNotificationGatewayTest {
 
         assertThat(received.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(batchBodies).hasSize(1);
+        // engine.io đóng kết nối khi thấy "Upgrade: h2c" (HttpClient mặc định HTTP_2) - phải gửi HTTP/1.1 thuần.
+        assertThat(upgradeHeaders).isEmpty();
         assertThat(bodiesByPath).isEmpty();
         assertThat(queriesByPath.get("/api/socket-batch")).isEqualTo("api_key=TANDANJSC");
 

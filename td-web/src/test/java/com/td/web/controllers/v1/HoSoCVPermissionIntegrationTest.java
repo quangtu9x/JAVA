@@ -147,6 +147,10 @@ class HoSoCVPermissionIntegrationTest {
     private com.td.application.hosocv.XemVanBanKhacUseCase xemVanBanKhacUseCase;
     @MockBean
     private com.td.application.hosocv.XoaVanBanKhacUseCase xoaVanBanKhacUseCase;
+    @MockBean
+    private com.td.application.hosocv.ThuHoiTrinhDuyetHoSoUseCase thuHoiTrinhDuyetHoSoUseCase;
+    @MockBean
+    private com.td.application.hosocv.GetQuaTrinhHoSoUseCase getQuaTrinhHoSoUseCase;
 
     @Test
     void taoHoSo_withAnyAuthenticatedRole_shouldReturn201() throws Exception {

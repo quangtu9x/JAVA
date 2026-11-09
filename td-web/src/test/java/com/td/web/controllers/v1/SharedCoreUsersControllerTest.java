@@ -16,6 +16,7 @@ import com.td.application.sharedcore.SwitchUserUseCase;
 import com.td.application.sharedcore.TransferAppUsersUseCase;
 import com.td.application.sharedcore.UnlockAppUsersUseCase;
 import com.td.application.sharedcore.UpdateAppUserUseCase;
+import com.td.application.sharedcore.UpdateMyProfileUseCase;
 import com.td.application.sharedcore.UploadUserSignatureImageUseCase;
 import com.td.application.sharedcore.UserOrganizationProfileDto;
 import com.td.application.sharedcore.UserRoleGroupConfigDto;
@@ -65,6 +66,8 @@ class SharedCoreUsersControllerTest {
     private CreateAppUserUseCase createAppUserUseCase;
     @MockBean
     private UpdateAppUserUseCase updateAppUserUseCase;
+    @MockBean
+    private UpdateMyProfileUseCase updateMyProfileUseCase;
     @MockBean
     private DeleteAppUserUseCase deleteAppUserUseCase;
     @MockBean

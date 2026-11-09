@@ -277,8 +277,12 @@ public class SendVbdiDocumentUseCase {
     }
 
     /**
-     * SendDocument.java#gui_thong_bao_cho_noi_nhan: báo người nhận để biết (username) + văn thư đơn vị nội bộ /
-     * cơ quan liên hệ (mã định danh -> room coquan_<mã>) vừa được gửi. Người gửi hiển thị = đơn vị phát hành.
+     * SendDocument.java#gui_thong_bao_cho_noi_nhan: báo NGƯỜI NHẬN ĐỂ BIẾT (coordinator, cùng đơn vị - xem văn bản đi
+     * này). Người gửi hiển thị = đơn vị phát hành.
+     *
+     * <p>30/10/2026: KHÔNG báo đơn vị nội bộ/cơ quan liên hệ ở đây nữa - trước đây docid = văn bản ĐI của đơn vị gửi
+     * nên phía nhận thấy "Văn bản đi" và bấm vào lỗi (id không có ở DB đơn vị nhận). Thông báo "Văn bản đến mới"
+     * do td-woker phát sau khi tạo văn bản đến ở DB đơn vị nhận (IncomingDocumentNotifier, vbdi.delivery).</p>
      */
     private void notifyRecipients(VbdiDocument document, Map<String, List<VbdiSendRecipientRequest>> written) {
         Map<String, Object> fields = dynamicDocumentFieldsService.parseDynamicFields(document.getDynamicFieldsJson());
@@ -288,15 +292,9 @@ public class SendVbdiDocumentUseCase {
         if (unitPublish != null && !String.valueOf(unitPublish).isBlank()) {
             notification.creator(String.valueOf(unitPublish));
         }
-        written.forEach((group, recipients) -> {
-            if (VbdiSendRecipientGroup.EXTERNAL_UNIT.equals(group)) {
-                return;
-            }
-            for (VbdiSendRecipientRequest recipient : recipients) {
-                notification.to(VbdiSendRecipientGroup.COORDINATOR.equals(group)
-                    ? recipient.getUsername() : recipient.getIdentifier());
-            }
-        });
+        for (VbdiSendRecipientRequest recipient : written.getOrDefault(VbdiSendRecipientGroup.COORDINATOR, List.of())) {
+            notification.to(recipient.getUsername());
+        }
         realtimeNotifier.notify(notification);
     }
 

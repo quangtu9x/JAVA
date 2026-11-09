@@ -74,12 +74,12 @@ public class TrinhDuyetHoSoUseCase {
         documentCacheService.evictAllListCaches();
         documentLogService.logUpdate(saved.getId(), before, buildSnapshot(saved));
 
-        appendProcessRecord(saved.getId(), request.getGhiChu(), actingUsername);
+        appendProcessRecord(saved.getId(), request.getGhiChu(), actingUsername, request.getNguoiDuyet());
 
         return Result.success(saved.getId());
     }
 
-    private void appendProcessRecord(UUID hosocvId, String ghiChu, String actingUsername) {
+    private void appendProcessRecord(UUID hosocvId, String ghiChu, String actingUsername, String nguoiDuyet) {
         try {
             var processRequest = new AddDynamicDocumentRequest();
             processRequest.setTitle("Trình duyệt hồ sơ công việc");
@@ -87,6 +87,10 @@ public class TrinhDuyetHoSoUseCase {
             processFields.put("hosocv_id", hosocvId.toString());
             processFields.put("process_type", PROCESS_TYPE_TRINH_DUYET);
             processFields.put("creator", actingUsername);
+            // 30/10/2026: người nhận cho panel "Quá trình duyệt" (GetQuaTrinhHoSoUseCase).
+            if (nguoiDuyet != null && !nguoiDuyet.isBlank()) {
+                processFields.put("receiver_username", nguoiDuyet.trim());
+            }
             if (ghiChu != null && !ghiChu.isBlank()) {
                 processFields.put("note", ghiChu);
             }

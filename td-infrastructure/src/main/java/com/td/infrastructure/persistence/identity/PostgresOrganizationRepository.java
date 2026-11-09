@@ -67,8 +67,18 @@ public class PostgresOrganizationRepository implements OrganizationRepository {
             .and(keywordFilter(request))
             .and(parentFilter(request))
             .and(levelFilter(request))
-            .and(activeFilter(request));
+            .and(activeFilter(request))
+            .and(formFilter(request));
         return jpa.findAll(spec, pageable);
+    }
+
+    // 30/10/2026: lọc theo loại node (cột node_type, không phân biệt hoa thường).
+    private static Specification<Organization> formFilter(SearchOrganizationsRequest req) {
+        if (req.getForm() == null || req.getForm().isBlank()) {
+            return null;
+        }
+        String form = req.getForm().trim().toLowerCase(java.util.Locale.ROOT);
+        return (root, q, cb) -> cb.equal(cb.lower(root.get("nodeType")), form);
     }
 
     private static Specification<Organization> notDeleted() {

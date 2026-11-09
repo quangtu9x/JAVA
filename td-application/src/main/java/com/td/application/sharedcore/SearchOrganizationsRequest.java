@@ -14,6 +14,10 @@ public class SearchOrganizationsRequest {
     private Integer level;
     private Boolean isActive;
 
+    // 30/10/2026: lọc theo loại node (agency_level/agency/unit/department) — màn quản trị Cấp cơ quan/
+    // Cơ quan/Đơn vị thay Domino qlvb/search search:{form}. null/rỗng = không lọc.
+    private String form;
+
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
 

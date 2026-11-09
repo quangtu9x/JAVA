@@ -91,6 +91,83 @@ public class PostgresHoSoLuuTruDocumentRepository implements HoSoLuuTruDocumentR
         return executeQuery(sql, parameters, pageable, "d.deleted_on DESC NULLS LAST");
     }
 
+    // 30/10/2026: tim kiem nang cao ho so luu tru (thay qlvb/search) - so khop khong dau td_search_norm.
+    @Override
+    public Page<HoSoLuuTruDocument> search(
+            String documentType,
+            List<String> scopeFieldNames, String scopeValue,
+            Map<String, String> containsFields,
+            Map<String, String> exactFields,
+            String keyword, List<String> keywordFields,
+            String dateField, java.time.LocalDate dateFrom, java.time.LocalDate dateTo,
+            Pageable pageable) {
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM hosoluutru_documents d
+            WHERE d.deleted_on IS NULL
+            """);
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        if (scopeFieldNames != null && !scopeFieldNames.isEmpty()) {
+            appendAnyFieldContainsPredicate(sql, parameters, scopeFieldNames, scopeValue);
+        }
+        int index = 0;
+        if (containsFields != null) {
+            for (Map.Entry<String, String> entry : containsFields.entrySet()) {
+                if (entry.getValue() == null || entry.getValue().isBlank()) {
+                    continue;
+                }
+                String field = KeywordSql.requireSafeFieldName(entry.getKey());
+                String param = "searchContains" + (index++);
+                // "title" co the chi nam o cot title (khong co trong dynamic_fields).
+                String column = "title".equals(field)
+                    ? "COALESCE(d.dynamic_fields->>'title', d.title, '')"
+                    : "COALESCE(d.dynamic_fields->>'" + field + "', '')";
+                sql.append(" AND ").append(SearchTextSql.norm(column))
+                    .append(" LIKE :").append(param);
+                parameters.put(param, SearchTextSql.containsLike(entry.getValue()));
+            }
+        }
+        if (exactFields != null) {
+            for (Map.Entry<String, String> entry : exactFields.entrySet()) {
+                if (entry.getValue() == null || entry.getValue().isBlank()) {
+                    continue;
+                }
+                String field = KeywordSql.requireSafeFieldName(entry.getKey());
+                String param = "searchExact" + (index++);
+                sql.append(" AND LOWER(TRIM(COALESCE(d.dynamic_fields->>'").append(field).append("', ''))) = :")
+                    .append(param);
+                parameters.put(param, entry.getValue().trim().toLowerCase());
+            }
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            sql.append(" AND (").append(SearchTextSql.norm("COALESCE(d.title, '')")).append(" LIKE :searchKeyword");
+            if (keywordFields != null) {
+                for (String rawField : keywordFields) {
+                    String field = KeywordSql.requireSafeFieldName(rawField);
+                    sql.append(" OR ").append(SearchTextSql.norm("COALESCE(d.dynamic_fields->>'" + field + "', '')"))
+                        .append(" LIKE :searchKeyword");
+                }
+            }
+            sql.append(")");
+            parameters.put("searchKeyword", SearchTextSql.containsLike(keyword));
+        }
+        if (dateField != null && !dateField.isBlank() && (dateFrom != null || dateTo != null)) {
+            String field = KeywordSql.requireSafeFieldName(dateField);
+            String dateExpr = "(CASE WHEN COALESCE(d.dynamic_fields->>'" + field + "', '') ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}'"
+                + " THEN to_date(substr(d.dynamic_fields->>'" + field + "', 1, 10), 'DD/MM/YYYY') END)";
+            if (dateFrom != null) {
+                sql.append(" AND ").append(dateExpr).append(" >= :searchDateFrom");
+                parameters.put("searchDateFrom", dateFrom);
+            }
+            if (dateTo != null) {
+                sql.append(" AND ").append(dateExpr).append(" <= :searchDateTo");
+                parameters.put("searchDateTo", dateTo);
+            }
+        }
+        appendDocumentTypeFilter(sql, parameters, documentType);
+        return executeQuery(sql, parameters, pageable, "d.created_on DESC");
+    }
+
     // ---- helpers (copy tu PostgresHoSoCVDocumentRepository, chi doi ten bang) ----
 
     private Page<HoSoLuuTruDocument> executeQuery(

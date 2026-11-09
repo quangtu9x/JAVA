@@ -93,6 +93,15 @@ class HoSoLuuTruControllerTest {
     private ThuHoiHoSoDaChoMuonUseCase thuHoiHoSoDaChoMuonUseCase;
     @MockBean
     private ViewQueryService viewQueryService;
+    // 30/10/2026: 4 use case mới của controller (cutover qlvb/get|delete|view/query|search).
+    @MockBean
+    private com.td.application.hosoluutru.XemTaiLieuLuuTruUseCase xemTaiLieuLuuTruUseCase;
+    @MockBean
+    private com.td.application.hosoluutru.DanhSachTaiLieuLuuTruUseCase danhSachTaiLieuLuuTruUseCase;
+    @MockBean
+    private com.td.application.hosoluutru.XoaTaiLieuLuuTruUseCase xoaTaiLieuLuuTruUseCase;
+    @MockBean
+    private com.td.application.hosoluutru.TimKiemHoSoLuuTruUseCase timKiemHoSoLuuTruUseCase;
 
     @Test
     void xemChiTiet_shouldDelegateAndReturn200() throws Exception {

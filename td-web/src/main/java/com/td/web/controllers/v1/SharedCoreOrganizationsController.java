@@ -73,9 +73,12 @@ public class SharedCoreOrganizationsController extends BaseController {
             @RequestParam(name = "keyword", required = false) String keyword,
             @RequestParam(name = "parentId", required = false) UUID parentId,
             @RequestParam(name = "level", required = false) Integer level,
-            @RequestParam(name = "isActive", required = false) Boolean isActive) {
+            @RequestParam(name = "isActive", required = false) Boolean isActive,
+            // 30/10/2026: agency_level/agency/unit/department (màn quản trị Cấp cơ quan/Cơ quan/Đơn vị).
+            @RequestParam(name = "form", required = false) String form) {
 
         var request = new SearchOrganizationsRequest();
+        request.setForm(form);
         request.setPageNumber(pageNumber);
         request.setPageSize(pageSize);
         request.setSortBy(sortBy);

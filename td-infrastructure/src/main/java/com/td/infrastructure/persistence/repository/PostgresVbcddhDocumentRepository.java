@@ -2,6 +2,7 @@ package com.td.infrastructure.persistence.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.td.application.vbcddh.VbcddhDocumentRepository;
+import com.td.application.vbcddh.VbcddhListCriteria;
 import com.td.domain.vbcddh.VbcddhDocument;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -189,6 +190,92 @@ public class PostgresVbcddhDocumentRepository implements VbcddhDocumentRepositor
     // (NhiemVuItemsList.jsx/ItemsList.jsx) LUON .toUpperCase() khoa truoc khi gui, xem javadoc
     // VbcddhDocumentRepository#findByFormAndAnyFieldContainsMember) - boc them ";" 2 dau field/gia
     // tri tim de tranh khop nham chuoi con.
+    // 30/10/2026 (cutover FE vbcddh khoi Domino qlvb/search|view/query): loc tong quat - ten field
+    // client gui (contains/dateRanges/equals) di qua THAM SO (dynamic_fields->>:kN), khong ghep chuoi.
+    @Override
+    public Page<VbcddhDocument> findByCriteria(VbcddhListCriteria criteria, Pageable pageable) {
+        VbcddhListCriteria c = criteria == null ? VbcddhListCriteria.builder().build() : criteria;
+        StringBuilder sql = new StringBuilder("""
+            SELECT d.*
+            FROM vbcddh_documents d
+            WHERE d.deleted_on IS NULL
+            """);
+        Map<String, Object> parameters = new LinkedHashMap<>();
+        appendDocumentTypeFilter(sql, parameters, c.getDocumentType());
+
+        if (c.getForms() != null && !c.getForms().isEmpty()) {
+            sql.append(" AND COALESCE(d.dynamic_fields->>'form', '') IN (:forms)");
+            parameters.put("forms", c.getForms());
+        }
+        if (c.getMemberFields() != null && !c.getMemberFields().isEmpty()) {
+            sql.append(" AND (");
+            appendAnyFieldContainsMemberOr(sql, parameters, c.getMemberFields(), c.getMember());
+            sql.append(")");
+        }
+        int index = 0;
+        if (c.getEqualsIgnoreCase() != null) {
+            for (Map.Entry<String, String> entry : c.getEqualsIgnoreCase().entrySet()) {
+                String k = "ek" + index;
+                String v = "ev" + index;
+                sql.append(" AND UPPER(TRIM(COALESCE(d.dynamic_fields->>CAST(:").append(k)
+                    .append(" AS text), ''))) = UPPER(TRIM(:").append(v).append("))");
+                parameters.put(k, entry.getKey());
+                parameters.put(v, entry.getValue() == null ? "" : entry.getValue());
+                index++;
+            }
+        }
+        if (c.getContains() != null) {
+            for (Map.Entry<String, String> entry : c.getContains().entrySet()) {
+                if (entry.getValue() == null || entry.getValue().isBlank()) {
+                    continue;
+                }
+                String k = "ck" + index;
+                String v = "cv" + index;
+                sql.append(" AND ").append(SearchTextSql.norm("COALESCE(d.dynamic_fields->>CAST(:" + k + " AS text), '')"))
+                    .append(" LIKE :").append(v);
+                parameters.put(k, entry.getKey());
+                parameters.put(v, SearchTextSql.containsLike(entry.getValue()));
+                index++;
+            }
+        }
+        if (c.getDateRanges() != null) {
+            for (Map.Entry<String, String[]> entry : c.getDateRanges().entrySet()) {
+                String[] range = entry.getValue();
+                if (range == null || range.length < 2 || isBlank(range[0]) || isBlank(range[1])) {
+                    continue;
+                }
+                String k = "dk" + index;
+                String expr = "SUBSTRING(COALESCE(d.dynamic_fields->>CAST(:" + k + " AS text), '') FROM 1 FOR 10)";
+                sql.append(" AND ").append(expr).append(" ~ '^[0-9]{2}/[0-9]{2}/[0-9]{4}$'")
+                    .append(" AND TO_DATE(").append(expr).append(", 'DD/MM/YYYY') BETWEEN TO_DATE(:df").append(index)
+                    .append(", 'DD/MM/YYYY') AND TO_DATE(:dt").append(index).append(", 'DD/MM/YYYY')");
+                parameters.put(k, entry.getKey());
+                parameters.put("df" + index, range[0].trim());
+                parameters.put("dt" + index, range[1].trim());
+                index++;
+            }
+        }
+        if (!isBlank(c.getKeyword())) {
+            sql.append(" AND (").append(SearchTextSql.norm("COALESCE(d.title, '')")).append(" LIKE :kw");
+            List<String> keywordFields = c.getKeywordFields() == null ? List.of() : c.getKeywordFields();
+            for (int i = 0; i < keywordFields.size(); i++) {
+                String k = "kwf" + i;
+                sql.append(" OR ").append(SearchTextSql.norm("COALESCE(d.dynamic_fields->>CAST(:" + k + " AS text), '')"))
+                    .append(" LIKE :kw");
+                parameters.put(k, keywordFields.get(i));
+            }
+            sql.append(")");
+            parameters.put("kw", SearchTextSql.containsLike(c.getKeyword()));
+        }
+        appendExtraPredicate(sql, c.getExtraPredicateSql());
+
+        return executeQuery(sql, parameters, pageable);
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
     private void appendAnyFieldContainsMemberOr(
             StringBuilder sql, Map<String, Object> parameters, List<String> fieldNames, String member) {
         for (int index = 0; index < fieldNames.size(); index++) {
@@ -220,7 +307,9 @@ public class PostgresVbcddhDocumentRepository implements VbcddhDocumentRepositor
     private Page<VbcddhDocument> executeQuery(StringBuilder sql, Map<String, Object> parameters, Pageable pageable) {
         long total = countNative(sql.toString(), parameters);
 
-        sql.append(" ORDER BY d.created_on ASC NULLS LAST LIMIT :limit OFFSET :offset");
+        // 30/10/2026 (cutover FE vbcddh): mới nhất trước - FE luôn gửi orderBy createdOn DESC (kể cả
+        // các truy vấn "lấy bản tiến độ/kết quả cuối" pageSize=1).
+        sql.append(" ORDER BY d.created_on DESC NULLS LAST LIMIT :limit OFFSET :offset");
         Query query = entityManager.createNativeQuery(sql.toString(), VbcddhDocument.class);
         parameters.forEach(query::setParameter);
         query.setParameter("limit", pageable.getPageSize());

@@ -30,6 +30,12 @@ import com.td.application.hosoluutru.TiepNhanHoSoLuuTruUseCase;
 import com.td.application.hosoluutru.TraLaiHoSoLuuTruUseCase;
 import com.td.application.hosoluutru.TraTaiLieuUseCase;
 import com.td.application.hosoluutru.XoaDanhMucLuuTruUseCase;
+import com.td.application.hosoluutru.DanhSachTaiLieuLuuTruRequest;
+import com.td.application.hosoluutru.DanhSachTaiLieuLuuTruUseCase;
+import com.td.application.hosoluutru.TimKiemHoSoLuuTruRequest;
+import com.td.application.hosoluutru.TimKiemHoSoLuuTruUseCase;
+import com.td.application.hosoluutru.XemTaiLieuLuuTruUseCase;
+import com.td.application.hosoluutru.XoaTaiLieuLuuTruUseCase;
 import com.td.application.viewquery.ViewQueryRequest;
 import com.td.application.viewquery.ViewQueryService;
 import com.td.web.controllers.BaseController;
@@ -96,6 +102,11 @@ public class HoSoLuuTruController extends BaseController {
     private final TraTaiLieuUseCase traTaiLieuUseCase;
     private final ThuHoiHoSoDaChoMuonUseCase thuHoiHoSoDaChoMuonUseCase;
     private final ViewQueryService viewQueryService;
+    // 30/10/2026: cutover các lệnh qlvb/get|delete|view/query|search còn lại của FE hosoluutru.
+    private final XemTaiLieuLuuTruUseCase xemTaiLieuLuuTruUseCase;
+    private final DanhSachTaiLieuLuuTruUseCase danhSachTaiLieuLuuTruUseCase;
+    private final XoaTaiLieuLuuTruUseCase xoaTaiLieuLuuTruUseCase;
+    private final TimKiemHoSoLuuTruUseCase timKiemHoSoLuuTruUseCase;
 
     @PostMapping("/XemChiTiet")
     @PreAuthorize("isAuthenticated()")
@@ -248,5 +259,47 @@ public class HoSoLuuTruController extends BaseController {
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> getView(
             @Valid @RequestBody ViewQueryRequest request) {
         return ok(viewQueryService.execute(DB_TYPE, request));
+    }
+
+    @PostMapping("/XemTaiLieu")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xem 1 bản ghi bất kỳ của module (30/10/2026)",
+        description = "Thay qlvb/get?databasetype=hosoluutru — tra văn bản con/phiếu yêu cầu/danh mục/hồ sơ/vết; kèm files")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> xemTaiLieu(@RequestBody GetHoSoLuuTruChiTietRequest request) {
+        return ok(xemTaiLieuLuuTruUseCase.execute(request));
+    }
+
+    @PostMapping("/DanhSachVanBan")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Danh sách văn bản con của hồ sơ lưu trữ (30/10/2026)",
+        description = "Thay qlvb/view/query viewname vanban_by_hoso_id — từ khoá không dấu + phân trang + files")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> danhSachVanBan(
+            @RequestBody DanhSachTaiLieuLuuTruRequest request) {
+        return ok(danhSachTaiLieuLuuTruUseCase.danhSachVanBan(request));
+    }
+
+    @PostMapping("/QuaTrinh")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Vết quá trình của hồ sơ lưu trữ (30/10/2026)",
+        description = "Thay qlvb/view/query?databasetype=hosoluutru_res — loai=chuyenltls|quatrinh")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> quaTrinh(
+            @RequestBody DanhSachTaiLieuLuuTruRequest request) {
+        return ok(danhSachTaiLieuLuuTruUseCase.quaTrinh(request));
+    }
+
+    @PostMapping("/XoaTaiLieu")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Xoá mềm văn bản con/phiếu yêu cầu/vết quá trình (30/10/2026)",
+        description = "Thay qlvb/delete?databasetype=hosoluutru cho bản ghi con — chỉ xoá mềm")
+    public ResponseEntity<ApiResponse<List<UUID>>> xoaTaiLieu(@RequestBody List<UUID> ids) {
+        return ok(xoaTaiLieuLuuTruUseCase.execute(ids));
+    }
+
+    @PostMapping("/TimKiem")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Tìm kiếm nâng cao hồ sơ lưu trữ (30/10/2026)",
+        description = "Thay qlvb/search?databasetype=hosoluutru — đọc các ô form CollapseHoSoLuuTru")
+    public ResponseEntity<ApiResponse<List<Map<String, Object>>>> timKiem(@RequestBody TimKiemHoSoLuuTruRequest request) {
+        return ok(timKiemHoSoLuuTruUseCase.execute(request));
     }
 }

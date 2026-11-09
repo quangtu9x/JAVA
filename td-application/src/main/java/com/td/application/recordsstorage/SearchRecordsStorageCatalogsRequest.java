@@ -16,6 +16,9 @@ public class SearchRecordsStorageCatalogsRequest {
     // `danhmuchoso_by_identifier_demuchoso_id` lọc theo 1 id bất kể id đó thuộc cấp nào).
     private UUID selectedNodeId;
     private Integer yearInception;
+    // 30/10/2026: danh mục hồ sơ "cá nhân" — individual_obj chứa "<username>" (thay Domino
+    // [individual_obj] CONTAINS ở hosocv DMHSCanNhanItemsList/SubFormDanhMucHoSo).
+    private String individualUsername;
 
     @Min(value = 0, message = "Page number phải >= 0")
     private int pageNumber = 0;
